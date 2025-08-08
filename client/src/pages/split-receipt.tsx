@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Receipt, Check } from "lucide-react";
-import oneTapLogo from "@assets/2C508BEA-D169-4FDB-A1F9-0F6E333C1A18_1754620280792.png";
+import receiptifyLogo from "@assets/Screenshot 2025-08-08 at 05.45.22_1754621466675.png";
 
 // Different views based on URL parameters or state
 type SplitView = 'shared' | 'confirmation' | 'received' | 'original';
@@ -47,7 +47,7 @@ export default function SplitReceipt() {
       {/* Header with logo */}
       <div className="bg-green-50 px-6 py-6 text-center">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <img src={oneTapLogo} alt="OneTap Receipts" className="w-10 h-10" />
+          <img src={receiptifyLogo} alt="Receiptify" className="w-10 h-10" />
           <h1 className="text-2xl font-bold text-green-800">Receiptify</h1>
         </div>
         <h2 className="text-xl text-green-700">Shared with {sharedReceiptData.sharedWith}</h2>
@@ -103,7 +103,7 @@ export default function SplitReceipt() {
       <div className="px-6 py-12">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <img src={oneTapLogo} alt="OneTap Receipts" className="w-12 h-12" />
+            <img src={receiptifyLogo} alt="Receiptify" className="w-12 h-12" />
             <h1 className="text-2xl font-bold text-green-800">Receiptify</h1>
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function SplitReceipt() {
     <div className="min-h-screen bg-green-50 pb-24">
       <div className="px-6 py-6">
         <div className="flex items-center justify-center gap-3 mb-6">
-          <img src={oneTapLogo} alt="OneTap Receipts" className="w-10 h-10" />
+          <img src={receiptifyLogo} alt="Receiptify" className="w-10 h-10" />
           <h1 className="text-2xl font-bold text-green-800">Receiptify</h1>
         </div>
 

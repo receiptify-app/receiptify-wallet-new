@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
+import AppHeader from "@/components/app-header";
 
 // Sample data to match the design
 const spendingData = [
@@ -44,13 +45,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100">
-        <h1 className="text-2xl font-bold text-gray-900">OneTap</h1>
-        <Button variant="ghost" size="sm">
-          <Menu className="h-5 w-5 text-gray-600" />
-        </Button>
-      </div>
+      <AppHeader />
 
       <div className="px-6 py-4 space-y-6">
         {/* Spending Summary */}

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Search, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import AppHeader from "@/components/app-header";
 import logoSrc from "@assets/2C508BEA-D169-4FDB-A1F9-0F6E333C1A18_1754620280792.png";
 
 interface Subscription {
@@ -64,6 +66,7 @@ const sampleSubscriptions = [
 export default function Subscriptions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: subscriptions = sampleSubscriptions, isLoading } = useQuery({
     queryKey: ["/api/subscriptions"],
