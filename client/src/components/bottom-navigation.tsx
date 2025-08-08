@@ -6,15 +6,17 @@ import {
   CreditCard, 
   Leaf, 
   MapPin,
-  User 
+  User,
+  RefreshCw,
+  Shield
 } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: Home, label: "Home" },
   { path: "/scan", icon: QrCode, label: "Scan" },
   { path: "/cards", icon: CreditCard, label: "Cards" },
-  { path: "/eco", icon: Leaf, label: "Eco" },
-  { path: "/map", icon: MapPin, label: "Map" },
+  { path: "/subscriptions", icon: RefreshCw, label: "Subs" },
+  { path: "/warranties", icon: Shield, label: "Warranty" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
 

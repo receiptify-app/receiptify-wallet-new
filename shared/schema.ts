@@ -5,10 +5,20 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
+  username: text("username").unique(),
   email: text("email"),
   phone: text("phone"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  profileImageUrl: text("profile_image_url"),
+  authProvider: text("auth_provider").default("local"), // local, google, apple, facebook, phone
+  providerId: text("provider_id"), // External provider user ID
+  phoneVerified: boolean("phone_verified").default(false),
+  emailVerified: boolean("email_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const merchants = pgTable("merchants", {
@@ -63,23 +73,50 @@ export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   merchantName: text("merchant_name").notNull(),
+  serviceName: text("service_name").notNull(), // Netflix, Spotify, etc.
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   frequency: text("frequency").notNull(), // monthly, weekly, yearly
   nextDate: timestamp("next_date"),
+  lastChargedDate: timestamp("last_charged_date"),
+  isPaused: boolean("is_paused").default(false),
   isActive: boolean("is_active").default(true),
+  status: text("status").default("active"), // active, paused, cancelled
+  cancellationUrl: text("cancellation_url"),
+  manageUrl: text("manage_url"),
+  category: text("category"), // Entertainment, Fitness, Software, etc.
+  description: text("description"),
   lastReceiptId: varchar("last_receipt_id"),
+  autoDetected: boolean("auto_detected").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const warranties = pgTable("warranties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  receiptId: varchar("receipt_id").notNull(),
+  receiptId: varchar("receipt_id"),
   productName: text("product_name").notNull(),
+  brand: text("brand"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
   purchaseDate: timestamp("purchase_date").notNull(),
-  expiryDate: timestamp("expiry_date").notNull(),
-  warrantyPeriod: integer("warranty_period"), // months
-  claimCode: text("claim_code"),
+  warrantyStartDate: timestamp("warranty_start_date").notNull(),
+  warrantyEndDate: timestamp("warranty_end_date").notNull(),
+  warrantyPeriodMonths: integer("warranty_period_months").notNull(),
+  warrantyType: text("warranty_type").default("manufacturer"), // manufacturer, extended, store
+  retailerName: text("retailer_name").notNull(),
+  retailerContact: text("retailer_contact"),
+  retailerWebsite: text("retailer_website"),
+  retailerSupportEmail: text("retailer_support_email"),
+  retailerSupportPhone: text("retailer_support_phone"),
+  invoiceNumber: text("invoice_number"),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  category: text("category"), // Electronics, Appliances, etc.
+  description: text("description"),
+  warrantyTerms: text("warranty_terms"),
+  claimInstructions: text("claim_instructions"),
   isActive: boolean("is_active").default(true),
+  reminderSent: boolean("reminder_sent").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const ecoMetrics = pgTable("eco_metrics", {
@@ -112,11 +149,88 @@ export const splits = pgTable("splits", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Session storage table for authentication
+export const sessions = pgTable("sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
+// OTP verification table for phone/SMS authentication
+export const otpVerifications = pgTable("otp_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull(),
+  email: text("email"),
+  otpCode: text("otp_code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isVerified: boolean("is_verified").default(false),
+  attempts: integer("attempts").default(0),
+  method: text("method").default("sms"), // sms, ussd, email
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Kiosk integration table for in-store scanning
+export const kioskSessions = pgTable("kiosk_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  storeId: text("store_id").notNull(),
+  userId: varchar("user_id"),
+  phoneNumber: text("phone_number").notNull(),
+  qrCode: text("qr_code").notNull(),
+  pointsEarned: integer("points_earned").default(0),
+  receiptId: varchar("receipt_id"),
+  status: text("status").default("pending"), // pending, completed, expired
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Warranty claims table for tracking warranty claims
+export const warrantyClaims = pgTable("warranty_claims", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  warrantyId: varchar("warranty_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  claimType: text("claim_type").notNull(), // repair, replacement, refund
+  issueDescription: text("issue_description").notNull(),
+  claimDate: timestamp("claim_date").defaultNow(),
+  status: text("status").default("submitted"), // submitted, in_progress, approved, denied, completed
+  claimNumber: text("claim_number"),
+  retailerResponse: text("retailer_response"),
+  resolutionDate: timestamp("resolution_date"),
+  resolutionDetails: text("resolution_details"),
+  attachments: text("attachments").array(), // image URLs
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  email: true,
-  phone: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+});
+
+export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWarrantySchema = createInsertSchema(warranties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWarrantyClaimSchema = createInsertSchema(warrantyClaims).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKioskSessionSchema = createInsertSchema(kioskSessions).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
@@ -133,14 +247,6 @@ export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({
 });
 
 export const insertLoyaltyCardSchema = createInsertSchema(loyaltyCards).omit({
-  id: true,
-});
-
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
-  id: true,
-});
-
-export const insertWarrantySchema = createInsertSchema(warranties).omit({
   id: true,
 });
 
@@ -188,3 +294,12 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 
 export type Split = typeof splits.$inferSelect;
 export type InsertSplit = z.infer<typeof insertSplitSchema>;
+
+export type OtpVerification = typeof otpVerifications.$inferSelect;
+export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
+
+export type KioskSession = typeof kioskSessions.$inferSelect;
+export type InsertKioskSession = z.infer<typeof insertKioskSessionSchema>;
+
+export type WarrantyClaim = typeof warrantyClaims.$inferSelect;
+export type InsertWarrantyClaim = z.infer<typeof insertWarrantyClaimSchema>;

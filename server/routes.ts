@@ -8,7 +8,11 @@ import {
   insertSplitSchema,
   insertLoyaltyCardSchema,
   insertSubscriptionSchema,
-  insertWarrantySchema
+  insertWarrantySchema,
+  insertUserSchema,
+  insertOtpVerificationSchema,
+  insertKioskSessionSchema,
+  insertWarrantyClaimSchema,
 } from "@shared/schema";
 import multer from "multer";
 
@@ -422,6 +426,255 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(split);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create split: " + error.message });
+    }
+  });
+
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      
+      if (existingUser) {
+        return res.status(409).json({ error: "User already exists" });
+      }
+      
+      const user = await storage.createUser(validatedData);
+      res.status(201).json({ user: { id: user.id, email: user.email, username: user.username } });
+    } catch (error) {
+      console.error("Error registering user:", error);
+      res.status(400).json({ error: "Failed to register user" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, phone, authProvider, providerId } = req.body;
+      
+      let user;
+      if (authProvider && providerId) {
+        user = await storage.getUserByProviderId(authProvider, providerId);
+      } else if (email) {
+        user = await storage.getUserByEmail(email);
+      } else if (phone) {
+        user = await storage.getUserByPhone(phone);
+      }
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      res.json({ user: { id: user.id, email: user.email, username: user.username } });
+    } catch (error) {
+      console.error("Error logging in user:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  // OTP verification routes
+  app.post("/api/auth/send-otp", async (req, res) => {
+    try {
+      const { phoneNumber, method = "sms" } = req.body;
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      
+      const otp = await storage.createOtpVerification({
+        phoneNumber,
+        otpCode,
+        expiresAt,
+        method,
+      });
+      
+      // In production, integrate with SMS service like Twilio or SendGrid
+      console.log(`OTP for ${phoneNumber}: ${otpCode}`);
+      
+      res.json({ message: "OTP sent successfully", otpId: otp.id });
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { phoneNumber, otpCode } = req.body;
+      const verification = await storage.getOtpVerification(phoneNumber, otpCode);
+      
+      if (!verification) {
+        return res.status(400).json({ error: "Invalid OTP" });
+      }
+      
+      if (verification.expiresAt < new Date()) {
+        return res.status(400).json({ error: "OTP expired" });
+      }
+      
+      await storage.updateOtpVerification(verification.id, { isVerified: true });
+      
+      // Create or find user
+      let user = await storage.getUserByPhone(phoneNumber);
+      if (!user) {
+        user = await storage.createUser({
+          phone: phoneNumber,
+          phoneVerified: true,
+          authProvider: "phone",
+        });
+      } else {
+        await storage.updateUser(user.id, { phoneVerified: true });
+      }
+      
+      res.json({ user: { id: user.id, phone: user.phone }, verified: true });
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      res.status(500).json({ error: "Failed to verify OTP" });
+    }
+  });
+
+  // Enhanced subscription routes
+  app.get("/api/subscriptions", async (req, res) => {
+    try {
+      const subscriptions = await storage.getSubscriptions(defaultUserId);
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch subscriptions" });
+    }
+  });
+
+  app.post("/api/subscriptions/detect", async (req, res) => {
+    try {
+      const detectedSubs = await storage.detectSubscriptions(defaultUserId);
+      res.json(detectedSubs);
+    } catch (error) {
+      console.error("Error detecting subscriptions:", error);
+      res.status(500).json({ error: "Failed to detect subscriptions" });
+    }
+  });
+
+  app.patch("/api/subscriptions/:id/pause", async (req, res) => {
+    try {
+      const subscription = await storage.pauseSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error pausing subscription:", error);
+      res.status(500).json({ error: "Failed to pause subscription" });
+    }
+  });
+
+  app.patch("/api/subscriptions/:id/cancel", async (req, res) => {
+    try {
+      const subscription = await storage.cancelSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      res.status(500).json({ error: "Failed to cancel subscription" });
+    }
+  });
+
+  // Enhanced warranty tracking routes
+  app.get("/api/warranty-claims", async (req, res) => {
+    try {
+      const claims = await storage.getWarrantyClaims(defaultUserId);
+      res.json(claims);
+    } catch (error) {
+      console.error("Error fetching warranty claims:", error);
+      res.status(500).json({ error: "Failed to fetch warranty claims" });
+    }
+  });
+
+  app.post("/api/warranty-claims", async (req, res) => {
+    try {
+      const validatedData = insertWarrantyClaimSchema.parse({
+        ...req.body,
+        userId: defaultUserId,
+      });
+      
+      const claim = await storage.createWarrantyClaim(validatedData);
+      res.status(201).json(claim);
+    } catch (error) {
+      console.error("Error creating warranty claim:", error);
+      res.status(400).json({ error: "Failed to create warranty claim" });
+    }
+  });
+
+  app.patch("/api/warranty-claims/:id", async (req, res) => {
+    try {
+      const claim = await storage.updateWarrantyClaim(req.params.id, req.body);
+      if (!claim) {
+        return res.status(404).json({ error: "Warranty claim not found" });
+      }
+      res.json(claim);
+    } catch (error) {
+      console.error("Error updating warranty claim:", error);
+      res.status(500).json({ error: "Failed to update warranty claim" });
+    }
+  });
+
+  // Kiosk integration routes
+  app.post("/api/kiosk/scan", async (req, res) => {
+    try {
+      const { storeId, phoneNumber } = req.body;
+      const qrCode = `KIOSK_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      const session = await storage.createKioskSession({
+        storeId,
+        phoneNumber,
+        qrCode,
+        expiresAt,
+      });
+      
+      res.json({ qrCode: session.qrCode, sessionId: session.id, expiresAt });
+    } catch (error) {
+      console.error("Error creating kiosk session:", error);
+      res.status(500).json({ error: "Failed to create kiosk session" });
+    }
+  });
+
+  app.post("/api/kiosk/complete/:qrCode", async (req, res) => {
+    try {
+      const session = await storage.getKioskSession(req.params.qrCode);
+      if (!session) {
+        return res.status(404).json({ error: "Invalid QR code" });
+      }
+      
+      if (session.expiresAt < new Date()) {
+        return res.status(400).json({ error: "QR code expired" });
+      }
+      
+      const { receiptData, pointsEarned = 10 } = req.body;
+      
+      // Create receipt if provided
+      let receiptId = null;
+      if (receiptData) {
+        const receipt = await storage.createReceipt({
+          ...receiptData,
+          userId: session.userId || defaultUserId,
+        });
+        receiptId = receipt.id;
+      }
+      
+      const updatedSession = await storage.updateKioskSession(session.id, {
+        status: "completed",
+        pointsEarned,
+        receiptId,
+      });
+      
+      res.json({ 
+        success: true, 
+        pointsEarned, 
+        receiptId,
+        message: "Points earned and e-receipt saved!" 
+      });
+    } catch (error) {
+      console.error("Error completing kiosk session:", error);
+      res.status(500).json({ error: "Failed to complete kiosk session" });
     }
   });
 

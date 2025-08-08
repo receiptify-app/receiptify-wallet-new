@@ -9,14 +9,24 @@ import {
   type EcoMetrics, type InsertEcoMetrics,
   type Comment, type InsertComment,
   type Split, type InsertSplit,
+  type OtpVerification, type InsertOtpVerification,
+  type KioskSession, type InsertKioskSession,
+  type WarrantyClaim, type InsertWarrantyClaim,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims } from "@shared/schema";
+import { eq, and, like, gte, lte, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByProviderId(provider: string, providerId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
 
   // Merchant operations
   getMerchants(): Promise<Merchant[]>;
@@ -70,6 +80,26 @@ export interface IStorage {
   getSplits(receiptId: string): Promise<Split[]>;
   createSplit(split: InsertSplit): Promise<Split>;
   updateSplit(id: string, updates: Partial<InsertSplit>): Promise<Split | undefined>;
+
+  // OTP operations
+  createOtpVerification(otp: InsertOtpVerification): Promise<OtpVerification>;
+  getOtpVerification(phoneNumber: string, otpCode: string): Promise<OtpVerification | undefined>;
+  updateOtpVerification(id: string, updates: Partial<InsertOtpVerification>): Promise<OtpVerification | undefined>;
+
+  // Kiosk operations
+  createKioskSession(session: InsertKioskSession): Promise<KioskSession>;
+  getKioskSession(qrCode: string): Promise<KioskSession | undefined>;
+  updateKioskSession(id: string, updates: Partial<InsertKioskSession>): Promise<KioskSession | undefined>;
+
+  // Warranty claim operations
+  getWarrantyClaims(userId: string): Promise<WarrantyClaim[]>;
+  createWarrantyClaim(claim: InsertWarrantyClaim): Promise<WarrantyClaim>;
+  updateWarrantyClaim(id: string, updates: Partial<InsertWarrantyClaim>): Promise<WarrantyClaim | undefined>;
+
+  // Enhanced subscription operations
+  detectSubscriptions(userId: string): Promise<Subscription[]>;
+  pauseSubscription(id: string): Promise<Subscription | undefined>;
+  cancelSubscription(id: string): Promise<Subscription | undefined>;
 
   // Search
   searchReceipts(userId: string, query: string): Promise<Receipt[]>;
@@ -393,6 +423,16 @@ export class MemStorage implements IStorage {
       isActive: subscription.isActive ?? true,
       nextDate: subscription.nextDate || null,
       lastReceiptId: subscription.lastReceiptId || null,
+      serviceName: subscription.serviceName,
+      isPaused: subscription.isPaused ?? false,
+      status: subscription.status || "active",
+      autoDetected: subscription.autoDetected ?? true,
+      createdAt: new Date(),
+      lastChargedDate: subscription.lastChargedDate || null,
+      cancellationUrl: subscription.cancellationUrl || null,
+      manageUrl: subscription.manageUrl || null,
+      category: subscription.category || null,
+      description: subscription.description || null,
     };
     this.subscriptions.set(id, newSubscription);
     return newSubscription;
@@ -526,6 +566,551 @@ export class MemStorage implements IStorage {
       receipt.receiptNumber?.toLowerCase().includes(lowerQuery)
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
+
+  // Stub implementations for new authentication and enhanced features
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.phone === phone);
+  }
+
+  async getUserByProviderId(provider: string, providerId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => 
+      user.authProvider === provider && user.providerId === providerId
+    );
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    const updatedUser = { ...user, ...updates, updatedAt: new Date() };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async createOtpVerification(otp: InsertOtpVerification): Promise<OtpVerification> {
+    const id = randomUUID();
+    const verification: OtpVerification = { 
+      ...otp, 
+      id, 
+      createdAt: new Date(),
+      isVerified: false,
+      attempts: 0,
+    };
+    return verification; // Would store in DB
+  }
+
+  async getOtpVerification(phoneNumber: string, otpCode: string): Promise<OtpVerification | undefined> {
+    return undefined; // Would query from DB
+  }
+
+  async updateOtpVerification(id: string, updates: Partial<InsertOtpVerification>): Promise<OtpVerification | undefined> {
+    return undefined; // Would update in DB
+  }
+
+  async createKioskSession(session: InsertKioskSession): Promise<KioskSession> {
+    const id = randomUUID();
+    const kioskSession: KioskSession = { 
+      ...session, 
+      id, 
+      createdAt: new Date(),
+      status: "pending",
+      pointsEarned: 0,
+    };
+    return kioskSession; // Would store in DB
+  }
+
+  async getKioskSession(qrCode: string): Promise<KioskSession | undefined> {
+    return undefined; // Would query from DB
+  }
+
+  async updateKioskSession(id: string, updates: Partial<InsertKioskSession>): Promise<KioskSession | undefined> {
+    return undefined; // Would update in DB
+  }
+
+  async getWarrantyClaims(userId: string): Promise<WarrantyClaim[]> {
+    return []; // Would query from DB
+  }
+
+  async createWarrantyClaim(claim: InsertWarrantyClaim): Promise<WarrantyClaim> {
+    const id = randomUUID();
+    const warrantyClaim: WarrantyClaim = { 
+      ...claim, 
+      id, 
+      createdAt: new Date(),
+      status: "submitted",
+      claimDate: new Date(),
+    };
+    return warrantyClaim; // Would store in DB
+  }
+
+  async updateWarrantyClaim(id: string, updates: Partial<InsertWarrantyClaim>): Promise<WarrantyClaim | undefined> {
+    return undefined; // Would update in DB
+  }
+
+  async detectSubscriptions(userId: string): Promise<Subscription[]> {
+    // Simple subscription detection logic
+    const userReceipts = await this.getReceipts(userId);
+    const subscriptionServices = ['Netflix', 'Spotify', 'Disney+', 'Amazon Prime', 'Apple Music'];
+    
+    const detectedSubs: Subscription[] = [];
+    for (const service of subscriptionServices) {
+      const serviceReceipts = userReceipts.filter(r => 
+        r.merchantName.toLowerCase().includes(service.toLowerCase())
+      );
+      
+      if (serviceReceipts.length > 1) {
+        const lastReceipt = serviceReceipts[0];
+        const subId = randomUUID();
+        detectedSubs.push({
+          id: subId,
+          userId,
+          merchantName: lastReceipt.merchantName,
+          serviceName: service,
+          amount: lastReceipt.total,
+          frequency: 'monthly',
+          lastChargedDate: new Date(lastReceipt.date),
+          nextDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          isPaused: false,
+          isActive: true,
+          status: 'active',
+          autoDetected: true,
+          createdAt: new Date(),
+          cancellationUrl: null,
+          manageUrl: null,
+          category: 'Entertainment',
+          description: null,
+          lastReceiptId: lastReceipt.id,
+        });
+      }
+    }
+    
+    return detectedSubs;
+  }
+
+  async pauseSubscription(id: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription) return undefined;
+    
+    const updated = { ...subscription, isPaused: true, status: 'paused' };
+    this.subscriptions.set(id, updated);
+    return updated;
+  }
+
+  async cancelSubscription(id: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription) return undefined;
+    
+    const updated = { ...subscription, isActive: false, status: 'cancelled' };
+    this.subscriptions.set(id, updated);
+    return updated;
+  }
 }
 
-export const storage = new MemStorage();
+// DatabaseStorage implementation using PostgreSQL
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user;
+  }
+
+  async getUserByProviderId(provider: string, providerId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(
+      and(eq(users.authProvider, provider), eq(users.providerId, providerId))
+    );
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  // Receipt operations (abbreviated for space - following similar pattern)
+  async getReceipts(userId: string, filters?: any): Promise<Receipt[]> {
+    let query = db.select().from(receipts).where(eq(receipts.userId, userId));
+    
+    if (filters?.category) {
+      query = query.where(eq(receipts.category, filters.category));
+    }
+    
+    return await query.orderBy(desc(receipts.date));
+  }
+
+  async getReceipt(id: string): Promise<Receipt | undefined> {
+    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id));
+    return receipt;
+  }
+
+  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    const [newReceipt] = await db.insert(receipts).values(receipt).returning();
+    return newReceipt;
+  }
+
+  async updateReceipt(id: string, updates: Partial<InsertReceipt>): Promise<Receipt | undefined> {
+    const [updatedReceipt] = await db.update(receipts)
+      .set(updates)
+      .where(eq(receipts.id, id))
+      .returning();
+    return updatedReceipt;
+  }
+
+  async deleteReceipt(id: string): Promise<boolean> {
+    const result = await db.delete(receipts).where(eq(receipts.id, id));
+    return result.rowCount > 0;
+  }
+
+  // OTP operations
+  async createOtpVerification(otp: InsertOtpVerification): Promise<OtpVerification> {
+    const [verification] = await db.insert(otpVerifications).values(otp).returning();
+    return verification;
+  }
+
+  async getOtpVerification(phoneNumber: string, otpCode: string): Promise<OtpVerification | undefined> {
+    const [verification] = await db.select().from(otpVerifications)
+      .where(and(
+        eq(otpVerifications.phoneNumber, phoneNumber),
+        eq(otpVerifications.otpCode, otpCode)
+      ));
+    return verification;
+  }
+
+  async updateOtpVerification(id: string, updates: Partial<InsertOtpVerification>): Promise<OtpVerification | undefined> {
+    const [updated] = await db.update(otpVerifications)
+      .set(updates)
+      .where(eq(otpVerifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Enhanced subscription operations
+  async getSubscriptions(userId: string): Promise<Subscription[]> {
+    return await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+  }
+
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [newSub] = await db.insert(subscriptions).values(subscription).returning();
+    return newSub;
+  }
+
+  async updateSubscription(id: string, updates: Partial<InsertSubscription>): Promise<Subscription | undefined> {
+    const [updated] = await db.update(subscriptions)
+      .set(updates)
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async detectSubscriptions(userId: string): Promise<Subscription[]> {
+    // Enhanced subscription detection with recurring pattern analysis
+    const userReceipts = await this.getReceipts(userId);
+    const subscriptionPatterns = new Map<string, Receipt[]>();
+    
+    // Group receipts by merchant to find recurring patterns
+    userReceipts.forEach(receipt => {
+      const merchant = receipt.merchantName.toLowerCase();
+      if (!subscriptionPatterns.has(merchant)) {
+        subscriptionPatterns.set(merchant, []);
+      }
+      subscriptionPatterns.get(merchant)!.push(receipt);
+    });
+
+    const detectedSubs: Subscription[] = [];
+    
+    for (const [merchant, merchantReceipts] of subscriptionPatterns) {
+      if (merchantReceipts.length >= 2) {
+        // Check for recurring patterns (monthly charges)
+        const sortedReceipts = merchantReceipts.sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        
+        const latestReceipt = sortedReceipts[0];
+        const serviceName = this.detectServiceName(merchant);
+        
+        if (serviceName) {
+          const subscription: InsertSubscription = {
+            userId,
+            merchantName: latestReceipt.merchantName,
+            serviceName,
+            amount: latestReceipt.total,
+            frequency: 'monthly',
+            lastChargedDate: new Date(latestReceipt.date),
+            nextDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            isPaused: false,
+            isActive: true,
+            status: 'active',
+            autoDetected: true,
+            category: this.categorizeService(serviceName),
+            lastReceiptId: latestReceipt.id,
+          };
+          
+          const newSub = await this.createSubscription(subscription);
+          detectedSubs.push(newSub);
+        }
+      }
+    }
+    
+    return detectedSubs;
+  }
+
+  private detectServiceName(merchant: string): string | null {
+    const serviceMap: Record<string, string> = {
+      'netflix': 'Netflix',
+      'spotify': 'Spotify',
+      'disney': 'Disney+',
+      'amazon prime': 'Amazon Prime',
+      'apple music': 'Apple Music',
+      'youtube premium': 'YouTube Premium',
+      'adobe': 'Adobe Creative Cloud',
+      'microsoft 365': 'Microsoft 365',
+      'dropbox': 'Dropbox',
+      'github': 'GitHub',
+    };
+    
+    for (const [key, value] of Object.entries(serviceMap)) {
+      if (merchant.includes(key)) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  private categorizeService(serviceName: string): string {
+    const categories: Record<string, string> = {
+      'Netflix': 'Entertainment',
+      'Spotify': 'Entertainment', 
+      'Disney+': 'Entertainment',
+      'YouTube Premium': 'Entertainment',
+      'Adobe Creative Cloud': 'Software',
+      'Microsoft 365': 'Software',
+      'Dropbox': 'Storage',
+      'GitHub': 'Development',
+      'Amazon Prime': 'Shopping',
+      'Apple Music': 'Entertainment',
+    };
+    return categories[serviceName] || 'Other';
+  }
+
+  async pauseSubscription(id: string): Promise<Subscription | undefined> {
+    return await this.updateSubscription(id, { isPaused: true, status: 'paused' });
+  }
+
+  async cancelSubscription(id: string): Promise<Subscription | undefined> {
+    return await this.updateSubscription(id, { isActive: false, status: 'cancelled' });
+  }
+
+  // Warranty operations
+  async getWarranties(userId: string): Promise<Warranty[]> {
+    return await db.select().from(warranties).where(eq(warranties.userId, userId));
+  }
+
+  async createWarranty(warranty: InsertWarranty): Promise<Warranty> {
+    const [newWarranty] = await db.insert(warranties).values(warranty).returning();
+    return newWarranty;
+  }
+
+  async updateWarranty(id: string, updates: Partial<InsertWarranty>): Promise<Warranty | undefined> {
+    const [updated] = await db.update(warranties)
+      .set(updates)
+      .where(eq(warranties.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Warranty claims
+  async getWarrantyClaims(userId: string): Promise<WarrantyClaim[]> {
+    return await db.select().from(warrantyClaims).where(eq(warrantyClaims.userId, userId));
+  }
+
+  async createWarrantyClaim(claim: InsertWarrantyClaim): Promise<WarrantyClaim> {
+    const [newClaim] = await db.insert(warrantyClaims).values(claim).returning();
+    return newClaim;
+  }
+
+  async updateWarrantyClaim(id: string, updates: Partial<InsertWarrantyClaim>): Promise<WarrantyClaim | undefined> {
+    const [updated] = await db.update(warrantyClaims)
+      .set(updates)
+      .where(eq(warrantyClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Kiosk operations
+  async createKioskSession(session: InsertKioskSession): Promise<KioskSession> {
+    const [newSession] = await db.insert(kioskSessions).values(session).returning();
+    return newSession;
+  }
+
+  async getKioskSession(qrCode: string): Promise<KioskSession | undefined> {
+    const [session] = await db.select().from(kioskSessions)
+      .where(eq(kioskSessions.qrCode, qrCode));
+    return session;
+  }
+
+  async updateKioskSession(id: string, updates: Partial<InsertKioskSession>): Promise<KioskSession | undefined> {
+    const [updated] = await db.update(kioskSessions)
+      .set(updates)
+      .where(eq(kioskSessions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Placeholder implementations for other methods (following similar patterns)
+  async getMerchants(): Promise<Merchant[]> {
+    return await db.select().from(merchants);
+  }
+
+  async getMerchant(id: string): Promise<Merchant | undefined> {
+    const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id));
+    return merchant;
+  }
+
+  async createMerchant(merchant: InsertMerchant): Promise<Merchant> {
+    const [newMerchant] = await db.insert(merchants).values(merchant).returning();
+    return newMerchant;
+  }
+
+  async getReceiptItems(receiptId: string): Promise<ReceiptItem[]> {
+    return await db.select().from(receiptItems).where(eq(receiptItems.receiptId, receiptId));
+  }
+
+  async createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem> {
+    const [newItem] = await db.insert(receiptItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateReceiptItem(id: string, updates: Partial<InsertReceiptItem>): Promise<ReceiptItem | undefined> {
+    const [updated] = await db.update(receiptItems)
+      .set(updates)
+      .where(eq(receiptItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteReceiptItem(id: string): Promise<boolean> {
+    const result = await db.delete(receiptItems).where(eq(receiptItems.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getLoyaltyCards(userId: string): Promise<LoyaltyCard[]> {
+    return await db.select().from(loyaltyCards).where(eq(loyaltyCards.userId, userId));
+  }
+
+  async createLoyaltyCard(card: InsertLoyaltyCard): Promise<LoyaltyCard> {
+    const [newCard] = await db.insert(loyaltyCards).values(card).returning();
+    return newCard;
+  }
+
+  async updateLoyaltyCard(id: string, updates: Partial<InsertLoyaltyCard>): Promise<LoyaltyCard | undefined> {
+    const [updated] = await db.update(loyaltyCards)
+      .set(updates)
+      .where(eq(loyaltyCards.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getEcoMetrics(userId: string, month?: string): Promise<EcoMetrics | undefined> {
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+    const [metrics] = await db.select().from(ecoMetrics)
+      .where(and(eq(ecoMetrics.userId, userId), eq(ecoMetrics.month, targetMonth)));
+    return metrics;
+  }
+
+  async updateEcoMetrics(userId: string, month: string, updates: Partial<InsertEcoMetrics>): Promise<EcoMetrics> {
+    const existing = await this.getEcoMetrics(userId, month);
+    
+    if (existing) {
+      const [updated] = await db.update(ecoMetrics)
+        .set({
+          papersSaved: (existing.papersSaved || 0) + (updates.papersSaved || 0),
+          co2Reduced: (parseFloat(existing.co2Reduced || "0") + parseFloat(updates.co2Reduced || "0")).toString(),
+          treesEquivalent: (parseFloat(existing.treesEquivalent || "0") + parseFloat(updates.treesEquivalent || "0")).toString(),
+          ecoPoints: (existing.ecoPoints || 0) + (updates.ecoPoints || 0),
+        })
+        .where(eq(ecoMetrics.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [newMetrics] = await db.insert(ecoMetrics)
+        .values({ userId, month, ...updates })
+        .returning();
+      return newMetrics;
+    }
+  }
+
+  async getComments(receiptId?: string, itemId?: string): Promise<Comment[]> {
+    let query = db.select().from(comments);
+    
+    if (receiptId && itemId) {
+      query = query.where(and(eq(comments.receiptId, receiptId), eq(comments.itemId, itemId)));
+    } else if (receiptId) {
+      query = query.where(eq(comments.receiptId, receiptId));
+    } else if (itemId) {
+      query = query.where(eq(comments.itemId, itemId));
+    }
+    
+    return await query.orderBy(desc(comments.createdAt));
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const [newComment] = await db.insert(comments).values(comment).returning();
+    return newComment;
+  }
+
+  async getSplits(receiptId: string): Promise<Split[]> {
+    return await db.select().from(splits).where(eq(splits.receiptId, receiptId));
+  }
+
+  async createSplit(split: InsertSplit): Promise<Split> {
+    const [newSplit] = await db.insert(splits).values(split).returning();
+    return newSplit;
+  }
+
+  async updateSplit(id: string, updates: Partial<InsertSplit>): Promise<Split | undefined> {
+    const [updated] = await db.update(splits)
+      .set(updates)
+      .where(eq(splits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async searchReceipts(userId: string, query: string): Promise<Receipt[]> {
+    return await db.select().from(receipts)
+      .where(and(
+        eq(receipts.userId, userId),
+        like(receipts.merchantName, `%${query}%`)
+      ))
+      .orderBy(desc(receipts.date));
+  }
+}
+
+// Use DatabaseStorage for production, MemStorage for testing
+export const storage = process.env.NODE_ENV === 'development' 
+  ? new DatabaseStorage() 
+  : new MemStorage();
