@@ -296,8 +296,6 @@ export class MemStorage implements IStorage {
       category: receipt.category || null,
       merchantId: receipt.merchantId || null,
       paymentMethod: receipt.paymentMethod || null,
-      notes: receipt.notes || null,
-      tags: receipt.tags || null,
       latitude: receipt.latitude || null,
       longitude: receipt.longitude || null,
     };
