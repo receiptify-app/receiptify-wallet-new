@@ -5,6 +5,7 @@ import {
   QrCode, 
   CreditCard, 
   Leaf, 
+  MapPin,
   User 
 } from "lucide-react";
 
@@ -13,6 +14,7 @@ const navItems = [
   { path: "/scan", icon: QrCode, label: "Scan" },
   { path: "/cards", icon: CreditCard, label: "Cards" },
   { path: "/eco", icon: Leaf, label: "Eco" },
+  { path: "/map", icon: MapPin, label: "Map" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
 

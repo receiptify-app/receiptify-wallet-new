@@ -1,40 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useLocation } from "wouter";
+import { ArrowLeft, MapPin, Calendar, CreditCard, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Calendar, 
-  CreditCard, 
-  Share2, 
-  MessageSquare,
-  Split,
-  Download
-} from "lucide-react";
-import { useLocation } from "wouter";
+import ReceiptSplit from "@/components/receipt-split";
+import ReceiptComments from "@/components/receipt-comments";
 import type { Receipt, ReceiptItem } from "@shared/schema";
 
-export default function ReceiptDetail() {
-  const [, params] = useRoute("/receipt/:id");
-  const [, setLocation] = useLocation();
-  const receiptId = params?.id;
+export default function ReceiptDetailPage() {
+  const [location] = useLocation();
+  const receiptId = location.split('/').pop();
+  const [, navigate] = useLocation();
 
-  const { data: receiptData, isLoading, error } = useQuery<Receipt & { items: ReceiptItem[] }>({
-    queryKey: ["/api/receipts", receiptId],
+  const { data: receipt, isLoading: receiptLoading } = useQuery<Receipt>({
+    queryKey: [`/api/receipts/${receiptId}`],
+  });
+
+  const { data: items = [], isLoading: itemsLoading } = useQuery<ReceiptItem[]>({
+    queryKey: [`/api/receipts/${receiptId}/items`],
     enabled: !!receiptId,
   });
 
-  if (isLoading) {
+  if (receiptLoading || itemsLoading) {
     return (
-      <div className="px-6 py-4 pb-24">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 w-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded-xl"></div>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
+      <div className="p-6 pb-24">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-16 bg-gray-200 rounded"></div>
             ))}
           </div>
@@ -43,49 +37,37 @@ export default function ReceiptDetail() {
     );
   }
 
-  if (error || !receiptData) {
+  if (!receipt) {
     return (
-      <div className="px-6 py-4 pb-24">
+      <div className="p-6 pb-24">
         <div className="text-center py-12">
-          <div className="text-red-500 mb-4">Receipt not found</div>
-          <Button onClick={() => setLocation("/")}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Receipt not found</h2>
+          <p className="text-gray-600 mb-4">The receipt you're looking for doesn't exist.</p>
+          <Button onClick={() => navigate('/')}>Back to Home</Button>
         </div>
       </div>
     );
   }
 
-  const { items = [], ...receipt } = receiptData;
-
-  const getMerchantLogo = (merchantName: string) => {
-    const name = merchantName.toLowerCase();
-    if (name.includes('tesco')) return { logo: 'T', color: '#00539C' };
-    if (name.includes('waitrose')) return { logo: 'W', color: '#2C5F41' };
-    if (name.includes('shell')) return { logo: '⛽', color: '#DC143C' };
-    if (name.includes('sainsbury')) return { logo: 'S', color: '#FF8200' };
-    if (name.includes('argos')) return { logo: 'A', color: '#DC143C' };
-    if (name.includes('boots')) return { logo: 'B', color: '#0054A6' };
-    return { logo: receipt.merchantName.charAt(0), color: '#6B7280' };
-  };
-
-  const merchantInfo = getMerchantLogo(receipt.merchantName);
+  const total = items.reduce((sum, item) => sum + parseFloat(item.price), 0);
 
   return (
-    <div className="px-6 py-4 pb-24">
+    <div className="p-6 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" onClick={() => setLocation("/")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 p-0"
+        >
+          <ArrowLeft className="w-5 h-5" />
           Back
         </Button>
-        <div className="flex space-x-2">
-          <Button size="sm" variant="outline">
-            <Share2 className="w-4 h-4" />
-          </Button>
-          <Button size="sm" variant="outline">
-            <Download className="w-4 h-4" />
+        <div className="flex gap-2">
+          <ReceiptSplit receipt={receipt} items={items} />
+          <Button variant="outline" size="sm">
+            <Share2 className="w-4 h-4 mr-2" />
+            Share
           </Button>
         </div>
       </div>
@@ -93,135 +75,100 @@ export default function ReceiptDetail() {
       {/* Receipt Header */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div 
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-                style={{ backgroundColor: merchantInfo.color }}
-              >
-                {merchantInfo.logo}
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{receipt.merchantName}</h1>
-                {receipt.location && (
-                  <div className="flex items-center text-gray-600 text-sm">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    {receipt.location}
-                  </div>
-                )}
-              </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {receipt.merchantName}
+            </h1>
+            <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+              <MapPin className="w-4 h-4" />
+              <span className="text-sm">{receipt.location}</span>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">
-                £{parseFloat(receipt.total).toFixed(2)}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <span>{new Date(receipt.date).toLocaleDateString()}</span>
               </div>
-              {receipt.category && (
-                <Badge variant="secondary" className="mt-1">
-                  {receipt.category}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-gray-500" />
+                <span>{receipt.paymentMethod || 'Card'}</span>
+              </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center text-gray-600">
-              <Calendar className="w-4 h-4 mr-2" />
-              {new Date(receipt.date).toLocaleDateString('en-UK')}
-            </div>
-            <div className="flex items-center text-gray-600">
-              <CreditCard className="w-4 h-4 mr-2" />
-              {receipt.paymentMethod || 'Card'}
-            </div>
-          </div>
-
-          {receipt.receiptNumber && (
-            <div className="mt-4 text-xs text-gray-500">
-              Receipt #{receipt.receiptNumber}
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {/* Items */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-lg">Items</CardTitle>
+          <CardTitle>Items ({items.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-0">
-            {items.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                No items available for this receipt
-              </div>
-            ) : (
-              items.map((item, index) => (
-                <div key={item.id}>
-                  <div className="px-6 py-4 flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{item.name}</div>
-                      {item.category && (
-                        <div className="text-sm text-gray-500">{item.category}</div>
-                      )}
-                      {item.quantity && parseFloat(item.quantity) !== 1 && (
-                        <div className="text-sm text-gray-500">
-                          Qty: {parseFloat(item.quantity)}
-                        </div>
-                      )}
-                      {item.notes && (
-                        <div className="text-sm text-gray-600 mt-1 flex items-center">
-                          <MessageSquare className="w-3 h-3 mr-1" />
-                          {item.notes}
-                        </div>
-                      )}
-                    </div>
-                    <div className="font-semibold text-gray-900">
-                      £{parseFloat(item.price).toFixed(2)}
-                    </div>
-                  </div>
-                  {index < items.length - 1 && <Separator />}
+            {items.map((item, index) => (
+              <div
+                key={item.id}
+                className={`flex justify-between items-center p-4 ${
+                  index !== items.length - 1 ? 'border-b border-gray-100' : ''
+                }`}
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{item.name}</div>
+                  {item.category && (
+                    <div className="text-sm text-gray-500">{item.category}</div>
+                  )}
+                  {item.quantity && item.quantity !== "1" && (
+                    <div className="text-sm text-gray-500">Qty: {item.quantity}</div>
+                  )}
                 </div>
-              ))
-            )}
+                <div className="text-right">
+                  <div className="font-semibold text-gray-900">£{item.price}</div>
+                </div>
+              </div>
+            ))}
           </div>
+        </CardContent>
+      </Card>
 
-          {items.length > 0 && (
-            <>
-              <Separator />
-              <div className="px-6 py-4 bg-gray-50">
-                <div className="flex items-center justify-between font-semibold">
-                  <span>Total ({items.length} items)</span>
-                  <span>£{parseFloat(receipt.total).toFixed(2)}</span>
-                </div>
-              </div>
-            </>
+      {/* Total */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-semibold">Total</span>
+            <span className="text-2xl font-bold text-primary">
+              £{receipt.total}
+            </span>
+          </div>
+          {Math.abs(total - parseFloat(receipt.total)) > 0.01 && (
+            <div className="text-sm text-gray-500 mt-1">
+              Items total: £{total.toFixed(2)} • Difference may include tax/fees
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-4">
-        <Button variant="outline" className="flex items-center justify-center">
-          <Split className="w-4 h-4 mr-2" />
-          Split Bill
-        </Button>
-        <Button variant="outline" className="flex items-center justify-center">
-          <MessageSquare className="w-4 h-4 mr-2" />
-          Add Note
-        </Button>
+      {/* Comments Section */}
+      <div className="mb-6">
+        <ReceiptComments receiptId={receipt.id} />
       </div>
 
       {/* Eco Impact */}
-      <Card className="mt-6 bg-light-green border-accent/20">
+      <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center">
-                <span className="text-white text-xs">♻</span>
+          <div className="text-center">
+            <div className="text-sm font-medium text-primary mb-2">Eco Impact</div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-lg font-bold text-accent">1</div>
+                <div className="text-xs text-gray-600">Paper Saved</div>
               </div>
-              <span className="text-sm font-medium text-gray-900">Eco Impact</span>
-            </div>
-            <div className="text-sm text-gray-600">
-              +{receipt.ecoPoints} eco points • 1 paper saved
+              <div>
+                <div className="text-lg font-bold text-accent">0.05kg</div>
+                <div className="text-xs text-gray-600">CO₂ Reduced</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-accent">0.001</div>
+                <div className="text-xs text-gray-600">Trees Saved</div>
+              </div>
             </div>
           </div>
         </CardContent>

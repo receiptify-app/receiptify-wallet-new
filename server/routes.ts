@@ -379,6 +379,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Comments routes
+  app.get("/api/comments", async (req, res) => {
+    try {
+      const { receiptId, itemId } = req.query;
+      const comments = await storage.getComments(
+        receiptId as string,
+        itemId as string
+      );
+      res.json(comments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch comments: " + error.message });
+    }
+  });
+
+  app.post("/api/comments", async (req, res) => {
+    try {
+      const comment = await storage.createComment(req.body);
+      res.status(201).json(comment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create comment: " + error.message });
+    }
+  });
+
+  // Splits routes
+  app.get("/api/splits", async (req, res) => {
+    try {
+      const { receiptId } = req.query;
+      if (!receiptId) {
+        return res.status(400).json({ error: "receiptId is required" });
+      }
+      const splits = await storage.getSplits(receiptId as string);
+      res.json(splits);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch splits: " + error.message });
+    }
+  });
+
+  app.post("/api/splits", async (req, res) => {
+    try {
+      const split = await storage.createSplit(req.body);
+      res.status(201).json(split);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create split: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

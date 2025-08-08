@@ -14,6 +14,14 @@ The application features multi-channel receipt capture (QR codes, camera scans, 
 ✓ Mobile-responsive design with bottom navigation
 ✓ Receipt detail views with itemized breakdowns
 
+## Collaboration Features Added (August 2025)
+
+✓ **Receipt Splitting & Payment**: Advanced bill splitting with checkbox item selection, automatic cost calculation, and integrated payment link generation
+✓ **Comments System**: Real-time commenting on receipts and individual items for collaboration and note-taking
+✓ **Geo-Tagged Map View**: Interactive map showing purchase locations with receipt markers and navigation integration
+✓ **Enhanced Receipt Detail**: Integrated split & pay functionality directly in receipt view with comprehensive collaboration tools
+✓ **API Integration Ready**: Backend endpoints configured for Stripe payments and SendGrid SMS notifications
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.

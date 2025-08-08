@@ -9,6 +9,7 @@ import Scan from "@/pages/scan";
 import Cards from "@/pages/cards";
 import Eco from "@/pages/eco";
 import Profile from "@/pages/profile";
+import Map from "@/pages/map";
 import ReceiptDetail from "@/pages/receipt-detail";
 import BottomNavigation from "@/components/bottom-navigation";
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/scan" component={Scan} />
       <Route path="/cards" component={Cards} />
       <Route path="/eco" component={Eco} />
+      <Route path="/map" component={Map} />
       <Route path="/profile" component={Profile} />
       <Route path="/receipt/:id" component={ReceiptDetail} />
       <Route component={NotFound} />
