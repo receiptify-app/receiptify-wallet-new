@@ -1,156 +1,204 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import AppHeader from "@/components/app-header";
-import EcoStats from "@/components/eco-stats";
-import ReceiptCard from "@/components/receipt-card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, TrendingUp, Calendar } from "lucide-react";
-import ScannerModal from "@/components/scanner-modal";
-import type { Receipt } from "@shared/schema";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
 
-const categoryFilters = [
-  { label: "All", value: "" },
-  { label: "Groceries", value: "Groceries" },
-  { label: "Fuel", value: "Fuel" },
-  { label: "Retail", value: "Retail" },
-  { label: "Dining", value: "Dining" },
+// Sample data to match the design
+const spendingData = [
+  { category: "Food", amount: 17.20, color: "#4CAF50" },
+  { category: "Tech", amount: 1.99, color: "#FFC107" },
+  { category: "Transport", amount: 103.00, color: "#9C27B0" }
+];
+
+const recentActivity = [
+  {
+    id: "1",
+    merchant: "Waitrose",
+    logo: "W", // Placeholder for Waitrose logo
+    amount: "12.02",
+    date: "12 July 2025",
+    color: "#1B5E20"
+  },
+  {
+    id: "2", 
+    merchant: "Argos",
+    logo: "A", // Placeholder for Argos logo
+    amount: "59.99",
+    date: "25 June 2025", 
+    color: "#D32F2F"
+  },
+  {
+    id: "3",
+    merchant: "Shell", 
+    logo: "🛢️", // Shell icon
+    amount: "23.80",
+    date: "22 June 2025",
+    color: "#FF9800"
+  }
 ];
 
 export default function Home() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [showScanner, setShowScanner] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState("This month");
 
-  const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
-    queryKey: ["/api/receipts", selectedCategory],
-    enabled: true,
-  });
-
-  const { data: searchResults = [] } = useQuery<Receipt[]>({
-    queryKey: ["/api/search"],
-    enabled: false,
-  });
-
-  const filteredReceipts = searchQuery 
-    ? receipts.filter(receipt => 
-        receipt.merchantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        receipt.location?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : receipts;
-
-  const totalSpending = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.total), 0);
+  const totalSpending = spendingData.reduce((sum, item) => sum + item.amount, 0);
 
   return (
-    <div className="pb-24">
-      <AppHeader />
+    <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Header */}
+      <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100">
+        <h1 className="text-2xl font-bold text-gray-900">OneTap</h1>
+        <Button variant="ghost" size="sm">
+          <Menu className="h-5 w-5 text-gray-600" />
+        </Button>
+      </div>
 
-      <div className="px-6 py-4">
-        {/* Search and Filters */}
-        <div className="mb-6">
-          <div className="relative mb-4">
-            <Input
-              type="text"
-              placeholder="Search receipts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-100 border-0 focus:ring-2 focus:ring-accent"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          </div>
-
-          <div className="flex space-x-2 overflow-x-auto pb-2">
-            {categoryFilters.map((filter) => (
-              <Button
-                key={filter.value}
-                variant={selectedCategory === filter.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(filter.value)}
-                className={`whitespace-nowrap text-xs ${
-                  selectedCategory === filter.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {filter.label}
-              </Button>
-            ))}
+      <div className="px-6 py-4 space-y-6">
+        {/* Spending Summary */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" className="flex items-center gap-2 text-gray-700">
+              {selectedPeriod}
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <h2 className="text-4xl font-bold text-gray-900">£{totalSpending.toFixed(0)}</h2>
           </div>
         </div>
 
-        {/* Receipts List */}
-        <div className="space-y-4 mb-8">
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
-                      <div>
-                        <div className="h-4 w-24 bg-gray-200 rounded mb-1"></div>
-                        <div className="h-3 w-16 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="h-4 w-12 bg-gray-200 rounded mb-1"></div>
-                      <div className="h-3 w-16 bg-gray-200 rounded"></div>
-                    </div>
+        {/* Spending Chart Card */}
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center mb-6">
+              {/* Simple donut chart representation */}
+              <div className="relative w-32 h-32">
+                <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#e5e7eb"
+                    strokeWidth="10"
+                  />
+                  {/* Food segment - largest */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#4CAF50"
+                    strokeWidth="10"
+                    strokeDasharray={`${(17.20/122.19) * 251.33} 251.33`}
+                    strokeDashoffset="0"
+                  />
+                  {/* Transport segment */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#9C27B0"
+                    strokeWidth="10"
+                    strokeDasharray={`${(103.00/122.19) * 251.33} 251.33`}
+                    strokeDashoffset={`-${(17.20/122.19) * 251.33}`}
+                  />
+                  {/* Tech segment - smallest */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#FFC107"
+                    strokeWidth="10"
+                    strokeDasharray={`${(1.99/122.19) * 251.33} 251.33`}
+                    strokeDashoffset={`-${((17.20+103.00)/122.19) * 251.33}`}
+                  />
+                </svg>
+              </div>
+            </div>
+            
+            {/* Category breakdown */}
+            <div className="space-y-3">
+              {spendingData.map((item) => (
+                <div key={item.category} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-gray-900 font-medium">{item.category}</span>
                   </div>
+                  <span className="font-semibold text-gray-900">£{item.amount.toFixed(2)}</span>
                 </div>
               ))}
             </div>
-          ) : filteredReceipts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards */}
+        <div className="space-y-3">
+          <Card className="bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <Leaf className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span className="text-gray-900 font-medium">Eco Points</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">40</span>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No receipts found</h3>
-              <p className="text-gray-600 mb-6">
-                {searchQuery ? "Try a different search term" : "Start scanning receipts to see them here"}
-              </p>
-              <Button onClick={() => setShowScanner(true)} className="bg-primary hover:bg-primary/90">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Receipt
-              </Button>
-            </div>
-          ) : (
-            filteredReceipts.map((receipt) => (
-              <ReceiptCard key={receipt.id} receipt={receipt} />
-            ))
-          )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                    <CreditCard className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span className="text-gray-900 font-medium">Loyalty usage</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">6x uses</span>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3 mb-2">
-              <TrendingUp className="text-accent w-5 h-5" />
-              <span className="font-medium text-gray-900">Spending Trends</span>
-            </div>
-            <p className="text-xs text-gray-600">£{totalSpending.toFixed(2)} this month</p>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3 mb-2">
-              <Calendar className="text-accent w-5 h-5" />
-              <span className="font-medium text-gray-900">Subscriptions</span>
-            </div>
-            <p className="text-xs text-gray-600">3 active subscriptions</p>
+        {/* Recent Activity */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h3>
+          <div className="space-y-3">
+            {recentActivity.map((activity) => (
+              <Card key={activity.id} className="bg-white shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                        style={{ backgroundColor: activity.color }}
+                      >
+                        {activity.logo}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{activity.merchant}</h4>
+                        <p className="text-sm text-gray-600">{activity.date}</p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-gray-900">£{activity.amount}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Floating Action Button */}
-      <Button
-        onClick={() => setShowScanner(true)}
-        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0"
-      >
-        <Plus className="w-6 h-6" />
-      </Button>
-
-      {/* Scanner Modal */}
-      <ScannerModal open={showScanner} onOpenChange={setShowScanner} />
     </div>
   );
 }
