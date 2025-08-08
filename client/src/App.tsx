@@ -11,6 +11,7 @@ import Eco from "@/pages/eco";
 import Profile from "@/pages/profile";
 import Map from "@/pages/map";
 import ReceiptDetail from "@/pages/receipt-detail";
+import SplitReceipt from "@/pages/split-receipt";
 import Subscriptions from "@/pages/subscriptions";
 import Warranties from "@/pages/warranties";
 import Landing from "@/pages/landing";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/map" component={Map} />
       <Route path="/profile" component={Profile} />
       <Route path="/receipt/:id" component={ReceiptDetail} />
+      <Route path="/split-receipt" component={SplitReceipt} />
       <Route path="/subscriptions" component={Subscriptions} />
       <Route path="/warranties" component={Warranties} />
       <Route path="/welcome" component={Landing} />
