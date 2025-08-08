@@ -1,0 +1,78 @@
+I’m building **Receiptify**, a UK-focused, eco-friendly, wallet-style React Native + Node.js app (with PostgreSQL and S3) that consolidates every receipt—POS API/webhook, bank/Open-Banking sync, QR/NFC key-card tap, camera/photo scan, email-forward—into one searchable digital inbox. 
+
+**Project skeleton**  
+- Monorepo: `/mobile` (React Native Expo), `/backend` (Node.js + Express + TypeScript)  
+- CI/CD: GitHub Actions for build & deploy  
+- Env & secrets: Use `.env` and AWS Parameter Store  
+
+**Backend**  
+1. **Authentication**  
+   - Phone-OTP + social login (Google/Facebook)  
+   - SMS/USSD fallback  
+   - JWT sessions, refresh tokens  
+
+2. **Ingestion pipeline**  
+   - Webhooks (Square `order.created`, Ingenico QR/CLO)  
+   - Open Banking / card-network API sync  
+   - Email-forward endpoint  
+   - Camera-scan upload endpoint (multipart + OCR stub)  
+   - NFC keychain webhook  
+
+   Workflow: receive → normalize JSON → store in PostgreSQL → push event to SQS → processing worker → S3 + DB → notify (push/SMS).  
+
+3. **Data models**  
+   - Users, Cards, Receipts, LineItems, Categories, Comments, Splits, LoyaltyAccounts, Subscriptions, Warranties, Returns, EcoMetrics  
+
+4. **API routes**  
+   - `POST /auth/*`, `/receipts/upload`, `/receipts/webhook/*`, `/receipts/:id`, `/search`, `/filters`  
+   - `POST /receipts/:id/split`, `/comments`, `/loyalty/link`, `/subscriptions`, `/warranties`, `/returns`  
+
+5. **Notifications**  
+   - Push via Firebase + SMS via Twilio  
+
+6. **Security & compliance**  
+   - TLS everywhere, encrypted storage, IAM roles  
+   - GDPR consent flows, audit logs, DPA template  
+
+**Mobile (React Native + Expo)**  
+1. **Onboarding**  
+   - Splash carousel (“One Scan. Zero Paper.”)  
+   - Sign-up screens (OTP, social)  
+
+2. **Receipt Capture**  
+   - One-Tap via NFC/QR scanner screen  
+   - Camera/photo scan fallback  
+
+3. **Feed & Detail**  
+   - Chronological flat list of receipts  
+   - Search bar + filters (merchant, date, category, amount, map pin)  
+   - Detail view with line items, icons, tags, notes, share (CSV/PDF)  
+
+4. **Engagement features**  
+   - **Split & Pay**: checkbox items → in-app/SMS payment link  
+   - **Comments**: per-item notes  
+   - **Loyalty**: link Tesco, Nectar, Waitrose, Shell GO+, Argos via API/CLO → show points + redemption CTA  
+   - **Promos & Surveys**: inline merchant CTAs, coupon entry, one-question feedback  
+
+5. **Advanced trackers**  
+   - **Subscriptions**: detect recurrences, show next date, allow pause/cancel  
+   - **Warranties**: extract expiry, list active, push reminders, QR claim code  
+   - **Returns**: dynamic return-QR generator, policy countdown, photo proof upload  
+   - **Eco-Impact**: compute “kg CO₂ saved”, “papers saved”, “trees saved” badges & monthly dashboard  
+
+6. **Settings & Account**  
+   - Manage cards, import receipts, backup & sync  
+   - Notification toggles, profile edit  
+
+7. **In-Store & Web hooks**  
+   - “Scan for points & instant e-receipt” kiosk screen  
+   - Web portal stub (React) for desktop view  
+
+**Deliverables**  
+- Fully wired CI/CD pipeline  
+- Running backend on Replit or DigitalOcean App Platform  
+- Expo dev build + Android/iOS preview  
+- Seed data and sample receipts for Tesco, Waitrose, Argos, Shell  
+- README with setup & merchant integration docs  
+
+Use TypeScript throughout, Tailwind-style utility classes in React Native via `twrnc`, Prisma ORM for Postgres, AWS SDK for S3, Passport.js for auth, Firebase Cloud Messaging, and Twilio. Scaffold all folders, install dependencies, generate boilerplate CRUD endpoints and screens, then stub in each feature area so I can start filling in merchant-specific API keys immediately. Ship me a working “Receiptify MVP” today.  
