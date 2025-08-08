@@ -1,6 +1,6 @@
 # Overview
 
-Receiptify is a UK-focused, eco-friendly digital receipt management application with the tagline "One Scan. Zero Paper." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
+Receiptify is a UK-focused, eco-friendly digital receipt management application with the tagline "OneTap Receipts. Zero Paper." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
 
 The application features multi-channel receipt capture (QR codes, camera scans, file uploads), comprehensive receipt management with search and filtering, loyalty card integration for major UK retailers, real-time environmental impact tracking, and detailed analytics. The system uses device-based storage for privacy and supports all payment methods without requiring personal information.
 
@@ -14,13 +14,17 @@ The application features multi-channel receipt capture (QR codes, camera scans, 
 ✓ Mobile-responsive design with bottom navigation
 ✓ Receipt detail views with itemized breakdowns
 
-## Collaboration Features Added (August 2025)
+## Latest Updates (August 2025)
 
 ✓ **Receipt Splitting & Payment**: Advanced bill splitting with checkbox item selection, automatic cost calculation, and integrated payment link generation
 ✓ **Comments System**: Real-time commenting on receipts and individual items for collaboration and note-taking
 ✓ **Geo-Tagged Map View**: Interactive map showing purchase locations with receipt markers and navigation integration
 ✓ **Enhanced Receipt Detail**: Integrated split & pay functionality directly in receipt view with comprehensive collaboration tools
-✓ **API Integration Ready**: Backend endpoints configured for Stripe payments and SendGrid SMS notifications
+✓ **Enhanced Authentication**: Complete social login system (Gmail, Apple Pay, Facebook), phone OTP verification, and session management
+✓ **Advanced Subscription Tracking**: Automatic detection of recurring purchases from receipts with pause/cancel functionality
+✓ **Comprehensive Warranty Management**: Full warranty tracking with expiry monitoring, claim management, and retailer contact integration
+✓ **Database Migration**: Complete PostgreSQL integration with comprehensive schema and enhanced storage capabilities
+✓ **Logo Integration**: Updated branding with official "OneTap Receipts. Zero Paper." logo throughout the application
 
 # User Preferences
 

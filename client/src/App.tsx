@@ -13,6 +13,7 @@ import Map from "@/pages/map";
 import ReceiptDetail from "@/pages/receipt-detail";
 import Subscriptions from "@/pages/subscriptions";
 import Warranties from "@/pages/warranties";
+import Landing from "@/pages/landing";
 import BottomNavigation from "@/components/bottom-navigation";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/receipt/:id" component={ReceiptDetail} />
       <Route path="/subscriptions" component={Subscriptions} />
       <Route path="/warranties" component={Warranties} />
+      <Route path="/welcome" component={Landing} />
       <Route component={NotFound} />
     </Switch>
   );
