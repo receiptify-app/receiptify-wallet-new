@@ -1,243 +1,179 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { 
-  User, 
-  Settings, 
+  CreditCard, 
+  Star, 
   Bell, 
-  Download, 
-  Share2, 
-  Shield, 
-  HelpCircle,
+  Euro, 
   ChevronRight,
-  Calendar,
-  Receipt,
-  Clock
+  RefreshCw,
+  Download
 } from "lucide-react";
-import type { Subscription, Warranty } from "@shared/schema";
-import logoSrc from "@assets/2C508BEA-D169-4FDB-A1F9-0F6E333C1A18_1754620280792.png";
+import { useLocation } from "wouter";
+import AppHeader from "@/components/app-header";
+
+// Sample user data matching the mockup
+const sampleUser = {
+  name: "Alex Green",
+  email: "alex.green@email.com",
+  avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
+};
 
 export default function Profile() {
-  const [notifications, setNotifications] = useState({
-    receipts: true,
-    eco: true,
-    warranties: false,
-    subscriptions: true,
-  });
+  const [, navigate] = useLocation();
+  const [darkMode, setDarkMode] = useState(false);
+  const [gbpCurrency, setGbpCurrency] = useState(true);
 
-  const { data: subscriptions = [] } = useQuery<Subscription[]>({
-    queryKey: ["/api/subscriptions"],
+  const { data: user = sampleUser } = useQuery<typeof sampleUser>({
+    queryKey: ["/api/user"],
+    retry: false,
   });
-
-  const { data: warranties = [] } = useQuery<Warranty[]>({
-    queryKey: ["/api/warranties"],
-  });
-
-  const activeSubscriptions = subscriptions.filter(sub => sub.isActive);
-  const activeWarranties = warranties.filter(warranty => warranty.isActive);
 
   return (
-    <div className="px-6 py-4 pb-24">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary mb-2">Profile</h1>
-        <p className="text-gray-600">Manage your account and preferences</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <AppHeader 
+        showBackButton={true}
+        onBackClick={() => navigate('/')}
+        title="Settings"
+      />
 
-      {/* User Info */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-primary/20 p-2">
-              <img 
-                src={logoSrc} 
-                alt="Profile Logo" 
-                className="w-full h-full object-contain"
+      <div className="px-6 py-6 space-y-8">
+        {/* User Profile Section */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
+                  <img 
+                    src={user.avatar} 
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{user.name}</h2>
+                  <p className="text-gray-600">{user.email}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dark Mode */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Dark Mode</h3>
+              <Switch 
+                checked={darkMode}
+                onCheckedChange={setDarkMode}
+                className="data-[state=checked]:bg-green-600"
               />
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Demo User</h2>
-              <p className="text-gray-600">demo@receiptify.com</p>
-              <Badge variant="secondary" className="mt-1 bg-accent/10 text-accent">
-                Premium Member
-              </Badge>
-            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment & Loyalty Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Payment & Loyalty</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/linked-cards')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <CreditCard className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Linked Cards</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/cards')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Star className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Linked Loyalty Cards</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Receipt className="w-6 h-6 text-primary mx-auto mb-2" />
-            <div className="text-lg font-bold text-gray-900">47</div>
-            <div className="text-xs text-gray-600">Total Receipts</div>
-          </CardContent>
-        </Card>
+        {/* App Preferences Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">App Preferences</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Bell className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Notifications</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Calendar className="w-6 h-6 text-accent mx-auto mb-2" />
-            <div className="text-lg font-bold text-gray-900">{activeSubscriptions.length}</div>
-            <div className="text-xs text-gray-600">Subscriptions</div>
-          </CardContent>
-        </Card>
+            <Card className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Euro className="w-6 h-6 text-gray-700" />
+                    <div>
+                      <span className="text-lg font-medium text-gray-900">Currency</span>
+                      <p className="text-sm text-gray-600">£ GBP</p>
+                    </div>
+                  </div>
+                  <Switch 
+                    checked={gbpCurrency}
+                    onCheckedChange={setGbpCurrency}
+                    className="data-[state=checked]:bg-green-600"
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Clock className="w-6 h-6 text-amber-500 mx-auto mb-2" />
-            <div className="text-lg font-bold text-gray-900">{activeWarranties.length}</div>
-            <div className="text-xs text-gray-600">Warranties</div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <RefreshCw className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Auto-Categorise</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">ON</span>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-      {/* Settings Sections */}
-      <div className="space-y-6">
-        {/* Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <Bell className="w-5 h-5 mr-2" />
-              Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">New Receipts</div>
-                <div className="text-sm text-gray-600">Get notified when receipts are shared</div>
+        {/* Receipts Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Receipts</h3>
+          <Card className="bg-white shadow-sm border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Download className="w-6 h-6 text-gray-700" />
+                  <span className="text-lg font-medium text-gray-900">Export Receipts</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
               </div>
-              <Switch 
-                checked={notifications.receipts}
-                onCheckedChange={(checked) => 
-                  setNotifications(prev => ({ ...prev, receipts: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Eco Milestones</div>
-                <div className="text-sm text-gray-600">Celebrate your environmental achievements</div>
-              </div>
-              <Switch 
-                checked={notifications.eco}
-                onCheckedChange={(checked) => 
-                  setNotifications(prev => ({ ...prev, eco: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Warranty Expiry</div>
-                <div className="text-sm text-gray-600">Reminders before warranties expire</div>
-              </div>
-              <Switch 
-                checked={notifications.warranties}
-                onCheckedChange={(checked) => 
-                  setNotifications(prev => ({ ...prev, warranties: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Subscription Alerts</div>
-                <div className="text-sm text-gray-600">Upcoming subscription renewals</div>
-              </div>
-              <Switch 
-                checked={notifications.subscriptions}
-                onCheckedChange={(checked) => 
-                  setNotifications(prev => ({ ...prev, subscriptions: checked }))
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Data & Privacy */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <Shield className="w-5 h-5 mr-2" />
-              Data & Privacy
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-between">
-              <div className="flex items-center">
-                <Download className="w-4 h-4 mr-2" />
-                Export Data
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <Button variant="outline" className="w-full justify-between">
-              <div className="flex items-center">
-                <Share2 className="w-4 h-4 mr-2" />
-                Data Sharing Settings
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <Button variant="outline" className="w-full justify-between">
-              <div className="flex items-center">
-                <Settings className="w-4 h-4 mr-2" />
-                Privacy Settings
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Support */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <HelpCircle className="w-5 h-5 mr-2" />
-              Support
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-between">
-              <span>Help Center</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <Button variant="outline" className="w-full justify-between">
-              <span>Contact Support</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <Button variant="outline" className="w-full justify-between">
-              <span>Privacy Policy</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-
-            <Button variant="outline" className="w-full justify-between">
-              <span>Terms of Service</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* App Info */}
-        <Card className="bg-light-green border-accent/20">
-          <CardContent className="p-4 text-center">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
-              <Receipt className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="font-semibold text-primary mb-1">Receiptify</h3>
-            <p className="text-sm text-gray-600 mb-3">One Scan. Zero Paper.</p>
-            <p className="text-xs text-gray-500">Version 1.0.0</p>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

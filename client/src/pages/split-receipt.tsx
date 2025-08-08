@@ -87,6 +87,7 @@ export default function SplitReceipt() {
               <Button 
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-lg font-semibold rounded-2xl"
                 size="lg"
+                onClick={() => navigate('/payment')}
               >
                 Pay £{sharedReceiptData.userAmount.toFixed(2)}
               </Button>

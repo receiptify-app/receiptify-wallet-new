@@ -14,6 +14,8 @@ import ReceiptDetail from "@/pages/receipt-detail";
 import SplitReceipt from "@/pages/split-receipt";
 import Subscriptions from "@/pages/subscriptions";
 import Warranties from "@/pages/warranties";
+import LinkedCards from "@/pages/linked-cards";
+import Payment from "@/pages/payment";
 import Landing from "@/pages/landing";
 import BottomNavigation from "@/components/bottom-navigation";
 
@@ -30,6 +32,8 @@ function Router() {
       <Route path="/split-receipt" component={SplitReceipt} />
       <Route path="/subscriptions" component={Subscriptions} />
       <Route path="/warranties" component={Warranties} />
+      <Route path="/linked-cards" component={LinkedCards} />
+      <Route path="/payment" component={Payment} />
       <Route path="/welcome" component={Landing} />
       <Route component={NotFound} />
     </Switch>

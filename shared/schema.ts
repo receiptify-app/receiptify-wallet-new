@@ -149,6 +149,21 @@ export const splits = pgTable("splits", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(), // credit_card, apple_pay, google_pay
+  last4: varchar("last4", { length: 4 }),
+  brand: text("brand"),
+  expiryMonth: integer("expiry_month"),
+  expiryYear: integer("expiry_year"),
+  isDefault: boolean("is_default").default(false),
+  nickname: text("nickname"),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Session storage table for authentication
 export const sessions = pgTable("sessions", {
   sid: varchar("sid").primaryKey(),
@@ -223,6 +238,12 @@ export const insertWarrantySchema = createInsertSchema(warranties).omit({
   createdAt: true,
 });
 
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertWarrantyClaimSchema = createInsertSchema(warrantyClaims).omit({
   id: true,
   createdAt: true,
@@ -294,6 +315,9 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 
 export type Split = typeof splits.$inferSelect;
 export type InsertSplit = z.infer<typeof insertSplitSchema>;
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
 
 export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
