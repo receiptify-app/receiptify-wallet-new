@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
+import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
 
 // Sample data to match the design
@@ -40,6 +41,7 @@ const recentActivity = [
 
 export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState("This month");
+  const [, navigate] = useLocation();
 
   const totalSpending = spendingData.reduce((sum, item) => sum + item.amount, 0);
 
@@ -131,7 +133,7 @@ export default function Home() {
 
         {/* Stats Cards */}
         <div className="space-y-3">
-          <Card className="bg-white shadow-sm">
+          <Card className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/eco')}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -148,7 +150,7 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm">
+          <Card className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/cards')}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -171,7 +173,7 @@ export default function Home() {
           <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h3>
           <div className="space-y-3">
             {recentActivity.map((activity) => (
-              <Card key={activity.id} className="bg-white shadow-sm">
+              <Card key={activity.id} className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/receipt/1')}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">

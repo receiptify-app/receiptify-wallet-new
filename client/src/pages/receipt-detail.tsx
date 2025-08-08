@@ -160,6 +160,19 @@ export default function ReceiptDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Split Receipt Button */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-lg font-semibold rounded-2xl"
+              size="lg"
+              onClick={() => navigate('/split-receipt')}
+            >
+              Split Receipt
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

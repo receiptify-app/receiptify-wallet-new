@@ -68,7 +68,7 @@ export default function Subscriptions() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const { data: subscriptions = sampleSubscriptions, isLoading } = useQuery({
+  const { data: subscriptions = sampleSubscriptions, isLoading } = useQuery<any[]>({
     queryKey: ["/api/subscriptions"],
   });
 
@@ -84,67 +84,58 @@ export default function Subscriptions() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-24">
-      {/* Header */}
-      <div className="px-6 py-8 text-center">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md p-2">
-            <img 
-              src={logoSrc} 
-              alt="Receiptify Logo" 
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-        </div>
-        <h2 className="text-4xl font-bold text-gray-900 mb-6">
-          Subscription Tracker
-        </h2>
-      </div>
-
-      {/* Subscriptions List */}
-      <div className="px-6 space-y-4">
-        {subscriptions.map((subscription: any) => (
-          <Card key={subscription.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                {/* Left side - Logo and details */}
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style={{ backgroundColor: subscription.color }}>
-                    {subscription.logo}
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <AppHeader 
+        showBackButton={true}
+        onBackClick={() => navigate('/')}
+        title="Subscription Tracker"
+      />
+      
+      <div className="px-6 py-6">
+        {/* Subscriptions List */}
+        <div className="space-y-4">
+          {subscriptions.map((subscription: any) => (
+            <Card key={subscription.id} className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  {/* Left side - Logo and details */}
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style={{ backgroundColor: subscription.color }}>
+                      {subscription.logo}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">
+                        {subscription.serviceName}
+                      </h3>
+                      <p className="text-gray-600 font-medium">
+                        £{subscription.amount} / {subscription.frequency}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                      {subscription.serviceName}
-                    </h3>
-                    <p className="text-gray-600 font-medium">
-                      £{subscription.amount} / {subscription.frequency}
-                    </p>
-                  </div>
+                  
+                  {/* Right side - Cancel button */}
+                  <Button
+                    onClick={() => cancelMutation.mutate(subscription.id)}
+                    disabled={cancelMutation.isPending}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full font-medium"
+                  >
+                    Cancel
+                  </Button>
                 </div>
-                
-                {/* Right side - Cancel button */}
-                <Button
-                  onClick={() => cancelMutation.mutate(subscription.id)}
-                  disabled={cancelMutation.isPending}
-                  className="bg-green-700 hover:bg-green-800 text-white px-6 py-3 rounded-full font-semibold min-w-[140px]"
-                >
-                  Cancel subscription
-                </Button>
+              </CardContent>
+            </Card>
+          ))}
+          
+          {/* Add subscription button */}
+          <Card className="bg-white border-2 border-dashed border-green-300 hover:border-green-500 transition-colors">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-3 text-green-700">
+                <Plus className="h-6 w-6" />
+                <span className="font-semibold">Add New Subscription</span>
               </div>
             </CardContent>
           </Card>
-        ))}
-        
-        {/* Add subscription button */}
-        <Card className="bg-white/60 backdrop-blur-sm border-2 border-dashed border-green-300 hover:border-green-500 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center gap-3 text-green-700">
-              <Plus className="h-6 w-6" />
-              <span className="font-semibold">Add New Subscription</span>
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     </div>
   );
