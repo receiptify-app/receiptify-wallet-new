@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const url = new URL(qrData);
           const params = new URLSearchParams(url.search);
           
-          // Extract common payment parameters
+          // Extract common payment parameters from URL
           const amount = params.get('amount') || params.get('total') || params.get('price') || params.get('sum');
           const merchant = params.get('merchant') || params.get('business') || params.get('name') || params.get('store');
           const itemName = params.get('item') || params.get('product') || params.get('description');
@@ -152,13 +152,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             merchantName = itemName;
           }
 
-          // Domain-based merchant detection
+          // Handle Square receipt QR codes - they often don't have URL parameters
           const hostname = url.hostname.toLowerCase();
           if (hostname.includes('square')) {
-            // Only create receipts if we have actual payment data
-            if (!merchant && !amount && hostname.includes('square.link')) {
+            // For Square QR codes without parameters, we need to inform user about data limitations
+            if (!merchant && !amount) {
               return res.status(400).json({ 
-                error: "Square QR code scanned but no payment information found. Please scan a QR code from a completed payment or receipt." 
+                error: "Square QR code detected but receipt data not available in QR format. Please manually enter receipt details or scan a QR code with embedded payment data." 
               });
             }
             if (!merchant) merchantName = "Square Payment";
@@ -174,27 +174,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             category = "Fuel";
           }
         } else {
-          // Try to parse as structured data (JSON, etc.)
+          // Handle non-URL QR codes (structured data, plain text, receipt formats)
           try {
+            // Try parsing as JSON first
             const jsonData = JSON.parse(qrData);
-            if (jsonData.merchant) merchantName = jsonData.merchant;
-            if (jsonData.amount || jsonData.total) total = (jsonData.amount || jsonData.total).toString();
-            if (jsonData.location) location = jsonData.location;
+            if (jsonData.merchant || jsonData.business_name) merchantName = jsonData.merchant || jsonData.business_name;
+            if (jsonData.amount || jsonData.total || jsonData.grand_total) total = (jsonData.amount || jsonData.total || jsonData.grand_total).toString();
+            if (jsonData.location || jsonData.address) location = jsonData.location || jsonData.address;
             if (jsonData.category) category = jsonData.category;
           } catch (e) {
-            // If not JSON, try to extract data from plain text
-            const lowerData = qrData.toLowerCase();
+            // If not JSON, try to extract receipt data from plain text formats
+            const lines = qrData.split('\n');
             
-            // Look for amount patterns (£X.XX, $X.XX, X.XX)
-            const amountMatch = qrData.match(/[£$]?(\d+\.?\d*)/);
-            if (amountMatch) {
-              total = parseFloat(amountMatch[1]).toFixed(2);
+            // Look for common receipt patterns
+            for (const line of lines) {
+              const cleanLine = line.trim();
+              
+              // Look for total amount patterns
+              if (cleanLine.match(/(total|amount|grand total|final)[:\s]*[£$]?(\d+\.?\d*)/i)) {
+                const amountMatch = cleanLine.match(/[£$]?(\d+\.?\d*)/);
+                if (amountMatch) {
+                  total = parseFloat(amountMatch[1]).toFixed(2);
+                }
+              }
+              
+              // Look for merchant name patterns (usually first non-empty line or after "merchant:")
+              if (cleanLine.match(/^[a-zA-Z\s&'-]+$/) && cleanLine.length > 3 && merchantName === "Unknown Merchant") {
+                merchantName = cleanLine;
+              }
+              
+              // Look for location/address patterns
+              if (cleanLine.match(/(address|location)[:\s]*(.+)/i)) {
+                const locationMatch = cleanLine.match(/(address|location)[:\s]*(.+)/i);
+                if (locationMatch) {
+                  location = locationMatch[2];
+                }
+              }
             }
             
-            // Only reject if it's not a recognized payment QR format
-            return res.status(400).json({ 
-              error: "QR code does not contain payment information. Please scan a QR code from a completed payment or receipt." 
-            });
+            // If still no data found, return error
+            if (total === "0.00" && merchantName === "Unknown Merchant") {
+              return res.status(400).json({ 
+                error: "QR code format not recognized. Please scan a QR code containing receipt data with merchant name and amount." 
+              });
+            }
           }
         }
 

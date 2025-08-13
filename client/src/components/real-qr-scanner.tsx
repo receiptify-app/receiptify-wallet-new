@@ -89,13 +89,14 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     
     setIsScanning(true);
     
-    // Simulate scanning delay then process a test QR code with real payment data
-    setTimeout(() => {
-      // Use a test QR code that contains actual payment information
-      const testQrData = "https://checkout.square.site/merchant/TEST123/checkout/ABC456?amount=12.50&merchant=Demo Coffee Shop&location=London, UK";
-      scanMutation.mutate(testQrData);
-      setIsScanning(false);
-    }, 2000);
+    // For testing, prompt user to input their actual QR data
+    const userQrData = prompt("For testing: Paste your Square receipt QR code data here (or any QR code content):");
+    
+    if (userQrData && userQrData.trim()) {
+      scanMutation.mutate(userQrData.trim());
+    }
+    
+    setIsScanning(false);
   };
 
   return (
@@ -139,7 +140,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Scan QR codes from completed payments or receipts
+            Point camera at receipt QR code to extract transaction data
           </p>
           
           <Button 
@@ -148,11 +149,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
             className="w-full"
           >
             <Camera className="w-4 h-4 mr-2" />
-            {isScanning || scanMutation.isPending ? "Scanning..." : "Scan Receipt QR Code"}
+            {isScanning || scanMutation.isPending ? "Processing..." : "Test QR Scan"}
           </Button>
           
           <p className="text-xs text-gray-500">
-            QR codes must contain merchant name and amount information
+            For testing: Enter your actual QR code content when prompted
           </p>
         </div>
       </div>
