@@ -155,13 +155,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Domain-based merchant detection
           const hostname = url.hostname.toLowerCase();
           if (hostname.includes('square')) {
-            if (!merchant) merchantName = "Square Merchant";
-            category = "Retail";
-            // For square.link URLs, set minimum valid amount if none provided
-            if (total === "0.00" && hostname.includes('square.link')) {
-              total = "1.00"; // Default amount for square.link QR codes
-              console.log("Set default amount for square.link:", total);
+            // Only create receipts if we have actual payment data
+            if (!merchant && !amount && hostname.includes('square.link')) {
+              return res.status(400).json({ 
+                error: "Square QR code scanned but no payment information found. Please scan a QR code from a completed payment or receipt." 
+              });
             }
+            if (!merchant) merchantName = "Square Payment";
+            category = "Retail";
           } else if (hostname.includes('tesco')) {
             merchantName = "Tesco";
             category = "Groceries";
@@ -190,33 +191,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               total = parseFloat(amountMatch[1]).toFixed(2);
             }
             
-            // If it's a square.link URL but we don't have amount data, allow it with default
-            if (lowerData.includes('square.link')) {
-              merchantName = "Square Merchant";
-              total = "1.00";
-              location = "Unknown Location";
-              category = "Retail";
-            } else {
-              // Only reject if it's not a recognized payment QR format
-              return res.status(400).json({ 
-                error: "Invalid QR code format. Please scan a Square payment link or properly formatted payment QR code." 
-              });
-            }
+            // Only reject if it's not a recognized payment QR format
+            return res.status(400).json({ 
+              error: "QR code does not contain payment information. Please scan a QR code from a completed payment or receipt." 
+            });
           }
         }
 
         // Only create receipt if we have valid payment data - no random generation
-        // Allow Square link QR codes even without amount data
-        const isSquareLink = qrData.toLowerCase().includes('square.link');
-        if (total === "0.00" && !isSquareLink) {
+        if (total === "0.00") {
           return res.status(400).json({ 
-            error: "QR code does not contain valid payment information. Please scan a valid payment QR code with amount data." 
+            error: "QR code does not contain valid payment information. Please scan a QR code from a completed payment or receipt with amount data." 
           });
-        }
-        
-        // Set minimum amount for Square link QR codes if still 0
-        if (total === "0.00" && isSquareLink) {
-          total = "1.00";
         }
 
       } catch (e) {

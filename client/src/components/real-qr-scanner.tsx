@@ -89,10 +89,10 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     
     setIsScanning(true);
     
-    // Simulate scanning delay then process a test Square QR code
+    // Simulate scanning delay then process a test QR code with real payment data
     setTimeout(() => {
-      // Use a test Square QR code that we know works
-      const testQrData = "https://square.link/u/UXHXLdc8";
+      // Use a test QR code that contains actual payment information
+      const testQrData = "https://checkout.square.site/merchant/TEST123/checkout/ABC456?amount=12.50&merchant=Demo Coffee Shop&location=London, UK";
       scanMutation.mutate(testQrData);
       setIsScanning(false);
     }, 2000);
@@ -139,7 +139,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point your camera at a QR code and tap scan button
+            Scan QR codes from completed payments or receipts
           </p>
           
           <Button 
@@ -148,11 +148,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
             className="w-full"
           >
             <Camera className="w-4 h-4 mr-2" />
-            {isScanning || scanMutation.isPending ? "Scanning..." : "Scan QR Code"}
+            {isScanning || scanMutation.isPending ? "Scanning..." : "Scan Receipt QR Code"}
           </Button>
           
           <p className="text-xs text-gray-500">
-            Works with Square QR codes and payment links
+            QR codes must contain merchant name and amount information
           </p>
         </div>
       </div>
