@@ -11,7 +11,8 @@ import {
   ChevronRight,
   RefreshCw,
   Download,
-  Receipt
+  Receipt,
+  ShieldCheck
 } from "lucide-react";
 import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
@@ -196,20 +197,34 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Receipts Section */}
+        {/* Receipts & Warranties Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Receipts</h3>
-          <Card className="bg-white shadow-sm border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Download className="w-6 h-6 text-gray-700" />
-                  <span className="text-lg font-medium text-gray-900">Export Receipts</span>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Receipts & Warranties</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/warranties')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <ShieldCheck className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Warranties</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Download className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Export Receipts</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
