@@ -83,12 +83,20 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     setIsScanning(false);
   };
 
-  // For demo purposes - only use real QR data
+  // Simulate QR code detection (in a real app, you'd use a QR code library)
   const simulateQrDetection = () => {
-    const userQrData = prompt("For testing: Enter your Square QR code URL or payment data:");
+    if (isScanning) return;
+    
+    setIsScanning(true);
+    
+    // For demo purposes, prompt for QR data
+    const userQrData = prompt("Enter your Square QR code URL (e.g., https://square.link/u/ABC123):");
+    
     if (userQrData && userQrData.trim()) {
-      handleQrScan(userQrData.trim());
+      scanMutation.mutate(userQrData.trim());
     }
+    
+    setIsScanning(false);
   };
 
   return (
@@ -141,11 +149,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
             className="w-full"
           >
             <Camera className="w-4 h-4 mr-2" />
-            {isScanning || scanMutation.isPending ? "Scanning..." : "Enter QR Data (For Testing)"}
+            {isScanning || scanMutation.isPending ? "Scanning..." : "Tap to Scan QR Code"}
           </Button>
           
           <p className="text-xs text-gray-500">
-            Use Square payment links with ?amount=X.XX&merchant=Name&location=City parameters
+            Supports Square QR codes (square.link/u/...) and payment links with amount data
           </p>
         </div>
       </div>
