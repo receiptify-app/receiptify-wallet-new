@@ -19,6 +19,8 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null);
+  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [scanCooldown, setScanCooldown] = useState(false);
 
   const scanMutation = useMutation({
     mutationFn: async (qrData: string) => {
@@ -54,11 +56,14 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
         });
       }
       
-      // Reset scanner for next attempt
-      setIsScanning(false);
-      if (qrScanner) {
-        qrScanner.start().catch(console.error);
-      }
+      // Reset scanner for next attempt after a delay
+      setTimeout(() => {
+        setIsScanning(false);
+        setScanCooldown(false);
+        if (qrScanner) {
+          qrScanner.start().catch(console.error);
+        }
+      }, 2000);
     }
   });
 
@@ -69,9 +74,23 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
         videoRef.current,
         (result) => {
           console.log('QR Code detected:', result.data);
+          
+          // Prevent scanning the same code multiple times
+          if (result.data === lastScannedCode || scanCooldown || isScanning) {
+            return;
+          }
+          
+          setLastScannedCode(result.data);
           setIsScanning(true);
+          setScanCooldown(true);
           scanner.stop();
           scanMutation.mutate(result.data);
+          
+          // Reset cooldown after 3 seconds
+          setTimeout(() => {
+            setScanCooldown(false);
+            setLastScannedCode('');
+          }, 3000);
         },
         {
           returnDetailedScanResult: true,
@@ -141,11 +160,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
           </div>
 
           {/* Scanning indicator */}
-          {(isScanning || scanMutation.isPending) && (
+          {(isScanning || scanMutation.isPending || scanCooldown) && (
             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
               <div className="text-white text-center">
                 <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-2" />
-                <p>Processing QR Code...</p>
+                <p>{scanCooldown ? 'QR Code Detected...' : 'Processing QR Code...'}</p>
               </div>
             </div>
           )}
@@ -153,14 +172,12 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point your camera at a receipt QR code with transaction data. Not all QR codes contain receipt information.
+            Point your camera at a receipt QR code with transaction data.
           </p>
           
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-xs">
-            <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">QR Code Tips:</p>
-            <p className="text-blue-700 dark:text-blue-300">• Look for QR codes on printed receipts</p>
-            <p className="text-blue-700 dark:text-blue-300">• Square payment links won't work - use 'Add Receipt' instead</p>
-            <p className="text-blue-700 dark:text-blue-300">• Make sure QR code is clear and well-lit</p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg text-xs">
+            <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">Important:</p>
+            <p className="text-amber-700 dark:text-amber-300">Square QR codes are payment links, not receipts. Use "Add Receipt Manually" below for Square transactions.</p>
           </div>
           
           <Button 
