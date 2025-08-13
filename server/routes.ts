@@ -95,8 +95,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: defaultUserId,
         merchantName: "Scanned Receipt",
         location: "Unknown Location",
-        total: "0.00",
-        date: new Date(),
+        total: "15.99",
+        date: new Date().toISOString(),
         category: "Other",
         paymentMethod: "Unknown",
         receiptNumber: `SCN${Date.now()}`,
@@ -107,6 +107,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing upload:", error);
       res.status(400).json({ error: "Failed to process receipt" });
+    }
+  });
+
+  // QR Code processing endpoint
+  app.post("/api/receipts/qr", async (req, res) => {
+    try {
+      const { qrData } = req.body;
+      
+      if (!qrData) {
+        return res.status(400).json({ error: "QR data is required" });
+      }
+
+      // Parse QR code data (simulate processing)
+      const mockReceiptData = {
+        userId: defaultUserId,
+        merchantName: qrData.includes('tesco') ? "Tesco Express" : 
+                     qrData.includes('waitrose') ? "Waitrose" :
+                     qrData.includes('shell') ? "Shell Station" : "Unknown Merchant",
+        location: "High Street, London",
+        total: "12.45",
+        date: new Date().toISOString(),
+        category: "Groceries",
+        paymentMethod: "Contactless",
+        receiptNumber: `QR${Date.now()}`,
+      };
+
+      const receipt = await storage.createReceipt(mockReceiptData);
+      
+      // Add some sample items
+      const sampleItems = [
+        { name: "Milk 2L", price: "1.25", quantity: "1", receiptId: receipt.id },
+        { name: "Bread", price: "0.85", quantity: "1", receiptId: receipt.id },
+        { name: "Apples 1kg", price: "2.50", quantity: "1", receiptId: receipt.id }
+      ];
+
+      for (const item of sampleItems) {
+        await storage.createReceiptItem(item);
+      }
+
+      res.status(201).json(receipt);
+    } catch (error) {
+      console.error("Error processing QR code:", error);
+      res.status(400).json({ error: "Failed to process QR code" });
     }
   });
 
@@ -389,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { receiptId, itemId } = req.query;
       const comments = await storage.getComments(
         receiptId as string,
-        itemId as string
+        itemId as string | undefined
       );
       res.json(comments);
     } catch (error: any) {

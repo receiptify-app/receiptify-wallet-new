@@ -261,6 +261,8 @@ export const insertMerchantSchema = createInsertSchema(merchants).omit({
 export const insertReceiptSchema = createInsertSchema(receipts).omit({
   id: true,
   createdAt: true,
+}).extend({
+  date: z.string().or(z.date()).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
 
 export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({

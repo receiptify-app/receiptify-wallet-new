@@ -18,42 +18,26 @@ export default function QrScanner({ onClose, onScan }: QrScannerProps) {
       // Simulate QR scan processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Mock receipt data from QR scan
-      const mockReceiptData = {
-        merchantName: "Waitrose & Partners",
-        location: "Canary Wharf, London",
-        total: "18.95",
-        date: new Date().toISOString(),
-        category: "Groceries",
-        paymentMethod: "Card",
-        items: [
-          { name: "Essential Oranges 1kg", price: "2.50", category: "Fruit" },
-          { name: "Duchy Organic Milk 1L", price: "1.85", category: "Dairy" },
-          { name: "Essential Pasta 500g", price: "1.20", category: "Pantry" },
-          { name: "Salmon Fillet 200g", price: "4.50", category: "Fish" },
-          { name: "Baby Spinach 200g", price: "2.25", category: "Vegetables" },
-          { name: "Sourdough Loaf", price: "3.50", category: "Bakery" },
-          { name: "Greek Yogurt 500g", price: "3.15", category: "Dairy" },
-        ]
-      };
+      // Simulate QR code detection
+      const qrData = "tesco-receipt-qr-12345678";
 
-      const response = await fetch('/api/receipts', {
+      const response = await fetch('/api/receipts/qr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mockReceiptData),
+        body: JSON.stringify({ qrData }),
       });
       
-      if (!response.ok) throw new Error('Failed to create receipt');
+      if (!response.ok) throw new Error('Failed to process QR code');
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: "QR code scanned successfully",
-        description: "Receipt imported from Waitrose & Partners.",
+        description: "Receipt imported from Tesco Express.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/eco-metrics'] });
-      onScan("waitrose-receipt-data");
+      onScan("tesco-receipt-data");
       onClose();
     },
     onError: () => {
