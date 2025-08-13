@@ -96,6 +96,24 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Subscriptions Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Subscriptions</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/subscriptions')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <RefreshCw className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">Subscription Tracker</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
         {/* Payment & Loyalty Section */}
         <div>
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Payment & Loyalty</h3>

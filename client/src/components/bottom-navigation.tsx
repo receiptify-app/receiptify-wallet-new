@@ -8,13 +8,14 @@ import {
   MapPin,
   User,
   RefreshCw,
-  Shield
+  Shield,
+  Receipt
 } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: Home, label: "Home" },
   { path: "/scan", icon: QrCode, label: "Scan" },
-  { path: "/subscriptions", icon: RefreshCw, label: "Subs" },
+  { path: "/receipts", icon: Receipt, label: "My Receipts" },
   { path: "/profile", icon: User, label: "More" },
 ];
 

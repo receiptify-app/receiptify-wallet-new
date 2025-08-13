@@ -24,13 +24,15 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     },
     onSuccess: (data: any) => {
       toast({
-        title: "QR code scanned successfully",
-        description: `Receipt imported from ${data.merchantName || "merchant"}.`,
+        title: "Receipt Created",
+        description: `Successfully processed receipt from ${data.merchantName || "merchant"}.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/eco-metrics'] });
       onScan("qr-receipt-data");
       onClose();
+      // Navigate to receipts page to show the scanned receipt
+      window.location.href = '/receipts';
     },
     onError: () => {
       toast({
