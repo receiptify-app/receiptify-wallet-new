@@ -44,8 +44,8 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
       // Handle specific error types
       if (error.message?.includes('Square QR code detected')) {
         toast({
-          title: "Square QR Code Detected",
-          description: "Square QR codes don't contain receipt data. Please enter receipt details manually using 'Add Receipt'.",
+          title: "Square Receipt Processing Failed",
+          description: "Unable to fetch receipt data from Square. Try scanning again or enter details manually.",
           variant: "destructive",
         });
       } else {
@@ -175,9 +175,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
             Point your camera at a receipt QR code with transaction data.
           </p>
           
-          <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg text-xs">
-            <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">Important:</p>
-            <p className="text-amber-700 dark:text-amber-300">Square QR codes are payment links, not receipts. Use "Add Receipt Manually" below for Square transactions.</p>
+          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-xs">
+            <p className="font-medium text-green-800 dark:text-green-200 mb-1">QR Scanner Ready:</p>
+            <p className="text-green-700 dark:text-green-300">• Detects Square receipts and extracts transaction data</p>
+            <p className="text-green-700 dark:text-green-300">• Works with receipt QR codes containing merchant info</p>
+            <p className="text-green-700 dark:text-green-300">• Automatically processes payment information</p>
           </div>
           
           <Button 
