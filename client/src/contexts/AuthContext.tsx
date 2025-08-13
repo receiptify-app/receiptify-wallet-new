@@ -51,9 +51,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Welcome to Receiptify! You can now start managing your receipts.",
       });
     } catch (error: any) {
+      console.error("Signup error:", error);
+      let errorMessage = "Failed to create account";
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "An account with this email already exists.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use at least 6 characters.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Please enter a valid email address.";
+      }
       toast({
         title: "Signup failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -68,9 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Successfully signed in to your account.",
       });
     } catch (error: any) {
+      console.error("Login error:", error);
+      let errorMessage = "Failed to sign in";
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email address.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Incorrect password. Please try again.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Please enter a valid email address.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed attempts. Please try again later.";
+      }
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -116,15 +140,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
+      // Add custom parameters for better compatibility
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
       await signInWithPopup(auth, provider);
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Google.",
       });
     } catch (error: any) {
+      console.error("Google sign in error:", error);
+      let errorMessage = "Failed to sign in with Google";
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = "Sign in was cancelled.";
+      }
       toast({
         title: "Google sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;

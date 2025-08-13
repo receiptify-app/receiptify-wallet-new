@@ -21,6 +21,8 @@ import Payment from "@/pages/payment";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
+import ForgotPassword from "@/pages/forgot-password";
+import TestAuth from "@/pages/test-auth";
 import BottomNavigation from "@/components/bottom-navigation";
 
 function AuthenticatedRouter() {
@@ -42,6 +44,8 @@ function AuthenticatedRouter() {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/test-auth" component={TestAuth} />
         <Route component={Landing} />
       </Switch>
     );
