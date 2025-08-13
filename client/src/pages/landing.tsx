@@ -1,137 +1,191 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Receipt, Leaf, Shield, MapPin, RefreshCw, QrCode, ArrowRight } from "lucide-react";
-import logoSrc from "@assets/2C508BEA-D169-4FDB-A1F9-0F6E333C1A18_1754620280792.png";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Leaf, QrCode, Smartphone, TrendingUp, Users, ShieldCheck } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Landing() {
-  const features = [
-    {
-      icon: QrCode,
-      title: "Instant Scanning",
-      description: "QR codes, camera capture, and automated receipt detection"
-    },
-    {
-      icon: Leaf,
-      title: "Eco Impact",
-      description: "Track your environmental savings and reduce paper waste"
-    },
-    {
-      icon: RefreshCw,
-      title: "Smart Subscriptions",
-      description: "Auto-detect and manage recurring purchases"
-    },
-    {
-      icon: Shield,
-      title: "Warranty Tracking",
-      description: "Never miss warranty expiry dates or claims"
-    },
-    {
-      icon: MapPin,
-      title: "Location Mapping",
-      description: "Geo-tagged receipts with interactive maps"
-    },
-    {
-      icon: Receipt,
-      title: "Bill Splitting",
-      description: "Share costs and collaborate on group purchases"
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
-      {/* Hero Section */}
-      <div className="px-6 py-12 text-center">
-        <div className="mb-8 flex justify-center">
-          <div className="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center p-4">
-            <img 
-              src={logoSrc} 
-              alt="Receiptify Logo" 
-              className="w-full h-full object-contain"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+      {/* Header */}
+      <header className="px-6 py-4 bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Leaf className="w-8 h-8 text-green-600" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
+              <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <Link href="/login">
+              <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button className="bg-green-600 hover:bg-green-700">
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
-        
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Receiptify
-        </h1>
-        <p className="text-xl text-gray-700 font-medium mb-2">
-          OneTap Receipts. Zero Paper.
-        </p>
-        <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          The UK's leading eco-friendly digital receipt management platform. 
-          Consolidate, track, and collaborate on all your purchases.
-        </p>
+      </header>
 
-        <div className="space-y-4">
-          <Button 
-            size="lg" 
-            className="w-full max-w-sm bg-primary hover:bg-primary/90 text-white font-semibold py-3"
-          >
-            Get Started
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-          <p className="text-sm text-gray-500">
-            Free to use • No credit card required
+      {/* Hero Section */}
+      <section className="px-6 py-16 text-center">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-5xl font-bold text-gray-900 mb-6">
+            Go Paperless with <span className="text-green-600">Smart Receipts</span>
+          </h2>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Capture, organize, and track your receipts effortlessly. Save the environment while managing your expenses with our eco-friendly digital receipt platform.
           </p>
-        </div>
-      </div>
-
-      {/* Features Grid */}
-      <div className="px-6 pb-12">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          Everything you need for digital receipts
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <Card key={index} className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                      <p className="text-sm text-gray-600">{feature.description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Environmental Impact CTA */}
-      <div className="px-6 pb-12">
-        <Card className="bg-gradient-to-r from-green-600 to-emerald-600 border-0 text-white max-w-md mx-auto">
-          <CardContent className="p-8 text-center">
-            <Leaf className="h-12 w-12 mx-auto mb-4 text-green-100" />
-            <h3 className="text-xl font-bold mb-2">Make an Impact</h3>
-            <p className="text-green-100 mb-4">
-              Our users have saved over 50,000 sheets of paper and reduced CO₂ emissions by 127kg
-            </p>
-            <Button 
-              variant="secondary" 
-              className="bg-white text-green-700 hover:bg-green-50"
-            >
-              Start Saving Today
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link href="/signup">
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 px-8 py-4 text-lg">
+                Start Free Trial
+              </Button>
+            </Link>
+            <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
+              Watch Demo
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="px-6 py-16 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <h3 className="text-3xl font-bold text-center text-gray-900 mb-12">
+            Everything you need to go paperless
+          </h3>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <QrCode className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Instant QR Scanning</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Scan any receipt QR code with your camera. Instantly capture transaction details from Square, Tesco, and more.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <Smartphone className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Smart Organization</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Automatic categorization, expense tracking, and receipt splitting. Your receipts organized intelligently.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <Leaf className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Eco Impact Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  See your environmental impact. Track papers saved, CO₂ reduced, and trees protected by going digital.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Expense Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Detailed spending insights, subscription tracking, and budget management tools to control your finances.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <Users className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Bill Splitting</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Split receipts with friends instantly. Generate payment links and track who owes what with ease.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="text-center">
+                <ShieldCheck className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <CardTitle className="text-xl">Warranty Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Never lose a warranty again. Track expiry dates, get reminders, and manage all your product warranties.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="px-6 py-16 bg-green-600 text-white">
+        <div className="max-w-4xl mx-auto text-center">
+          <h3 className="text-3xl font-bold mb-12">Join thousands saving the planet</h3>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div>
+              <div className="text-4xl font-bold mb-2">50K+</div>
+              <div className="text-green-100">Papers Saved</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold mb-2">2.5K</div>
+              <div className="text-green-100">Trees Protected</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold mb-2">15K</div>
+              <div className="text-green-100">Happy Users</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="px-6 py-16 text-center">
+        <div className="max-w-3xl mx-auto">
+          <h3 className="text-3xl font-bold text-gray-900 mb-6">
+            Ready to go paperless?
+          </h3>
+          <p className="text-xl text-gray-600 mb-8">
+            Join Receiptify today and start making a positive environmental impact while organizing your receipts effortlessly.
+          </p>
+          <Link href="/signup">
+            <Button size="lg" className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg">
+              Start Your Free Trial
+            </Button>
+          </Link>
+        </div>
+      </section>
 
       {/* Footer */}
-      <div className="px-6 py-8 text-center border-t border-green-200/50">
-        <p className="text-sm text-gray-600 mb-2">
-          Trusted by eco-conscious shoppers across the UK
-        </p>
-        <p className="text-xs text-gray-500">
-          © 2025 Receiptify. Digitizing receipts for a greener future.
-        </p>
-      </div>
+      <footer className="px-6 py-8 bg-gray-900 text-white">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Leaf className="w-6 h-6 text-green-400" />
+            <span className="text-xl font-bold">Receiptify</span>
+          </div>
+          <p className="text-gray-400">OneTap Receipts. Zero Paper. © 2025</p>
+        </div>
+      </footer>
     </div>
   );
 }

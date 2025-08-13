@@ -12,9 +12,11 @@ import {
   RefreshCw,
   Download,
   Receipt,
-  ShieldCheck
+  ShieldCheck,
+  LogOut
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import AppHeader from "@/components/app-header";
 
 // Sample user data matching the mockup
@@ -28,11 +30,27 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const [darkMode, setDarkMode] = useState(false);
   const [gbpCurrency, setGbpCurrency] = useState(true);
+  const { currentUser, logout } = useAuth();
 
   const { data: user = sampleUser } = useQuery<typeof sampleUser>({
     queryKey: ["/api/user"],
     retry: false,
   });
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  // Use Firebase user data if available, fallback to sample data
+  const displayUser = currentUser ? {
+    name: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
+    email: currentUser.email || "user@example.com",
+    avatar: currentUser.photoURL || sampleUser.avatar
+  } : user;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -50,14 +68,14 @@ export default function Profile() {
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
                   <img 
-                    src={user.avatar} 
-                    alt={user.name}
+                    src={displayUser.avatar} 
+                    alt={displayUser.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">{user.name}</h2>
-                  <p className="text-gray-600">{user.email}</p>
+                  <h2 className="text-xl font-bold text-gray-900">{displayUser.name}</h2>
+                  <p className="text-gray-600">{displayUser.email}</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -225,6 +243,22 @@ export default function Profile() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Logout Section */}
+        <div>
+          <Card className="bg-white shadow-sm border-0">
+            <CardContent className="p-6">
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="w-full h-12 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <LogOut className="w-5 h-5 mr-3" />
+                Sign Out
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
