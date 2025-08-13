@@ -769,7 +769,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
-    const [newReceipt] = await db.insert(receipts).values(receipt).returning();
+    // Ensure date is properly formatted
+    const receiptData = {
+      ...receipt,
+      date: typeof receipt.date === 'string' ? new Date(receipt.date) : receipt.date
+    };
+    const [newReceipt] = await db.insert(receipts).values(receiptData).returning();
     return newReceipt;
   }
 

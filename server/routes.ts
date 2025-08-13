@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         merchantName,
         location: "London, UK",
         total,
-        date: new Date().toISOString(),
+        date: new Date(),
         category,
         paymentMethod: "QR Payment",
         receiptNumber: `QR${Date.now()}`,
