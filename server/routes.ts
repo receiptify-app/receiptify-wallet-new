@@ -119,39 +119,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "QR data is required" });
       }
 
-      // Parse QR code data - handle different QR code types
+      // Enhanced QR data extraction - parse actual QR content
       let merchantName = "Unknown Merchant";
       let category = "Other";
-      let total = (Math.random() * 50 + 10).toFixed(2); // Random amount between £10-60
-      
-      // Detect merchant from QR data
-      if (qrData.toLowerCase().includes('tesco') || qrData.includes('tesco')) {
-        merchantName = "Tesco Express";
-        category = "Groceries";
-      } else if (qrData.toLowerCase().includes('waitrose')) {
-        merchantName = "Waitrose & Partners";
-        category = "Groceries";
-      } else if (qrData.toLowerCase().includes('shell')) {
-        merchantName = "Shell Station";
-        category = "Fuel";
-      } else if (qrData.toLowerCase().includes('square') || qrData.includes('checkout')) {
-        merchantName = "Square Merchant";
-        category = "Retail";
-      } else if (qrData.startsWith('http')) {
-        // Handle payment/checkout links
-        if (qrData.includes('square') || qrData.includes('checkout')) {
-          merchantName = "Square Payment";
-          category = "Payment";
+      let total = "0.00";
+      let location = "Unknown Location";
+
+      console.log("Processing QR data:", qrData);
+
+      try {
+        // Try to parse as URL and extract parameters
+        if (qrData.startsWith('http')) {
+          const url = new URL(qrData);
+          const params = new URLSearchParams(url.search);
+          
+          // Extract common payment parameters
+          const amount = params.get('amount') || params.get('total') || params.get('price') || params.get('sum');
+          const merchant = params.get('merchant') || params.get('business') || params.get('name') || params.get('store');
+          const itemName = params.get('item') || params.get('product') || params.get('description');
+          const loc = params.get('location') || params.get('address') || params.get('city');
+          
+          if (amount) {
+            total = parseFloat(amount).toFixed(2);
+          }
+          if (merchant) {
+            merchantName = merchant;
+          }
+          if (loc) {
+            location = loc;
+          }
+          if (itemName && !merchant) {
+            merchantName = itemName;
+          }
+
+          // Domain-based merchant detection
+          const hostname = url.hostname.toLowerCase();
+          if (hostname.includes('square')) {
+            if (!merchant) merchantName = "Square Merchant";
+            category = "Retail";
+          } else if (hostname.includes('tesco')) {
+            merchantName = "Tesco";
+            category = "Groceries";
+          } else if (hostname.includes('waitrose')) {
+            merchantName = "Waitrose";
+            category = "Groceries";
+          } else if (hostname.includes('shell')) {
+            merchantName = "Shell";
+            category = "Fuel";
+          }
         } else {
-          merchantName = "Online Merchant";
-          category = "Online";
+          // Try to parse as structured data (JSON, etc.)
+          try {
+            const jsonData = JSON.parse(qrData);
+            if (jsonData.merchant) merchantName = jsonData.merchant;
+            if (jsonData.amount || jsonData.total) total = (jsonData.amount || jsonData.total).toString();
+            if (jsonData.location) location = jsonData.location;
+            if (jsonData.category) category = jsonData.category;
+          } catch (e) {
+            // If not JSON, try to extract data from plain text
+            const lowerData = qrData.toLowerCase();
+            
+            // Look for amount patterns (£X.XX, $X.XX, X.XX)
+            const amountMatch = qrData.match(/[£$]?(\d+\.?\d*)/);
+            if (amountMatch) {
+              total = parseFloat(amountMatch[1]).toFixed(2);
+            }
+            
+            // Look for merchant patterns in text
+            if (lowerData.includes('tesco')) {
+              merchantName = "Tesco";
+              category = "Groceries";
+            } else if (lowerData.includes('waitrose')) {
+              merchantName = "Waitrose";
+              category = "Groceries";
+            } else if (lowerData.includes('shell')) {
+              merchantName = "Shell";
+              category = "Fuel";
+            } else if (lowerData.includes('square')) {
+              merchantName = "Square Merchant";
+              category = "Retail";
+            }
+          }
         }
+
+        // If no amount was found, we should not create a receipt with random data
+        if (total === "0.00") {
+          return res.status(400).json({ 
+            error: "QR code does not contain valid payment information. Please scan a valid payment QR code with amount data." 
+          });
+        }
+
+      } catch (e) {
+        console.error("Error parsing QR data:", e);
+        return res.status(400).json({ 
+          error: "Invalid QR code format. Please scan a valid payment QR code." 
+        });
       }
 
       const receiptData = {
         userId: defaultUserId,
         merchantName,
-        location: "London, UK",
+        location,
         total,
         date: new Date(),
         category,
@@ -161,15 +229,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const receipt = await storage.createReceipt(receiptData);
       
-      // Add some sample items
-      const sampleItems = [
-        { name: "Milk 2L", price: "1.25", quantity: "1", receiptId: receipt.id },
-        { name: "Bread", price: "0.85", quantity: "1", receiptId: receipt.id },
-        { name: "Apples 1kg", price: "2.50", quantity: "1", receiptId: receipt.id }
-      ];
+      // Only add items if we have specific product information from the QR code
+      // Otherwise, create a single line item for the total amount
+      const receiptItems = [];
+      
+      try {
+        if (qrData.startsWith('http')) {
+          const url = new URL(qrData);
+          const params = new URLSearchParams(url.search);
+          const itemName = params.get('item') || params.get('product') || params.get('description');
+          
+          if (itemName) {
+            receiptItems.push({
+              name: itemName,
+              price: total,
+              quantity: "1",
+              receiptId: receipt.id
+            });
+          }
+        } else {
+          // Try to parse JSON for items
+          try {
+            const jsonData = JSON.parse(qrData);
+            if (jsonData.items && Array.isArray(jsonData.items)) {
+              for (const item of jsonData.items) {
+                receiptItems.push({
+                  name: item.name || "Item",
+                  price: item.price || "0.00",
+                  quantity: item.quantity || "1",
+                  receiptId: receipt.id
+                });
+              }
+            }
+          } catch (e) {
+            // Not JSON, skip item parsing
+          }
+        }
+        
+        // If no specific items found, create a general purchase item
+        if (receiptItems.length === 0) {
+          receiptItems.push({
+            name: `Purchase from ${merchantName}`,
+            price: total,
+            quantity: "1",
+            receiptId: receipt.id
+          });
+        }
 
-      for (const item of sampleItems) {
-        await storage.createReceiptItem(item);
+        // Create the receipt items
+        for (const item of receiptItems) {
+          await storage.createReceiptItem(item);
+        }
+      } catch (error) {
+        console.error("Error creating receipt items:", error);
+        // Create fallback item
+        await storage.createReceiptItem({
+          name: `Purchase from ${merchantName}`,
+          price: total,
+          quantity: "1",
+          receiptId: receipt.id
+        });
       }
 
       res.status(201).json(receipt);
