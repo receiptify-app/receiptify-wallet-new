@@ -185,20 +185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               total = parseFloat(amountMatch[1]).toFixed(2);
             }
             
-            // Look for merchant patterns in text
-            if (lowerData.includes('tesco')) {
-              merchantName = "Tesco";
-              category = "Groceries";
-            } else if (lowerData.includes('waitrose')) {
-              merchantName = "Waitrose";
-              category = "Groceries";
-            } else if (lowerData.includes('shell')) {
-              merchantName = "Shell";
-              category = "Fuel";
-            } else if (lowerData.includes('square')) {
-              merchantName = "Square Merchant";
-              category = "Retail";
-            }
+            // Only accept properly formatted QR codes, no fallback pattern matching
+            return res.status(400).json({ 
+              error: "Invalid QR code format. Please scan a Square payment link or properly formatted payment QR code." 
+            });
           }
         }
 

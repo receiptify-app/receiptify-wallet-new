@@ -74,27 +74,21 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     };
   }, []);
 
-  // Simulate QR code detection (in a real app, you'd use a QR code library)
-  const simulateQrDetection = () => {
+  // Handle real QR code scanning
+  const handleQrScan = (qrData: string) => {
     if (isScanning) return;
     
     setIsScanning(true);
-    
-    // Simulate QR code scanning delay
-    setTimeout(() => {
-      // Simulate different types of QR codes
-      const qrTypes = [
-        "https://checkout.square.site/merchant/abc123",
-        "https://square.link/u/abc123",
-        "tesco-receipt-123456",
-        "waitrose-payment-789012",
-        "shell-fuel-345678"
-      ];
-      
-      const randomQr = qrTypes[Math.floor(Math.random() * qrTypes.length)];
-      scanMutation.mutate(randomQr);
-      setIsScanning(false);
-    }, 2000);
+    scanMutation.mutate(qrData);
+    setIsScanning(false);
+  };
+
+  // For demo purposes - only use real QR data
+  const simulateQrDetection = () => {
+    const userQrData = prompt("For testing: Enter your Square QR code URL or payment data:");
+    if (userQrData && userQrData.trim()) {
+      handleQrScan(userQrData.trim());
+    }
   };
 
   return (
@@ -138,7 +132,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point your camera at a payment QR code with merchant and amount information
+            Point your camera at a Square payment QR code to scan
           </p>
           
           <Button 
@@ -147,8 +141,12 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
             className="w-full"
           >
             <Camera className="w-4 h-4 mr-2" />
-            {isScanning || scanMutation.isPending ? "Scanning..." : "Tap to Scan"}
+            {isScanning || scanMutation.isPending ? "Scanning..." : "Enter QR Data (For Testing)"}
           </Button>
+          
+          <p className="text-xs text-gray-500">
+            Use Square payment links with ?amount=X.XX&merchant=Name&location=City parameters
+          </p>
         </div>
       </div>
     </div>
