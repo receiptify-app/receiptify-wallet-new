@@ -29,6 +29,7 @@ The application features multi-channel receipt capture (QR codes, camera scans, 
 ✓ **Receiptify Branding**: Implemented consistent "Receiptify" branding with new logo and "OneTap Receipts. Zero Paper." tagline across all pages
 ✓ **Comprehensive Receipt Splitting**: Full bill splitting system with shared receipts, payment confirmations, and collaboration features
 ✓ **Payment Integration System**: Complete Apple Pay, Google Pay, and credit card integration with comprehensive payment method management, secure payment processing for split receipts and invoice payments, profile/settings page with payment method linking, and seamless payment selection interface matching user mockup design
+✓ **Enhanced Manual Receipt Entry**: Complete manual receipt form with photo capture, real barcode scanning using QuaggaJS, itemized entry with automatic calculations, comprehensive form validation, and integration with existing storage system - resolves issue where manual receipts showed auto-generated data instead of actual receipt information
 
 # User Preferences
 
