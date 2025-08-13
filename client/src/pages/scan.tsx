@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Camera, Upload, QrCode, FileText } from "lucide-react";
-import QrScanner from "@/components/qr-scanner";
+import RealQrScanner from "@/components/real-qr-scanner";
 import ScannerModal from "@/components/scanner-modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -144,7 +144,7 @@ export default function Scan() {
 
       {/* QR Scanner Modal */}
       {showQrScanner && (
-        <QrScanner
+        <RealQrScanner
           onClose={() => setShowQrScanner(false)}
           onScan={(data) => {
             console.log("QR Code scanned:", data);

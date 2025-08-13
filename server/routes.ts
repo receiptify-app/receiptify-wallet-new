@@ -119,21 +119,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "QR data is required" });
       }
 
-      // Parse QR code data (simulate processing)
-      const mockReceiptData = {
+      // Parse QR code data - handle different QR code types
+      let merchantName = "Unknown Merchant";
+      let category = "Other";
+      let total = (Math.random() * 50 + 10).toFixed(2); // Random amount between £10-60
+      
+      // Detect merchant from QR data
+      if (qrData.toLowerCase().includes('tesco') || qrData.includes('tesco')) {
+        merchantName = "Tesco Express";
+        category = "Groceries";
+      } else if (qrData.toLowerCase().includes('waitrose')) {
+        merchantName = "Waitrose & Partners";
+        category = "Groceries";
+      } else if (qrData.toLowerCase().includes('shell')) {
+        merchantName = "Shell Station";
+        category = "Fuel";
+      } else if (qrData.toLowerCase().includes('square') || qrData.includes('checkout')) {
+        merchantName = "Square Merchant";
+        category = "Retail";
+      } else if (qrData.startsWith('http')) {
+        // Handle payment/checkout links
+        if (qrData.includes('square') || qrData.includes('checkout')) {
+          merchantName = "Square Payment";
+          category = "Payment";
+        } else {
+          merchantName = "Online Merchant";
+          category = "Online";
+        }
+      }
+
+      const receiptData = {
         userId: defaultUserId,
-        merchantName: qrData.includes('tesco') ? "Tesco Express" : 
-                     qrData.includes('waitrose') ? "Waitrose" :
-                     qrData.includes('shell') ? "Shell Station" : "Unknown Merchant",
-        location: "High Street, London",
-        total: "12.45",
+        merchantName,
+        location: "London, UK",
+        total,
         date: new Date().toISOString(),
-        category: "Groceries",
-        paymentMethod: "Contactless",
+        category,
+        paymentMethod: "QR Payment",
         receiptNumber: `QR${Date.now()}`,
       };
 
-      const receipt = await storage.createReceipt(mockReceiptData);
+      const receipt = await storage.createReceipt(receiptData);
       
       // Add some sample items
       const sampleItems = [
