@@ -125,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let total = "0.00";
       let location = "Unknown Location";
 
-      console.log("Processing QR data:", qrData);
+      console.log("Processing QR data:", qrData.substring(0, 50) + "...");
 
       try {
         // Try to parse as URL and extract parameters
