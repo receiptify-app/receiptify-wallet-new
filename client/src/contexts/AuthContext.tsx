@@ -178,9 +178,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Successfully signed in with Facebook.",
       });
     } catch (error: any) {
+      console.error("Facebook sign in error:", error);
+      let errorMessage = "Failed to sign in with Facebook";
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = "Sign in was cancelled.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = "Facebook sign-in is not enabled. Please contact support.";
+      }
       toast({
         title: "Facebook sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -198,9 +209,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Successfully signed in with Apple.",
       });
     } catch (error: any) {
+      console.error("Apple sign in error:", error);
+      let errorMessage = "Failed to sign in with Apple";
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = "Sign in was cancelled.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = "Apple sign-in is not enabled. Please contact support.";
+      }
       toast({
         title: "Apple sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;

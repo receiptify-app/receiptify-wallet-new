@@ -2,12 +2,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/firebase";
-import { signInAnonymously } from "firebase/auth";
-import { Leaf } from "lucide-react";
+import { signInAnonymously, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { Leaf, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
+import FirebaseSetupHelp from "@/components/firebase-setup-help";
 
 export default function TestAuth() {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<string>("");
+  const [showSetupHelp, setShowSetupHelp] = useState(false);
 
   const testFirebaseConnection = async () => {
     setTesting(true);
@@ -15,21 +18,35 @@ export default function TestAuth() {
     
     try {
       console.log("Testing Firebase connection...");
-      console.log("Firebase config:", {
+      const configInfo = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? "Set" : "Missing",
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "Missing",
         appId: import.meta.env.VITE_FIREBASE_APP_ID ? "Set" : "Missing"
-      });
+      };
+      console.log("Firebase config:", configInfo);
+      
+      setResult(`🔍 Testing Firebase connection...\n\nConfig Status:\n${JSON.stringify(configInfo, null, 2)}\n\n`);
       
       // Try anonymous auth as a simple test
       const userCredential = await signInAnonymously(auth);
-      setResult(`✅ Firebase connection successful! User ID: ${userCredential.user.uid}`);
+      setResult(prev => prev + `✅ Firebase connection successful!\nUser ID: ${userCredential.user.uid}\n\n`);
+      
+      // Test Google Auth setup
+      try {
+        const provider = new GoogleAuthProvider();
+        // Just check if we can create the provider
+        setResult(prev => prev + `✅ Google Auth provider created successfully\n`);
+      } catch (googleError: any) {
+        setResult(prev => prev + `❌ Google Auth setup failed: ${googleError.message}\n`);
+      }
       
       // Sign out the test user
       await auth.signOut();
+      setResult(prev => prev + `✅ Test completed successfully`);
+      
     } catch (error: any) {
       console.error("Firebase test error:", error);
-      setResult(`❌ Firebase error: ${error.code} - ${error.message}`);
+      setResult(prev => prev + `❌ Firebase error: ${error.code}\nMessage: ${error.message}\n\nFull error: ${JSON.stringify(error, null, 2)}`);
     } finally {
       setTesting(false);
     }
@@ -74,8 +91,26 @@ export default function TestAuth() {
               <li>App ID: {import.meta.env.VITE_FIREBASE_APP_ID ? "✅ Set" : "❌ Missing"}</li>
             </ul>
           </div>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowSetupHelp(!showSetupHelp)}
+              variant="outline"
+              className="w-full h-12"
+            >
+              {showSetupHelp ? "Hide" : "Show"} Setup Guide
+            </Button>
+            
+            <Link href="/">
+              <Button variant="outline" size="icon" className="h-12 w-12">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
+
+      {showSetupHelp && <FirebaseSetupHelp />}
     </div>
   );
 }

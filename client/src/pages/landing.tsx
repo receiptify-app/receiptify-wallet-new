@@ -29,6 +29,11 @@ export default function Landing() {
                 Get Started
               </Button>
             </Link>
+            <Link href="/test-auth">
+              <Button variant="outline" size="sm" className="text-xs">
+                Test Auth
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
