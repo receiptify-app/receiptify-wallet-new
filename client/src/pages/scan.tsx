@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Upload, QrCode, FileText } from "lucide-react";
+import { Camera, Upload, QrCode, FileText, ScanLine, Edit } from "lucide-react";
 import RealQrScanner from "@/components/real-qr-scanner";
 import ScannerModal from "@/components/scanner-modal";
+import ManualReceiptForm from "@/components/manual-receipt-form";
+import BarcodeScanner from "@/components/barcode-scanner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,6 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 export default function Scan() {
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -43,6 +48,27 @@ export default function Scan() {
       uploadMutation.mutate(file);
     }
   };
+
+  const handleBarcodeDetected = (barcode: string) => {
+    setDetectedBarcode(barcode);
+    toast({
+      title: "Barcode Detected",
+      description: `Barcode: ${barcode}`,
+    });
+    
+    // Auto-open manual form with barcode data
+    setShowManualForm(true);
+  };
+
+  // Listen for custom event from scanner modal
+  useEffect(() => {
+    const handleOpenManualForm = () => {
+      setShowManualForm(true);
+    };
+
+    window.addEventListener('openManualReceiptForm', handleOpenManualForm);
+    return () => window.removeEventListener('openManualReceiptForm', handleOpenManualForm);
+  }, []);
 
   return (
     <div className="px-6 py-4 pb-24">
@@ -118,6 +144,53 @@ export default function Scan() {
             </label>
           </CardContent>
         </Card>
+
+        {/* Barcode Scanner Option */}
+        <Card className="hover:shadow-md transition-shadow border-2 border-blue-200">
+          <CardContent className="p-6">
+            <Button
+              onClick={() => setShowBarcodeScanner(true)}
+              variant="outline"
+              className="w-full h-auto py-6 text-left border-0 hover:bg-blue-50"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <ScanLine className="w-6 h-6 text-blue-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-lg text-gray-900">Scan Barcode</div>
+                  <div className="text-sm text-gray-600">Scan product barcode on receipt</div>
+                  {detectedBarcode && (
+                    <div className="text-xs text-blue-600 mt-1">
+                      Last detected: {detectedBarcode}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Manual Entry Option */}
+        <Card className="hover:shadow-md transition-shadow border-2 border-green-200">
+          <CardContent className="p-6">
+            <Button
+              onClick={() => setShowManualForm(true)}
+              variant="outline"
+              className="w-full h-auto py-6 text-left border-0 hover:bg-green-50"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Edit className="w-6 h-6 text-green-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-lg text-gray-900">Enter Details Manually</div>
+                  <div className="text-sm text-gray-600">Type receipt information by hand</div>
+                </div>
+              </div>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Information Section */}
@@ -159,6 +232,20 @@ export default function Scan() {
 
       {/* Camera Scanner Modal */}
       <ScannerModal open={showCamera} onOpenChange={setShowCamera} />
+
+      {/* Manual Receipt Form */}
+      <ManualReceiptForm 
+        open={showManualForm} 
+        onOpenChange={setShowManualForm}
+        initialData={detectedBarcode ? { notes: `Barcode detected: ${detectedBarcode}` } : undefined}
+      />
+
+      {/* Barcode Scanner */}
+      <BarcodeScanner
+        open={showBarcodeScanner}
+        onOpenChange={setShowBarcodeScanner}
+        onBarcodeDetected={handleBarcodeDetected}
+      />
     </div>
   );
 }

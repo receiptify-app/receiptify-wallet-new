@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Upload, X, QrCode } from "lucide-react";
+import { Camera, Upload, X, QrCode, Edit } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -283,6 +283,35 @@ export default function ScannerModal({ open, onOpenChange }: ScannerModalProps) 
                   </div>
                 </div>
               </label>
+            </CardContent>
+          </Card>
+
+          {/* Manual Entry Option */}
+          <Card className="hover:shadow-md transition-shadow border-2 border-green-200">
+            <CardContent className="p-0">
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  // This will be handled by the parent component
+                  window.dispatchEvent(new CustomEvent('openManualReceiptForm'));
+                }}
+                variant="outline"
+                className="w-full h-auto py-6 text-left border-0 hover:bg-green-50"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <Edit className="w-6 h-6 text-green-700" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-lg text-gray-900">
+                      Enter Details Manually
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Type receipt information by hand
+                    </div>
+                  </div>
+                </div>
+              </Button>
             </CardContent>
           </Card>
         </div>

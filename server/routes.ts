@@ -96,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         merchantName: "Scanned Receipt",
         location: "Unknown Location",
         total: "15.99",
-        date: new Date().toISOString(),
+        date: new Date(),
         category: "Other",
         paymentMethod: "Unknown",
         receiptNumber: `SCN${Date.now()}`,
