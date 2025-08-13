@@ -202,21 +202,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // If no amount was found, but we detected a known merchant, create with estimated amount
+        // Only create receipt if we have valid payment data - no random generation
         if (total === "0.00") {
-          if (lowerData.includes('square') || lowerData.includes('checkout')) {
-            // For Square payments, try to extract any numeric value or use realistic estimate
-            const numberMatch = qrData.match(/(\d+\.?\d*)/);
-            if (numberMatch) {
-              total = parseFloat(numberMatch[1]).toFixed(2);
-            } else {
-              total = (Math.random() * 50 + 10).toFixed(2); // Fallback for demo
-            }
-          } else {
-            return res.status(400).json({ 
-              error: "QR code does not contain valid payment information. Please scan a valid payment QR code with amount data." 
-            });
-          }
+          return res.status(400).json({ 
+            error: "QR code does not contain valid payment information. Please scan a valid payment QR code with amount data." 
+          });
         }
 
       } catch (e) {
@@ -276,10 +266,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // If no specific items found, create a general purchase item
+        // If no specific items found, create a general purchase item using real data only
         if (receiptItems.length === 0) {
           receiptItems.push({
-            name: `Purchase from ${merchantName}`,
+            name: merchantName === "Unknown Merchant" ? "Payment" : `Purchase from ${merchantName}`,
             price: total,
             quantity: "1",
             receiptId: receipt.id
@@ -292,9 +282,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (error) {
         console.error("Error creating receipt items:", error);
-        // Create fallback item
+        // Create fallback item with real data
         await storage.createReceiptItem({
-          name: `Purchase from ${merchantName}`,
+          name: merchantName === "Unknown Merchant" ? "Payment" : `Purchase from ${merchantName}`,
           price: total,
           quantity: "1",
           receiptId: receipt.id

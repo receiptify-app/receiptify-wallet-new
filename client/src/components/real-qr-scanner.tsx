@@ -138,7 +138,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point your camera at a QR code to scan it
+            Point your camera at a payment QR code with merchant and amount information
           </p>
           
           <Button 
