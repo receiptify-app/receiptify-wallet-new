@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { X, QrCode, Camera } from "lucide-react";
+import { X, QrCode, Camera, Plus } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -36,12 +36,29 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
       // Navigate to receipts page to show the scanned receipt
       window.location.href = '/receipts';
     },
-    onError: () => {
-      toast({
-        title: "Scan failed",
-        description: "Failed to process QR code. Please try again.",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      console.error('QR scan error:', error);
+      
+      // Handle specific error types
+      if (error.message?.includes('Square QR code detected')) {
+        toast({
+          title: "Square QR Code Detected",
+          description: "Square QR codes don't contain receipt data. Please enter receipt details manually using 'Add Receipt'.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "QR Scan Failed", 
+          description: "QR code doesn't contain receipt data. Try scanning a different QR code or enter details manually.",
+          variant: "destructive",
+        });
+      }
+      
+      // Reset scanner for next attempt
+      setIsScanning(false);
+      if (qrScanner) {
+        qrScanner.start().catch(console.error);
+      }
     }
   });
 
@@ -136,12 +153,27 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point your camera at a receipt QR code. The scanner will automatically detect and process it.
+            Point your camera at a receipt QR code with transaction data. Not all QR codes contain receipt information.
           </p>
           
-          <p className="text-xs text-gray-500">
-            Make sure the QR code is fully visible and well-lit for best results
-          </p>
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-xs">
+            <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">QR Code Tips:</p>
+            <p className="text-blue-700 dark:text-blue-300">• Look for QR codes on printed receipts</p>
+            <p className="text-blue-700 dark:text-blue-300">• Square payment links won't work - use 'Add Receipt' instead</p>
+            <p className="text-blue-700 dark:text-blue-300">• Make sure QR code is clear and well-lit</p>
+          </div>
+          
+          <Button 
+            onClick={() => {
+              handleClose();
+              window.location.href = '/receipts?add=true';
+            }}
+            variant="outline"
+            className="w-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Receipt Manually Instead
+          </Button>
         </div>
       </div>
     </div>

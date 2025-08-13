@@ -155,10 +155,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Handle Square receipt QR codes - they often don't have URL parameters
           const hostname = url.hostname.toLowerCase();
           if (hostname.includes('square')) {
-            // For Square QR codes without parameters, we need to inform user about data limitations
+            // For Square QR codes without parameters, provide helpful guidance
             if (!merchant && !amount) {
               return res.status(400).json({ 
-                error: "Square QR code detected but receipt data not available in QR format. Please manually enter receipt details or scan a QR code with embedded payment data." 
+                error: "Square QR code detected but no payment data found in QR. Square receipts typically require manual entry. Please use 'Add Receipt' to enter your transaction details manually.",
+                qrType: "square_link",
+                guidance: "Most Square QR codes are payment links, not receipt data. Enter receipt details manually instead."
               });
             }
             if (!merchant) merchantName = "Square Payment";
