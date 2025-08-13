@@ -4,6 +4,7 @@ import { X, QrCode, Camera } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import QrScanner from 'qr-scanner';
 
 interface RealQrScannerProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [qrScanner, setQrScanner] = useState<QrScanner | null>(null);
 
   const scanMutation = useMutation({
     mutationFn: async (qrData: string) => {
@@ -43,60 +45,54 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
     }
   });
 
-  // Initialize camera
+  // Initialize QR scanner with real camera scanning
   useEffect(() => {
-    const startCamera = async () => {
-      try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' } // Use back camera if available
-        });
-        setStream(mediaStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
+    if (videoRef.current && !qrScanner) {
+      const scanner = new QrScanner(
+        videoRef.current,
+        (result) => {
+          console.log('QR Code detected:', result.data);
+          setIsScanning(true);
+          scanner.stop();
+          scanMutation.mutate(result.data);
+        },
+        {
+          returnDetailedScanResult: true,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          preferredCamera: 'environment'
         }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
+      );
+      
+      setQrScanner(scanner);
+      
+      // Start scanning immediately
+      scanner.start().catch((error) => {
+        console.error('Error starting QR scanner:', error);
         toast({
-          title: "Camera access denied",
-          description: "Please allow camera access to scan QR codes.",
+          title: "Camera Error",
+          description: "Failed to access camera. Please check permissions.",
           variant: "destructive",
         });
-      }
-    };
-
-    startCamera();
+      });
+    }
 
     // Cleanup function
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      if (qrScanner) {
+        qrScanner.stop();
+        qrScanner.destroy();
       }
     };
-  }, []);
+  }, [qrScanner]);
 
-  // Handle real QR code scanning
-  const handleQrScan = (qrData: string) => {
-    if (isScanning) return;
-    
-    setIsScanning(true);
-    scanMutation.mutate(qrData);
-    setIsScanning(false);
-  };
-
-  // Simulate QR code detection (in a real app, you'd use a QR code library)
-  const simulateQrDetection = () => {
-    if (isScanning) return;
-    
-    setIsScanning(true);
-    
-    // For testing, prompt user to input their actual QR data
-    const userQrData = prompt("For testing: Paste your Square receipt QR code data here (or any QR code content):");
-    
-    if (userQrData && userQrData.trim()) {
-      scanMutation.mutate(userQrData.trim());
+  // Handle cleanup when component unmounts or closes
+  const handleClose = () => {
+    if (qrScanner) {
+      qrScanner.stop();
+      qrScanner.destroy();
     }
-    
-    setIsScanning(false);
+    onClose();
   };
 
   return (
@@ -104,7 +100,7 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-11/12 max-w-md mx-4">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Scan QR Code</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={handleClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -140,20 +136,11 @@ export default function RealQrScanner({ onClose, onScan }: RealQrScannerProps) {
 
         <div className="text-center space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Point camera at receipt QR code to extract transaction data
+            Point your camera at a receipt QR code. The scanner will automatically detect and process it.
           </p>
           
-          <Button 
-            onClick={simulateQrDetection}
-            disabled={isScanning || scanMutation.isPending}
-            className="w-full"
-          >
-            <Camera className="w-4 h-4 mr-2" />
-            {isScanning || scanMutation.isPending ? "Processing..." : "Test QR Scan"}
-          </Button>
-          
           <p className="text-xs text-gray-500">
-            For testing: Enter your actual QR code content when prompted
+            Make sure the QR code is fully visible and well-lit for best results
           </p>
         </div>
       </div>
