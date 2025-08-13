@@ -10,7 +10,8 @@ import {
   Euro, 
   ChevronRight,
   RefreshCw,
-  Download
+  Download,
+  Receipt
 } from "lucide-react";
 import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
@@ -76,6 +77,24 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* My Data Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">My Data</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/receipts')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Receipt className="w-6 h-6 text-gray-700" />
+                    <span className="text-lg font-medium text-gray-900">My Receipts & Orders</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Payment & Loyalty Section */}
         <div>

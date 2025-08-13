@@ -14,10 +14,8 @@ import {
 const navItems = [
   { path: "/", icon: Home, label: "Home" },
   { path: "/scan", icon: QrCode, label: "Scan" },
-  { path: "/cards", icon: CreditCard, label: "Cards" },
   { path: "/subscriptions", icon: RefreshCw, label: "Subs" },
-  { path: "/warranties", icon: Shield, label: "Warranty" },
-  { path: "/profile", icon: User, label: "Profile" },
+  { path: "/profile", icon: User, label: "More" },
 ];
 
 export default function BottomNavigation() {
