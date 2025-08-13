@@ -56,17 +56,34 @@ export default function FirebaseSetupHelp() {
               </div>
             </div>
 
-            <div>
-              <h4 className="font-medium mb-2">Step 2: Add Authorized Domains</h4>
-              <p className="text-sm text-gray-600 mb-2">
-                Add your Replit domain to the authorized domains list:
+            <div className="border-2 border-red-200 bg-red-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2 text-red-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                URGENT: Add Authorized Domain (Required for Social Login)
+              </h4>
+              <p className="text-sm text-red-700 mb-2">
+                <strong>Error:</strong> auth/unauthorized-domain detected. Add this domain to Firebase:
               </p>
-              <div className="bg-gray-100 p-3 rounded text-sm font-mono">
+              <div className="bg-yellow-100 p-3 rounded text-sm font-mono border border-yellow-300">
                 {window.location.hostname}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Copy this domain and add it in Authentication → Settings → Authorized domains
-              </p>
+              <div className="mt-3 space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.open('https://console.firebase.google.com/u/0/project/recieptify-app/authentication/settings', '_blank')}
+                  className="w-full border-red-300 text-red-700 hover:bg-red-100"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Firebase Settings → Authorized Domains
+                </Button>
+                <p className="text-xs text-red-600">
+                  1. Click the button above<br/>
+                  2. Click "+ Add domain"<br/>
+                  3. Paste: {window.location.hostname}<br/>
+                  4. Click "Done" and return here to test
+                </p>
+              </div>
             </div>
 
             <div>
