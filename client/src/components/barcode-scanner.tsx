@@ -17,6 +17,7 @@ export default function BarcodeScanner({ open, onOpenChange, onBarcodeDetected }
   const [isScanning, setIsScanning] = useState(false);
   const [flashlightOn, setFlashlightOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isQuaggaInitialized, setIsQuaggaInitialized] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
@@ -55,8 +56,15 @@ export default function BarcodeScanner({ open, onOpenChange, onBarcodeDetected }
     setIsScanning(false);
     setFlashlightOn(false);
     
-    // Stop QuaggaJS
-    Quagga.stop();
+    // Stop QuaggaJS only if it's initialized
+    try {
+      if (isQuaggaInitialized && typeof Quagga !== 'undefined') {
+        Quagga.stop();
+        setIsQuaggaInitialized(false);
+      }
+    } catch (error) {
+      console.warn("Error stopping Quagga:", error);
+    }
     
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
@@ -140,6 +148,7 @@ export default function BarcodeScanner({ open, onOpenChange, onBarcodeDetected }
       }
       
       console.log("QuaggaJS initialized successfully");
+      setIsQuaggaInitialized(true);
       Quagga.start();
 
       // Set up barcode detection listener
@@ -148,7 +157,13 @@ export default function BarcodeScanner({ open, onOpenChange, onBarcodeDetected }
         const code = result.codeResult.code;
         console.log("Barcode detected:", code);
         
-        Quagga.stop();
+        try {
+          Quagga.stop();
+          setIsQuaggaInitialized(false);
+        } catch (error) {
+          console.warn("Error stopping Quagga after detection:", error);
+        }
+        
         stopScanning();
         onBarcodeDetected(code);
         onOpenChange(false);
