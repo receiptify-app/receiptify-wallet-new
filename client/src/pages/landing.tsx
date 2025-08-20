@@ -13,7 +13,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Digital Receipts</h1>
               <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function Landing() {
             Ready to go paperless?
           </h3>
           <p className="text-xl text-gray-600 mb-8">
-            Join Receiptify today and start making a positive environmental impact while organizing your receipts effortlessly.
+            Join our digital receipt platform today and start making a positive environmental impact while organizing your receipts effortlessly.
           </p>
           <Link href="/signup">
             <Button size="lg" className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg">
@@ -186,7 +186,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-6 h-6 text-green-400" />
-            <span className="text-xl font-bold">Receiptify</span>
+            <span className="text-xl font-bold">Digital Receipts</span>
           </div>
           <p className="text-gray-400">OneTap Receipts. Zero Paper. © 2025</p>
         </div>

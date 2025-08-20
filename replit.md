@@ -1,6 +1,6 @@
 # Overview
 
-Receiptify is a UK-focused, eco-friendly digital receipt management application with the tagline "OneTap Receipts. Zero Paper." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
+This is a UK-focused, eco-friendly digital receipt management application with the tagline "OneTap Receipts. Zero Paper." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
 
 The application features multi-channel receipt capture (QR codes, camera scans, file uploads), comprehensive receipt management with search and filtering, loyalty card integration for major UK retailers, real-time environmental impact tracking, and detailed analytics. The system uses device-based storage for privacy and supports all payment methods without requiring personal information.
 
@@ -26,7 +26,7 @@ The application features multi-channel receipt capture (QR codes, camera scans, 
 ✓ **Database Migration**: Complete PostgreSQL integration with comprehensive schema and enhanced storage capabilities
 ✓ **Logo Integration**: Updated branding with official "OneTap Receipts. Zero Paper." logo throughout the application
 ✓ **UI Redesign**: Complete visual overhaul matching user specifications for subscription tracker, home dashboard, receipt geolocation, and warranty tracker pages
-✓ **Receiptify Branding**: Implemented consistent "Receiptify" branding with new logo and "OneTap Receipts. Zero Paper." tagline across all pages
+✓ **Generic Branding**: Implemented neutral branding without specific company names for partner presentations
 ✓ **Comprehensive Receipt Splitting**: Full bill splitting system with shared receipts, payment confirmations, and collaboration features
 ✓ **Payment Integration System**: Complete Apple Pay, Google Pay, and credit card integration with comprehensive payment method management, secure payment processing for split receipts and invoice payments, profile/settings page with payment method linking, and seamless payment selection interface matching user mockup design
 ✓ **Enhanced Manual Receipt Entry**: Complete manual receipt form with photo capture, real barcode scanning using QuaggaJS, itemized entry with automatic calculations, comprehensive form validation, and integration with existing storage system - resolves issue where manual receipts showed auto-generated data instead of actual receipt information
