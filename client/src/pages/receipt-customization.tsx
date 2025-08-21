@@ -216,12 +216,12 @@ export default function ReceiptCustomization() {
           <CardContent className="space-y-4">
             <div>
               <Label>Current Design</Label>
-              <Select value={selectedDesignId || ""} onValueChange={setSelectedDesignId}>
+              <Select value={selectedDesignId || "new"} onValueChange={setSelectedDesignId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Create new design or select existing" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Create New Design</SelectItem>
+                  <SelectItem value="new">Create New Design</SelectItem>
                   {designs.map((design: ReceiptDesign) => (
                     <SelectItem key={design.id} value={design.id}>
                       {design.name} {design.isDefault && "(Default)"}
