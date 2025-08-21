@@ -51,7 +51,7 @@ export const receipts = pgTable("receipts", {
 
 export const receiptItems = pgTable("receipt_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  receiptId: varchar("receiptId").notNull(),
+  receiptId: varchar("receipt_id").notNull(),
   name: text("name").notNull(),
   quantity: decimal("quantity", { precision: 8, scale: 2 }).default("1"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),

@@ -19,6 +19,7 @@ import {
   insertWarrantyClaimSchema,
 } from "@shared/schema";
 import multer from "multer";
+import * as fs from 'fs';
 import { OCRProcessor } from './ocr-processor';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -125,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Save the uploaded file temporarily for OCR processing
       const tempPath = `/tmp/${Date.now()}_${req.file.originalname}`;
-      require('fs').writeFileSync(tempPath, req.file.buffer);
+      fs.writeFileSync(tempPath, req.file.buffer);
       
       try {
         // Extract real data from the receipt image
@@ -164,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Clean up temp file
-        require('fs').unlinkSync(tempPath);
+        fs.unlinkSync(tempPath);
         
         res.status(201).json(receipt);
       } catch (error) {
@@ -188,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const receipt = await storage.createReceipt(receiptData);
         
         // Clean up temp file if it exists
-        try { require('fs').unlinkSync(tempPath); } catch {}
+        try { fs.unlinkSync(tempPath); } catch {}
         
         res.status(201).json(receipt);
       }
