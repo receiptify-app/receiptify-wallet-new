@@ -1,0 +1,71 @@
+Continue building Receiptify. Use the existing project (TASK 0–4 done) and now implement TASK 5–10. Stop and report when everything below passes acceptance checks.
+
+TASK 5 — Parsing pipeline (implement now)
+- Create `utils/parser.js` implementing:
+  1. HTML parser that looks for schema.org invoice/order markup.
+  2. Regex based extraction for amount/date/merchant as fallback.
+  3. Line-item table extraction heuristics (table -> rows -> item parsing).
+  4. A `parseEmailMessage(rawMimeOrParsed)` exported function which returns:
+     { messageId, threadId, merchant, date, amount, currency, lineItems, confidence, attachments: [{filename,url,mime}] }
+- Add basic merchant-specific template for 3 sample merchants (e.g., "Amazon", "Starbucks", "Uber") so extraction is tested on common formats.
+
+TASK 6 — Attachment storage & OCR
+- Create `lib/storage.js` with two implementations:
+  - Local file saves to `/public/uploads` (used in dev).
+  - S3 stub (respect `STORAGE_PROVIDER` env var).
+- Create `utils/ocr.js`:
+  - If `GOOGLE_VISION_KEY` present use Cloud Vision API.
+  - Otherwise use `tesseract.js` to OCR images/PDFs.
+  - Export `ocrExtract(filepath)` which returns `{ text, confidence }`.
+- Wire OCR to worker job `ocr.process` to run on attachments and attach OCR output to the `Receipt.parsedFrom` JSON.
+
+TASK 7 — Frontend pages & UX
+- Implement these pages/components:
+  1. `/settings/email` — Connect Gmail/Outlook buttons, forwarding address display, Auto-Accept toggle, last sync time, Disconnect button.
+  2. `/inbox/imports` — Pending imports list. For each entry show parsed fields, OCR text preview, Accept / Edit / Reject actions.
+  3. Edit modal — allow editing merchant/date/amount/items before Accept.
+- Hook Accept button to `POST /api/email/pending/:id/accept` which updates `Receipt.importStatus = 'accepted'`.
+- Hook Reject to change `importStatus = 'rejected'`.
+
+TASK 8 — Security & token handling
+- Implement token encryption when storing in `EmailIntegration.accessToken` and `refreshToken` (use Node `crypto` + `JWT_SECRET`).
+- `POST /api/email/disconnect` should revoke tokens where possible and remove integration record (or mark `status=disconnected`).
+- Validate webhook signatures for SendGrid / Mailgun if signature headers are provided; otherwise accept test-mode webhooks.
+
+TASK 9 — Tests & simulation scripts
+- Add `tests/sample_forwarded.json` (representative parsed payload with `rawMime`).
+- Add script `scripts/simulate_webhook.sh` which `curl`s `/api/email/webhook` with sample payload.
+- Add `scripts/test_ocr.sh` to upload a test image and assert OCR output saved in DB.
+- Create a simple end-to-end test script (`scripts/e2e_email_import.sh`) that:
+  1) posts webhook sample,
+  2) waits for worker to process,
+  3) checks `GET /api/email/pending` returns the parsed receipt,
+  4) posts accept and verifies `importStatus=accepted`.
+
+TASK 10 — Operational docs & backfill
+- Implement `POST /api/email/backfill?days=90` admin endpoint that enqueues an `email_backfill` job to fetch historical messages (stub provider fetch if secrets missing).
+- Add a `docs/provider_setup.md` describing Gmail watch vs polling, Microsoft Graph delta, SendGrid inbound parse setup, and how to create forwarding rules.
+
+DELIVERABLES (what to return now)
+1. Code changes pushed to the project (files created/updated). Ensure everything runs in dev mode.
+2. A `STATUS_REPORT.md` listing:
+   - Which endpoints are fully implemented vs stubbed,
+   - Which worker jobs run and which are stubbed,
+   - Any missing secrets and manual provider setup steps.
+3. Test outputs from running:
+   - `scripts/simulate_webhook.sh`
+   - `scripts/test_ocr.sh`
+   - `scripts/e2e_email_import.sh`
+4. Last 100 lines of server logs and worker logs if any failures.
+
+ACCEPTANCE CHECKS (must pass before reporting)
+- `POST /api/email/webhook` with the sample payload enqueues `email_process.message` job and returns 200.
+- Worker picks `email_process.message`, runs parsing, stores a `Receipt` with `source=email` and `importStatus=parsed`.
+- `GET /api/email/pending` returns that parsed receipt with parsed fields and attachment URLs.
+- `POST /api/email/pending/:id/accept` moves the receipt to `importStatus=accepted`.
+- `scripts/test_ocr.sh` returns OCR text attached to the `Receipt.parsedFrom` object.
+
+IMPORTANT:
+- If provider secrets are missing, implement provider fetch/backfill and OAuth exchange as stubs that still create realistic `EmailIntegration` records and enqueue backfill jobs; tests should run against these stubs.
+- Stop and report exactly what passed/failed and include failure logs. Wait for my confirmation before adding merchant-specific templates or improving parser accuracy.
+

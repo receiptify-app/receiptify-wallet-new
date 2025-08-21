@@ -284,4 +284,132 @@ export function registerEmailRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to reject pending receipt' });
     }
   });
+
+  // GET /api/email/forwarding-address
+  app.get("/api/email/forwarding-address", async (req, res) => {
+    try {
+      // Generate or retrieve forwarding address for this user/app
+      const domain = process.env.FORWARDING_DOMAIN || 'receipts.example.com';
+      const forwardingAddress = `import-${Date.now()}@${domain}`;
+      
+      res.json({
+        forwardingAddress,
+        instructions: `Forward your receipt emails to this address. We'll automatically process them and add receipts to your account.`,
+        setupGuide: `Set up email forwarding rules in your email client to automatically forward receipts from merchants to this address.`
+      });
+    } catch (error) {
+      console.error("Error generating forwarding address:", error);
+      res.status(500).json({ error: "Failed to generate forwarding address" });
+    }
+  });
+
+  // GET /api/email/integrations
+  app.get("/api/email/integrations", async (req, res) => {
+    try {
+      const integrations = await prisma.emailIntegration.findMany({
+        select: {
+          id: true,
+          provider: true,
+          email: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+      
+      res.json({
+        gmail: integrations.find(i => i.provider === 'gmail'),
+        outlook: integrations.find(i => i.provider === 'outlook'),
+        lastSync: integrations[0]?.updatedAt
+      });
+    } catch (error) {
+      console.error("Error fetching integrations:", error);
+      res.status(500).json({ error: "Failed to fetch integrations" });
+    }
+  });
+
+  // POST /api/email/disconnect
+  app.post("/api/email/disconnect", async (req, res) => {
+    try {
+      const { integrationId } = req.body;
+      
+      if (!integrationId) {
+        return res.status(400).json({ error: "Integration ID required" });
+      }
+      
+      await prisma.emailIntegration.update({
+        where: { id: integrationId },
+        data: { 
+          isActive: false,
+          accessToken: null,
+          refreshToken: null
+        }
+      });
+      
+      res.json({ success: true, message: "Integration disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting integration:", error);
+      res.status(500).json({ error: "Failed to disconnect integration" });
+    }
+  });
+
+  // POST /api/email/sync
+  app.post("/api/email/sync", async (req, res) => {
+    try {
+      const { integrationId } = req.body;
+      
+      if (!integrationId) {
+        return res.status(400).json({ error: "Integration ID required" });
+      }
+      
+      const job = await enqueueSimpleJob(JobType.EMAIL_SYNC_POLL, {
+        integrationId
+      });
+      
+      res.json({ success: true, jobId: job.id, message: "Sync initiated" });
+    } catch (error) {
+      console.error("Error starting sync:", error);
+      res.status(500).json({ error: "Failed to start sync" });
+    }
+  });
+
+  // POST /api/email/backfill?days=90
+  app.post("/api/email/backfill", async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      
+      if (days > 365) {
+        return res.status(400).json({ error: "Maximum backfill period is 365 days" });
+      }
+      
+      const integrations = await prisma.emailIntegration.findMany({
+        where: { isActive: true }
+      });
+      
+      if (integrations.length === 0) {
+        return res.status(400).json({ error: "No active email integrations found" });
+      }
+      
+      const jobs = [];
+      for (const integration of integrations) {
+        const job = await enqueueSimpleJob(JobType.EMAIL_BACKFILL, {
+          integrationId: integration.id,
+          days,
+          startDate: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+        });
+        jobs.push(job.id);
+      }
+      
+      res.json({ 
+        success: true, 
+        jobIds: jobs,
+        integrations: integrations.length,
+        days,
+        message: `Backfill initiated for ${integrations.length} integrations` 
+      });
+    } catch (error) {
+      console.error("Error starting backfill:", error);
+      res.status(500).json({ error: "Failed to start backfill" });
+    }
+  });
 }

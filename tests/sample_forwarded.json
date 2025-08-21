@@ -1,0 +1,39 @@
+{
+  "messageId": "sample_receipt_001",
+  "threadId": "thread_12345",
+  "subject": "Your Amazon Order Receipt #123-4567890-1234567",
+  "sender": "auto-confirm@amazon.com",
+  "body": {
+    "html": "<!DOCTYPE html><html><head><title>Your Amazon Order Receipt</title></head><body><div class=\"receipt\"><h1>Amazon.com</h1><p>Order #123-4567890-1234567</p><p>Order Date: December 15, 2023</p><table class=\"order-items\"><tr><th>Item</th><th>Price</th></tr><tr><td>Echo Dot (4th Gen) - Smart Speaker with Alexa</td><td>$29.99</td></tr><tr><td>Shipping & Handling</td><td>$5.99</td></tr><tr><td><strong>Total</strong></td><td><strong>$35.98</strong></td></tr></table><p>Thank you for shopping with Amazon!</p><div class=\"billing-address\"><h3>Billing Address:</h3><p>John Doe<br>123 Main St<br>Anytown, CA 12345</p></div></div></body></html>",
+    "text": "Amazon.com\nOrder #123-4567890-1234567\nOrder Date: December 15, 2023\n\nEcho Dot (4th Gen) - Smart Speaker with Alexa - $29.99\nShipping & Handling - $5.99\nTotal: $35.98\n\nThank you for shopping with Amazon!\n\nBilling Address:\nJohn Doe\n123 Main St\nAnytown, CA 12345"
+  },
+  "attachments": [
+    {
+      "filename": "receipt-amazon-123456.pdf",
+      "contentType": "application/pdf",
+      "size": 125678,
+      "url": "/uploads/receipt-amazon-123456.pdf"
+    }
+  ],
+  "rawMime": "Received: from mail.amazon.com by mx.example.com...\nFrom: auto-confirm@amazon.com\nTo: customer@example.com\nSubject: Your Amazon Order Receipt #123-4567890-1234567\nContent-Type: text/html; charset=UTF-8\n\n<!DOCTYPE html><html>...</html>",
+  "extractedData": {
+    "merchant": "Amazon",
+    "amount": "35.98",
+    "currency": "USD",
+    "date": "2023-12-15T00:00:00.000Z",
+    "orderNumber": "123-4567890-1234567",
+    "lineItems": [
+      {
+        "name": "Echo Dot (4th Gen) - Smart Speaker with Alexa",
+        "price": "29.99",
+        "quantity": 1
+      },
+      {
+        "name": "Shipping & Handling",
+        "price": "5.99",
+        "quantity": 1
+      }
+    ],
+    "confidence": 0.95
+  }
+}
