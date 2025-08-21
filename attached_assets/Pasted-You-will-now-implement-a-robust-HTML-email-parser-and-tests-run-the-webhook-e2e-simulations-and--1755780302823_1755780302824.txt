@@ -1,0 +1,75 @@
+You will now implement a robust HTML email parser and tests, run the webhook + e2e simulations, and report results. Work in the existing Receiptify project. If any secrets are missing, stub provider calls but keep behavior realistic.
+
+1) Install/check dependency
+- Ensure `cheerio` is installed. If not, run:
+  npm install cheerio
+
+2) Update parser
+- Replace or create `utils/parser.js` implementing a function `parseEmailMessage(parsed)` which accepts either a raw HTML string or an object `{ html, text, messageId, threadId, date, attachments }` and returns:
+  {
+    messageId,
+    threadId,
+    merchant,        // derived from <h1>/<h2>, meta og:site_name, strong, or large text
+    date,            // ISO string if found
+    amount,          // numeric (float) or "0.00" fallback
+    currency,        // 'USD'|'GBP'|...
+    lineItems: [{ name, price, rawPrice }],
+    confidence,      // 0..1 (rules below)
+    attachments: [{ filename, url }]
+  }
+
+Parsing rules:
+- Use cheerio to parse HTML.
+- Merchant: prefer <h1>, then <h2>, then meta property "og:site_name", then first bold text, then 'Unknown'.
+- Line items: parse the first <table> into rows; for rows with >=2 columns, treat col0=name, col1=price (use currency regex).
+- Total: find table rows whose text contains "total" (case-insensitive) and extract currency amount; else search body for patterns like "$35.98" or "35.98 GBP".
+- Currency parsing: support symbols £ $ € and currency suffixes (GBP, USD, EUR). Strip commas.
+- Confidence: if explicit total found => 0.9; else if line items present => 0.6; else if only currency pattern => 0.5; else => 0.3.
+- Support simple merchant templates for Amazon, Starbucks, Uber: if `subject` or `sender` or `html` matches known patterns, apply a tuned extraction.
+
+3) Add unit test
+- Create `tests/parser.test.js` that:
+  - Imports parseEmailMessage.
+  - Runs parseEmailMessage on a sample Amazon HTML payload (use the same sample from your simulate webhook).
+  - Asserts merchant === "Amazon" (or includes "Amazon") and amount === 35.98 (within 0.01).
+
+4) Wire parser into worker flow
+- Ensure the worker job `email_process.message` calls parseEmailMessage on incoming raw HTML/body before creating Receipt.
+- If already wired, just ensure it uses the updated parser.
+
+5) Run the simulations & tests
+- Start the server if not running (use project start script). If needed, start the worker in a separate process.
+- Run:
+  bash scripts/simulate_webhook.sh
+  bash scripts/test_ocr.sh    # if exists
+  bash scripts/e2e_email_import.sh
+  npm test                   # run unit tests
+
+6) What to return in your report (required)
+- The updated `utils/parser.js` file contents (paste entirely).
+- The test file `tests/parser.test.js`.
+- Console output (copy-paste) of:
+  - `bash scripts/simulate_webhook.sh`
+  - `bash scripts/test_ocr.sh` (or note if absent)
+  - `bash scripts/e2e_email_import.sh`
+  - `npm test`
+- The result of `curl http://localhost:3000/api/email/pending` after the e2e run (copy-paste response).
+- The `curl` accept command output for the parsed receipt (use ID returned).
+- Last 50 lines of server logs and last 50 lines of worker logs.
+- If any step failed, include the error stack, explain why, and list exact changes you made.
+
+7) Acceptance checks (must pass)
+- `parseEmailMessage` correctly extracts merchant and total from the sample Amazon HTML (test passes).
+- `POST /api/email/webhook` enqueues a job and a `Receipt` with `source=email` and `importStatus=parsed` is created.
+- `GET /api/email/pending` returns the parsed receipt with non-zero confidence and amount ≈ 35.98.
+- `POST /api/email/pending/:id/accept` updates `importStatus` to `accepted`.
+
+8) Constraints & notes
+- If provider secrets are missing, stub external provider fetches; still create realistic `EmailIntegration` records and enqueue backfill jobs.
+- Do not change unrelated files or break existing routes.
+- Stop and provide the full report above. Wait for my confirmation before any further changes.
+
+Proceed and return the report.```
+
+After the agent finishes, paste its full report here and I’ll validate, troubleshoot any failure, and generate any missing code or tests you need.
+::contentReference[oaicite:0]{index=0}

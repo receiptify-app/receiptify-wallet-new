@@ -1,333 +1,325 @@
-const { parseString } = require('xml2js');
-const cheerio = require('cheerio');
+import * as cheerio from 'cheerio';
 
-// Merchant-specific templates for common receipt formats
-const MERCHANT_TEMPLATES = {
-  'Amazon': {
-    patterns: {
-      merchant: /Amazon|amazon\.com/i,
-      amount: /Total[:\s]+\$?([\d,]+\.?\d*)/i,
-      date: /Order Date[:\s]+([\w\s,]+\d{4})/i,
-      orderNumber: /Order #[:\s]*([A-Z0-9-]+)/i
-    },
-    itemSelectors: [
-      'table[role="presentation"] tr',
-      '.order-info tr',
-      '.item-row'
-    ]
-  },
-  'Starbucks': {
-    patterns: {
-      merchant: /Starbucks|sbux/i,
-      amount: /Total[:\s]+\$?([\d,]+\.?\d*)/i,
-      date: /Date[:\s]+([\d\/\-]+)/i,
-      store: /Store[:\s]*#?(\d+)/i
-    },
-    itemSelectors: [
-      '.receipt-item',
-      'tr.item',
-      '.line-item'
-    ]
-  },
-  'Uber': {
-    patterns: {
-      merchant: /Uber|uber\.com/i,
-      amount: /Total[:\s]+\$?([\d,]+\.?\d*)/i,
-      date: /Trip on[:\s]+([\w\s,]+)/i,
-      tripId: /Trip ID[:\s]*([A-Z0-9-]+)/i
-    },
-    itemSelectors: [
-      '.trip-details tr',
-      '.fare-breakdown tr'
-    ]
-  }
-};
-
-// Generic patterns for fallback extraction
-const GENERIC_PATTERNS = {
-  amount: [
-    /Total[:\s]+\$?([\d,]+\.?\d*)/i,
-    /Amount[:\s]+\$?([\d,]+\.?\d*)/i,
-    /\$\s*([\d,]+\.?\d*)/g
-  ],
-  date: [
-    /Date[:\s]+([\d\/\-]+)/i,
-    /(\d{1,2}\/\d{1,2}\/\d{4})/,
-    /(\d{4}-\d{2}-\d{2})/,
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}/i
-  ],
-  merchant: [
-    /From[:\s]+([^<\n]+)/i,
-    /Receipt from[:\s]+([^<\n]+)/i,
-    /<title>([^<]+)/i
-  ]
-};
-
-function detectMerchant(content) {
-  const lowerContent = content.toLowerCase();
+/**
+ * Robust HTML email parser for receipt data extraction
+ * @param {string|object} input - Raw HTML string or object with {html, text, messageId, threadId, date, attachments}
+ * @returns {object} Parsed receipt data with merchant, amount, line items, etc.
+ */
+export function parseEmailMessage(input) {
+  let html, text, messageId, threadId, date, attachments;
   
-  for (const [merchant, template] of Object.entries(MERCHANT_TEMPLATES)) {
-    if (template.patterns.merchant.test(content)) {
-      return merchant;
+  // Handle both string and object inputs
+  if (typeof input === 'string') {
+    html = input;
+    text = '';
+    messageId = '';
+    threadId = '';
+    date = new Date().toISOString();
+    attachments = [];
+  } else {
+    html = input.html || input.body || '';
+    text = input.text || '';
+    messageId = input.messageId || '';
+    threadId = input.threadId || '';
+    date = input.date || new Date().toISOString();
+    attachments = input.attachments || [];
+  }
+
+  const $ = cheerio.load(html);
+  
+  // Initialize result object
+  const result = {
+    messageId,
+    threadId,
+    merchant: 'Unknown',
+    date: date,
+    amount: '0.00',
+    currency: 'USD',
+    lineItems: [],
+    confidence: 0.3,
+    attachments: attachments.map(att => ({
+      filename: att.filename || att,
+      url: att.url || `/uploads/${att.filename || att}`
+    }))
+  };
+
+  // Extract merchant name
+  result.merchant = extractMerchant($, html, input);
+  
+  // Extract line items from tables
+  result.lineItems = extractLineItems($);
+  
+  // Extract total amount and currency
+  const { amount, currency } = extractTotal($, html, text);
+  result.amount = amount;
+  result.currency = currency;
+  
+  // Calculate confidence based on extraction quality
+  result.confidence = calculateConfidence(result, html);
+  
+  return result;
+}
+
+/**
+ * Extract merchant name using multiple strategies
+ */
+function extractMerchant($, html, input) {
+  // Strategy 1: Check for merchant-specific templates
+  const merchantTemplates = {
+    amazon: /amazon/i,
+    starbucks: /starbucks/i,
+    uber: /uber/i,
+    tesco: /tesco/i,
+    sainsbury: /sainsbury/i,
+    asda: /asda/i
+  };
+  
+  const subject = input?.subject || '';
+  const sender = input?.sender || '';
+  const bodyText = html.toLowerCase();
+  
+  for (const [merchant, pattern] of Object.entries(merchantTemplates)) {
+    if (pattern.test(subject) || pattern.test(sender) || pattern.test(bodyText)) {
+      return merchant.charAt(0).toUpperCase() + merchant.slice(1);
+    }
+  }
+  
+  // Strategy 2: Look for h1 tags
+  const h1Text = $('h1').first().text().trim();
+  if (h1Text && h1Text.length > 0 && h1Text.length < 50) {
+    return cleanMerchantName(h1Text);
+  }
+  
+  // Strategy 3: Look for h2 tags
+  const h2Text = $('h2').first().text().trim();
+  if (h2Text && h2Text.length > 0 && h2Text.length < 50) {
+    return cleanMerchantName(h2Text);
+  }
+  
+  // Strategy 4: Check meta og:site_name
+  const ogSiteName = $('meta[property="og:site_name"]').attr('content');
+  if (ogSiteName && ogSiteName.length < 50) {
+    return cleanMerchantName(ogSiteName);
+  }
+  
+  // Strategy 5: Look for first bold/strong text
+  const strongText = $('strong, b').first().text().trim();
+  if (strongText && strongText.length > 0 && strongText.length < 50 && !strongText.match(/\d+[\d.,]*|\$|£|€/)) {
+    return cleanMerchantName(strongText);
+  }
+  
+  // Strategy 6: Extract from sender email domain
+  if (sender) {
+    const domain = sender.split('@')[1];
+    if (domain) {
+      const merchantFromDomain = domain.split('.')[0];
+      if (merchantFromDomain.length > 2) {
+        return merchantFromDomain.charAt(0).toUpperCase() + merchantFromDomain.slice(1);
+      }
     }
   }
   
   return 'Unknown';
 }
 
-function extractWithPatterns(content, patterns) {
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
-    if (match) {
-      return match[1] || match[0];
-    }
-  }
-  return null;
+/**
+ * Clean and normalize merchant name
+ */
+function cleanMerchantName(name) {
+  return name
+    .replace(/\.com|\.co\.uk|\.org/gi, '')
+    .replace(/[^\w\s]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
-function parseSchemaOrgMarkup(html) {
-  const $ = cheerio.load(html);
-  const result = {};
+/**
+ * Extract line items from table structures
+ */
+function extractLineItems($) {
+  const lineItems = [];
   
-  // Look for schema.org markup
-  const invoiceScript = $('script[type="application/ld+json"]').first();
-  if (invoiceScript.length) {
-    try {
-      const data = JSON.parse(invoiceScript.html());
-      if (data['@type'] === 'Invoice' || data['@type'] === 'Order') {
-        result.merchant = data.seller?.name || data.merchant?.name;
-        result.amount = data.totalPaymentDue?.value || data.total;
-        result.date = data.dateCreated || data.orderDate;
-        result.currency = data.totalPaymentDue?.currency || 'USD';
+  // Find all tables and extract line items
+  $('table').each((_, table) => {
+    const $table = $(table);
+    
+    $table.find('tr').each((_, row) => {
+      const $row = $(row);
+      const cells = $row.find('td, th').toArray();
+      
+      if (cells.length >= 2) {
+        const nameCell = $(cells[0]).text().trim();
+        const priceCell = $(cells[cells.length - 1]).text().trim();
         
-        if (data.orderedItem || data.lineItems) {
-          result.lineItems = (data.orderedItem || data.lineItems).map(item => ({
-            name: item.name || item.description,
-            price: item.offers?.price || item.price,
-            quantity: item.orderQuantity || 1
-          }));
+        // Skip header rows and total rows
+        if (nameCell.toLowerCase().includes('total') || 
+            nameCell.toLowerCase().includes('subtotal') ||
+            nameCell.toLowerCase().includes('tax') ||
+            nameCell.toLowerCase().includes('shipping') ||
+            priceCell.toLowerCase().includes('total')) {
+          return;
+        }
+        
+        const priceMatch = extractCurrencyAmount(priceCell);
+        if (priceMatch && nameCell.length > 0) {
+          lineItems.push({
+            name: nameCell,
+            price: priceMatch.amount,
+            rawPrice: priceCell
+          });
         }
       }
-    } catch (e) {
-      console.log('Failed to parse schema.org JSON:', e.message);
-    }
-  }
+    });
+  });
   
-  // Look for microdata
-  $('[itemtype*="schema.org/Invoice"], [itemtype*="schema.org/Order"]').each((i, el) => {
-    const $el = $(el);
-    if (!result.merchant) {
-      result.merchant = $el.find('[itemprop="seller"], [itemprop="merchant"]').text().trim();
-    }
-    if (!result.amount) {
-      result.amount = $el.find('[itemprop="totalPaymentDue"], [itemprop="total"]').text().trim();
-    }
-    if (!result.date) {
-      result.date = $el.find('[itemprop="dateCreated"], [itemprop="orderDate"]').text().trim();
+  return lineItems;
+}
+
+/**
+ * Extract total amount and currency from various sources
+ */
+function extractTotal($, html, text) {
+  let amount = '0.00';
+  let currency = 'USD';
+  
+  // Strategy 1: Look for total in table rows
+  $('table tr').each((_, row) => {
+    const $row = $(row);
+    const rowText = $row.text().toLowerCase();
+    
+    if (rowText.includes('total') && !rowText.includes('subtotal')) {
+      const cells = $row.find('td, th').toArray();
+      if (cells.length >= 2) {
+        const priceCell = $(cells[cells.length - 1]).text().trim();
+        const match = extractCurrencyAmount(priceCell);
+        if (match) {
+          amount = match.amount;
+          currency = match.currency;
+          return false; // Break out of loop
+        }
+      }
     }
   });
   
-  return result;
-}
-
-function extractLineItems(html, merchant) {
-  const $ = cheerio.load(html);
-  const lineItems = [];
-  
-  // Use merchant-specific selectors first
-  if (MERCHANT_TEMPLATES[merchant]) {
-    const selectors = MERCHANT_TEMPLATES[merchant].itemSelectors;
-    
-    for (const selector of selectors) {
-      $(selector).each((i, row) => {
-        const $row = $(row);
-        const text = $row.text().trim();
-        
-        if (text && text.length > 5) {
-          // Extract item name and price from row
-          const priceMatch = text.match(/\$?([\d,]+\.?\d*)/);
-          const price = priceMatch ? priceMatch[1] : null;
-          
-          // Clean item name (remove price and common words)
-          let name = text.replace(/\$?[\d,]+\.?\d*/, '').trim();
-          name = name.replace(/^(qty|quantity|item|product)[:\s]*/i, '').trim();
-          
-          if (name && name.length > 2) {
-            lineItems.push({
-              name: name.substring(0, 100), // Limit length
-              price: price || '0.00',
-              quantity: 1
-            });
-          }
-        }
-      });
+  // Strategy 2: Look for total in any element containing "total"
+  if (amount === '0.00') {
+    $('*').each((_, element) => {
+      const $el = $(element);
+      const text = $el.text().toLowerCase();
       
-      if (lineItems.length > 0) break; // Use first successful selector
-    }
-  }
-  
-  // Generic table extraction as fallback
-  if (lineItems.length === 0) {
-    $('table tr, .item, .line-item, .product').each((i, el) => {
-      const $el = $(el);
-      const text = $el.text().trim();
-      
-      if (text && text.includes('$') && text.length > 5) {
-        const priceMatch = text.match(/\$?([\d,]+\.?\d*)/);
-        const price = priceMatch ? priceMatch[1] : null;
-        
-        if (price) {
-          let name = text.replace(/\$?[\d,]+\.?\d*/, '').trim();
-          name = name.substring(0, 100);
-          
-          if (name.length > 2) {
-            lineItems.push({
-              name,
-              price,
-              quantity: 1
-            });
-          }
+      if (text.includes('total') && !text.includes('subtotal')) {
+        const match = extractCurrencyAmount($el.text());
+        if (match) {
+          amount = match.amount;
+          currency = match.currency;
+          return false;
         }
       }
     });
   }
   
-  return lineItems.slice(0, 20); // Limit to 20 items
-}
-
-function calculateConfidence(extracted) {
-  let confidence = 0;
-  
-  if (extracted.merchant && extracted.merchant !== 'Unknown') confidence += 0.3;
-  if (extracted.amount && parseFloat(extracted.amount) > 0) confidence += 0.3;
-  if (extracted.date) confidence += 0.2;
-  if (extracted.lineItems && extracted.lineItems.length > 0) confidence += 0.2;
-  
-  return Math.min(confidence, 1.0);
-}
-
-function parseEmailMessage(emailData) {
-  try {
-    // Handle different input formats
-    let htmlContent = '';
-    let textContent = '';
-    let subject = '';
-    let attachments = [];
-    
-    if (typeof emailData === 'string') {
-      // Raw HTML or text
-      htmlContent = emailData;
-      textContent = emailData;
-    } else if (emailData.body) {
-      // Parsed email object
-      htmlContent = emailData.body.html || emailData.body || '';
-      textContent = emailData.body.text || emailData.body || '';
-      subject = emailData.subject || '';
-      attachments = emailData.attachments || [];
-    } else {
-      // Direct properties
-      htmlContent = emailData.html || emailData.content || '';
-      textContent = emailData.text || emailData.content || '';
-      subject = emailData.subject || '';
-      attachments = emailData.attachments || [];
+  // Strategy 3: Search entire HTML for currency patterns
+  if (amount === '0.00') {
+    const allText = html + ' ' + text;
+    const match = extractCurrencyAmount(allText);
+    if (match) {
+      amount = match.amount;
+      currency = match.currency;
     }
-    
-    const content = htmlContent || textContent || '';
-    
-    // Extract basic information
-    const extracted = {
-      messageId: emailData.messageId || `msg_${Date.now()}`,
-      threadId: emailData.threadId || null,
-      merchant: 'Unknown',
-      date: null,
-      amount: null,
-      currency: 'USD',
-      lineItems: [],
-      confidence: 0,
-      attachments: attachments.map(att => ({
-        filename: att.filename || att.name || 'attachment',
-        url: att.url || att.path || null,
-        mime: att.contentType || att.mime || 'application/octet-stream'
-      }))
-    };
-    
-    // Try schema.org extraction first
-    if (htmlContent) {
-      const schemaData = parseSchemaOrgMarkup(htmlContent);
-      Object.assign(extracted, schemaData);
-    }
-    
-    // Detect merchant
-    extracted.merchant = detectMerchant(content);
-    
-    // Extract using patterns if not found in schema
-    if (!extracted.amount) {
-      extracted.amount = extractWithPatterns(content, GENERIC_PATTERNS.amount);
-    }
-    
-    if (!extracted.date) {
-      extracted.date = extractWithPatterns(content, GENERIC_PATTERNS.date);
-    }
-    
-    if (!extracted.merchant || extracted.merchant === 'Unknown') {
-      const merchantMatch = extractWithPatterns(content, GENERIC_PATTERNS.merchant);
-      if (merchantMatch) {
-        extracted.merchant = merchantMatch.trim();
-      }
-    }
-    
-    // Extract line items
-    if (htmlContent && extracted.lineItems.length === 0) {
-      extracted.lineItems = extractLineItems(htmlContent, extracted.merchant);
-    }
-    
-    // Clean and validate data
-    if (extracted.amount) {
-      extracted.amount = extracted.amount.replace(/[,$]/g, '');
-      if (isNaN(parseFloat(extracted.amount))) {
-        extracted.amount = null;
-      }
-    }
-    
-    if (extracted.date) {
-      try {
-        const parsedDate = new Date(extracted.date);
-        if (parsedDate.getTime()) {
-          extracted.date = parsedDate.toISOString();
-        } else {
-          extracted.date = null;
-        }
-      } catch (e) {
-        extracted.date = null;
-      }
-    }
-    
-    // Calculate confidence score
-    extracted.confidence = calculateConfidence(extracted);
-    
-    console.log(`Parsed email: merchant=${extracted.merchant}, amount=${extracted.amount}, confidence=${extracted.confidence}`);
-    
-    return extracted;
-    
-  } catch (error) {
-    console.error('Error parsing email message:', error);
-    return {
-      messageId: emailData.messageId || `msg_${Date.now()}`,
-      threadId: null,
-      merchant: 'Unknown',
-      date: null,
-      amount: null,
-      currency: 'USD',
-      lineItems: [],
-      confidence: 0,
-      attachments: [],
-      error: error.message
-    };
   }
+  
+  return { amount, currency };
 }
 
-module.exports = {
-  parseEmailMessage,
-  MERCHANT_TEMPLATES,
-  detectMerchant
-};
+/**
+ * Extract currency amount from text using comprehensive regex patterns
+ */
+function extractCurrencyAmount(text) {
+  if (!text) return null;
+  
+  // Currency patterns with symbols and codes
+  const patterns = [
+    // £12.34, $12.34, €12.34
+    /([£$€])(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
+    // 12.34 GBP, 12.34 USD, 12.34 EUR
+    /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(GBP|USD|EUR|£|$|€)/gi,
+    // Just numbers with decimal (fallback)
+    /(\d{1,3}(?:,\d{3})*\.\d{2})/g
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = Array.from(text.matchAll(pattern));
+    if (matches.length > 0) {
+      const match = matches[matches.length - 1]; // Take the last/largest match
+      
+      let amount, currency;
+      
+      if (match[1] && match[2]) {
+        // Pattern: £12.34 or 12.34 GBP
+        if (match[1].match(/[£$€]/)) {
+          currency = match[1] === '£' ? 'GBP' : match[1] === '$' ? 'USD' : 'EUR';
+          amount = match[2].replace(/,/g, '');
+        } else {
+          amount = match[1].replace(/,/g, '');
+          currency = match[2].toUpperCase();
+          if (currency === '£') currency = 'GBP';
+          if (currency === '$') currency = 'USD';
+          if (currency === '€') currency = 'EUR';
+        }
+      } else {
+        // Pattern: just number
+        amount = match[1].replace(/,/g, '');
+        currency = 'USD'; // Default
+      }
+      
+      // Validate amount
+      const numAmount = parseFloat(amount);
+      if (!isNaN(numAmount) && numAmount > 0) {
+        return {
+          amount: numAmount.toFixed(2),
+          currency: currency
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Calculate confidence score based on extraction quality
+ */
+function calculateConfidence(result, html) {
+  let confidence = 0.3; // Base confidence
+  
+  // Increase confidence for explicit total found
+  if (result.amount !== '0.00' && parseFloat(result.amount) > 0) {
+    if (html.toLowerCase().includes('total')) {
+      confidence = 0.9; // High confidence for explicit total
+    } else {
+      confidence = 0.7; // Good confidence for found amount
+    }
+  }
+  
+  // Increase confidence for line items
+  if (result.lineItems.length > 0) {
+    confidence = Math.max(confidence, 0.6);
+  }
+  
+  // Increase confidence for known merchant
+  if (result.merchant !== 'Unknown') {
+    confidence = Math.min(confidence + 0.1, 1.0);
+  }
+  
+  // Decrease confidence for very low amounts
+  if (parseFloat(result.amount) < 1.0) {
+    confidence *= 0.8;
+  }
+  
+  return Math.round(confidence * 100) / 100; // Round to 2 decimal places
+}
+
+// For backward compatibility with CommonJS require
+export default { parseEmailMessage };

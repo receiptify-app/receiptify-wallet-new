@@ -143,11 +143,22 @@ async function processEmailMessageSimple(data: EmailProcessMessageJob) {
   }
   
   try {
-    const { parseEmailMessage } = await import('../utils/parser.js')
+    // Dynamic import with absolute path
+    const parserModule = await import(new URL('../utils/parser.js', import.meta.url).href)
+    const parseEmailMessage = parserModule.parseEmailMessage || parserModule.default?.parseEmailMessage
+    
+    if (!parseEmailMessage) {
+      throw new Error('parseEmailMessage function not found in parser module')
+    }
+    
     parsed = parseEmailMessage(emailContent)
-    console.log('Parsed email data:', parsed)
+    console.log('Parsed email data:', JSON.stringify(parsed, null, 2))
   } catch (error) {
     console.warn('Parser not available, using default values:', error.message)
+    // Apply basic fallback parsing
+    parsed.merchant = data.sender?.split('@')[1]?.split('.')[0] || 'Unknown'
+    parsed.amount = (emailContent.body?.match(/\$?(\d+\.\d{2})/)?.[1]) || '0.00'
+    parsed.confidence = 0.4
   }
   
   // Create processed message record (with upsert to handle duplicates)
