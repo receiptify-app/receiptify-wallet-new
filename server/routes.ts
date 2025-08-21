@@ -81,10 +81,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/receipts", async (req, res) => {
     try {
-      const validatedData = insertReceiptSchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
+      // Convert date string to Date object if needed
+      const receiptData = { ...req.body, userId: defaultUserId };
+      if (receiptData.date && typeof receiptData.date === 'string') {
+        receiptData.date = new Date(receiptData.date);
+      }
+      
+      const validatedData = insertReceiptSchema.parse(receiptData);
       
       const receipt = await storage.createReceipt(validatedData);
       
@@ -112,19 +115,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      // Simulate OCR processing
-      const mockReceiptData = {
+      // Extract location data from request body if provided by frontend
+      const { latitude, longitude, merchantName, location, total, category } = req.body;
+
+      // Process the actual uploaded receipt data
+      const receiptData = {
         userId: defaultUserId,
-        merchantName: "Scanned Receipt",
-        location: "Unknown Location",
-        total: "15.99",
+        merchantName: merchantName || "Uploaded Receipt",
+        location: location || "Receipt Location",
+        total: total || "0.00",
         date: new Date(),
-        category: "Other",
+        category: category || "Other",
         paymentMethod: "Unknown",
-        receiptNumber: `SCN${Date.now()}`,
+        receiptNumber: `UPL${Date.now()}`,
+        imageUrl: `/uploads/${req.file.filename}`,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        ecoPoints: 1
       };
 
-      const receipt = await storage.createReceipt(mockReceiptData);
+      const receipt = await storage.createReceipt(receiptData);
       res.status(201).json(receipt);
     } catch (error) {
       console.error("Error processing upload:", error);

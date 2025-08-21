@@ -80,16 +80,36 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
 
   const createReceiptMutation = useMutation({
     mutationFn: async (data: ManualReceiptForm) => {
+      // Get current location if available
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: true
+          });
+        });
+        
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      } catch (error) {
+        console.log('Location not available for manual receipt:', error);
+      }
+
       const receiptData = {
-        ...data,
-        type: 'manual',
-        photo: capturedPhoto,
-        createdAt: new Date().toISOString(),
-        ecoImpact: {
-          paperSaved: 1,
-          co2Reduced: 0.003,
-          treesSaved: 0.0001
-        }
+        merchantName: data.merchantName,
+        location: data.merchantAddress || "Manual Entry",
+        total: data.totalAmount.toString(),
+        date: `${data.date}T${data.time}:00`,
+        category: "Other",
+        paymentMethod: data.paymentMethod,
+        receiptNumber: data.receiptNumber,
+        items: data.items,
+        latitude,
+        longitude,
+        ecoPoints: 1
       };
       
       return await apiRequest("POST", "/api/receipts", receiptData);

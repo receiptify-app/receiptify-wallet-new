@@ -25,6 +25,22 @@ export default function ScannerModal({ open, onOpenChange }: ScannerModalProps) 
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('receipt', file);
+      
+      // Get current location if available
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: true
+          });
+        });
+        
+        formData.append('latitude', position.coords.latitude.toString());
+        formData.append('longitude', position.coords.longitude.toString());
+      } catch (error) {
+        console.log('Location not available:', error);
+      }
+      
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
         body: formData,
