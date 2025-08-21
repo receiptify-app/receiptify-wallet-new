@@ -1,0 +1,138 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailIntegrations EmailIntegration[]
+  receipts          Receipt[]
+  pendingReceipts   PendingReceipt[]
+
+  @@map("users")
+}
+
+model EmailIntegration {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // 'gmail' or 'outlook'
+  email        String
+  accessToken  String
+  refreshToken String?
+  tokenExpiry  DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailSyncJobs       EmailSyncJob[]
+  processedMessages   ProcessedMessage[]
+
+  @@unique([userId, provider, email])
+  @@map("email_integrations")
+}
+
+model EmailSyncJob {
+  id                  String   @id @default(cuid())
+  emailIntegrationId  String
+  jobType             String   // 'poll', 'backfill'
+  status              String   @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  lastSyncedMessageId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  emailIntegration EmailIntegration @relation(fields: [emailIntegrationId], references: [id], onDelete: Cascade)
+
+  @@map("email_sync_jobs")
+}
+
+model ProcessedMessage {
+  id                 String   @id @default(cuid())
+  emailIntegrationId String
+  messageId          String   // Provider's message ID
+  subject            String?
+  sender             String?
+  receivedAt         DateTime
+  processed          Boolean  @default(false)
+  hasReceipt         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  emailIntegration EmailIntegration @relation(fields: [emailIntegrationId], references: [id], onDelete: Cascade)
+  receipts         Receipt[]
+
+  @@unique([emailIntegrationId, messageId])
+  @@map("processed_messages")
+}
+
+model PendingReceipt {
+  id              String   @id @default(cuid())
+  userId          String
+  messageId       String
+  extractedData   Json     // OCR extracted data
+  confidence      Float    @default(0.0)
+  status          String   @default("pending") // 'pending', 'accepted', 'rejected'
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("pending_receipts")
+}
+
+model Receipt {
+  id                String   @id @default(cuid())
+  userId            String
+  processedMessageId String?
+  merchantName      String
+  total             String
+  date              DateTime
+  receiptNumber     String?
+  category          String?
+  paymentMethod     String?
+  location          String?
+  items             Json?    // Array of receipt items
+  metadata          Json?    // Additional receipt metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processedMessage ProcessedMessage? @relation(fields: [processedMessageId], references: [id])
+
+  @@map("receipts")
+}
+
+model ForwardingAddress {
+  id        String   @id @default(cuid())
+  address   String   @unique
+  userId    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("forwarding_addresses")
+}
+
+model JobQueue {
+  id        String   @id @default(cuid())
+  jobType   String
+  payload   Json
+  status    String   @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  attempts  Int      @default(0)
+  maxAttempts Int    @default(3)
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("job_queue")
+}

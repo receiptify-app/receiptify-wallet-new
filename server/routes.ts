@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { registerEmailRoutes } from "./email-routes";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema,
@@ -20,6 +21,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const defaultUserId = "default-user"; // For demo purposes
+  
+  // Register email import routes
+  registerEmailRoutes(app);
 
   // Receipt routes
   app.get("/api/receipts", async (req, res) => {

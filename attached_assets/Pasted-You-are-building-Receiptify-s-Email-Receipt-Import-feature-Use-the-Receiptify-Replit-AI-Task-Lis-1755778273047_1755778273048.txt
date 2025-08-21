@@ -1,0 +1,33 @@
+You are building Receiptify's Email Receipt Import feature. Use the "Receiptify — Replit AI Task List" as full context, but START WITH TASK 0–4 ONLY.
+
+TASK 0–4 (do these now, stop and report when done)
+- TASK 0: Install dependencies and scaffold project folders (pages, api, workers, lib, utils, public).
+- TASK 1: Create environment variables placeholders (use Replit secrets for real values).
+- TASK 2: Add the provided Prisma schema and run migrations: `npx prisma migrate dev --name init-email` and `npx prisma generate`.
+- TASK 3: Implement API route skeletons (with real routing logic where possible):
+  - GET /api/email/authorize?provider=gmail|outlook  (return/redirect to provider URL)
+  - GET /api/email/callback?provider=gmail|outlook  (exchange code → store tokens; can stub for testing)
+  - POST /api/email/webhook  (accept inbound webhook payload and enqueue a job)
+  - POST /api/email/push  (receive provider push notifications and enqueue fetch job)
+  - GET /api/email/forwarding-address  (return forwarding address string)
+  - GET /api/email/pending, POST /api/email/pending/:id/accept, POST /api/email/pending/:id/reject
+- TASK 4: Implement a basic worker using bullmq or equivalent with job types:
+  - email_sync.poll, email_process.message, ocr.process, email_backfill
+  Ensure idempotency by checking messageId in DB before creating receipts.
+
+Deliverable for this stage (what to return)
+1. Runnable Replit project that:
+   - Installs dependencies,
+   - Applies Prisma schema/migration,
+   - Exposes the API routes above (skeletons OK, but should behave as described),
+   - Runs a worker that can accept a manual job enqueue for testing.
+2. Short instructions for me to run basic tests (commands to run).
+3. A status report showing which endpoints are working, which are stubbed, and any missing secrets/steps.
+
+Acceptance checks (must pass before reporting)
+- `GET /api/email/authorize?provider=gmail` returns a valid OAuth redirect URL (or a test redirect).
+- `GET /api/email/callback` can accept a test code and stores a test EmailIntegration record (stub ok).
+- `POST /api/email/webhook` accepts a sample payload and enqueues an `email_process.message` job.
+- Worker can read a queued `email_process.message` job and log / mark it processed in DB.
+
+IMPORTANT: stop after TASK 0–4 and report back with logs and the status report. Wait for my next instruction before proceeding to parsing/OCR/frontend tasks.
