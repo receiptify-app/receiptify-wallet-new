@@ -19,6 +19,7 @@ import {
   insertWarrantyClaimSchema,
 } from "@shared/schema";
 import multer from "multer";
+import { OCRProcessor } from './ocr-processor';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -116,26 +117,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Extract location data from request body if provided by frontend
-      const { latitude, longitude, merchantName, location, total, category } = req.body;
+      const { latitude, longitude } = req.body;
 
-      // Process the actual uploaded receipt data
-      const receiptData = {
-        userId: defaultUserId,
-        merchantName: merchantName || "Uploaded Receipt",
-        location: location || "Receipt Location",
-        total: total || "0.00",
-        date: new Date(),
-        category: category || "Other",
-        paymentMethod: "Unknown",
-        receiptNumber: `UPL${Date.now()}`,
-        imageUrl: `/uploads/${req.file.filename}`,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        ecoPoints: 1
-      };
+      // Process the receipt image with OCR
+      console.log(`Processing uploaded receipt image: ${req.file.originalname}`);
+      console.log(`Image size: ${req.file.size} bytes`);
+      
+      // Save the uploaded file temporarily for OCR processing
+      const tempPath = `/tmp/${Date.now()}_${req.file.originalname}`;
+      require('fs').writeFileSync(tempPath, req.file.buffer);
+      
+      try {
+        // Extract real data from the receipt image
+        const extractedData = await OCRProcessor.processReceiptImage(tempPath);
+        console.log('Extracted receipt data:', extractedData);
+        
+        const receiptData = {
+          userId: defaultUserId,
+          merchantName: extractedData.merchantName,
+          location: extractedData.location,
+          total: extractedData.total,
+          date: extractedData.date || new Date(),
+          category: "Shopping",
+          paymentMethod: extractedData.paymentMethod || "Unknown",
+          receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          ecoPoints: 1
+        };
 
-      const receipt = await storage.createReceipt(receiptData);
-      res.status(201).json(receipt);
+        const receipt = await storage.createReceipt(receiptData);
+        
+        // Add extracted items if any
+        for (const item of extractedData.items) {
+          try {
+            await storage.createReceiptItem({
+              receiptId: receipt.id,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity?.toString() || "1",
+              category: "Other"
+            });
+          } catch (error) {
+            console.error('Error adding receipt item:', error);
+          }
+        }
+        
+        // Clean up temp file
+        require('fs').unlinkSync(tempPath);
+        
+        res.status(201).json(receipt);
+      } catch (error) {
+        console.error('OCR processing error:', error);
+        
+        // Fallback: create basic receipt
+        const receiptData = {
+          userId: defaultUserId,
+          merchantName: "Receipt (OCR Failed)",
+          location: "Unknown Location", 
+          total: "0.00",
+          date: new Date(),
+          category: "Other",
+          paymentMethod: "Unknown",
+          receiptNumber: `ERR${Date.now()}`,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          ecoPoints: 1
+        };
+        
+        const receipt = await storage.createReceipt(receiptData);
+        
+        // Clean up temp file if it exists
+        try { require('fs').unlinkSync(tempPath); } catch {}
+        
+        res.status(201).json(receipt);
+      }
     } catch (error) {
       console.error("Error processing upload:", error);
       res.status(400).json({ error: "Failed to process receipt" });
