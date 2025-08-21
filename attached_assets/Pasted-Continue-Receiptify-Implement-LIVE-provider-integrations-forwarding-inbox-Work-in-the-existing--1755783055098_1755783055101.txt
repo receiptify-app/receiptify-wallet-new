@@ -1,0 +1,70 @@
+Continue Receiptify: Implement LIVE provider integrations + forwarding inbox.
+
+Work in the existing project (current state: parser + reprocess endpoint + worker present). Implement the following in order. If any provider secrets are missing, stub external calls but create realistic EmailIntegration records and store sync cursors.
+
+A) Gmail Integration
+1. Add route: GET /api/email/authorize?provider=gmail
+   - Redirect to Google OAuth consent with scope: https://www.googleapis.com/auth/gmail.readonly (or mail.google.com if needed)
+2. Add route: GET /api/email/callback?provider=gmail
+   - Exchange code for tokens (store access_token, refresh_token, scope)
+   - Store initial historyId (if available) or trigger a backfill job for the last 90 days
+3. Implement Gmail push/poll:
+   - Preferred: implement watch via Gmail API and accept Pub/Sub notifications endpoint /api/email/gmail/push (if Replit cannot receive Pub/Sub, implement polling fallback via users.history.list and users.messages.list)
+   - For each new message id discovered, enqueue email_process.message job with messageId + integrationId
+4. Save `historyId` or `syncCursor` on EmailIntegration after each poll/push.
+
+B) Microsoft Outlook Integration
+1. Add route: GET /api/email/authorize?provider=outlook
+   - Use Microsoft OAuth with scope: Mail.Read
+2. Add route: GET /api/email/callback?provider=outlook
+   - Exchange code for tokens, store refreshable tokens and create EmailIntegration
+3. Implement change notifications or delta polling:
+   - Add webhook route /api/email/outlook/push to accept notifications
+   - On notification, enqueue job to fetch new messages via Microsoft Graph and queue parsing
+4. Save `deltaToken` on EmailIntegration.
+
+C) Forwarding Inbox (SendGrid / Mailgun / Postmark)
+1. Add endpoint: GET /api/email/forwarding-address that returns a unique forwarding address for the current user: receipts+<userId>_<shortToken>@<your-domain>
+2. Add webhook receiver: POST /api/email/webhook
+   - Accept inbound parsed payloads or raw MIME from SendGrid/Mailgun
+   - Validate signature headers if present (in test-mode, allow bypass)
+   - Enqueue job email_process.message with raw MIME / parsed body + integrationId (create a 'forwarded' EmailIntegration if necessary)
+3. Save attachments to storage and enqueue OCR jobs.
+
+D) Backfill endpoints & admin
+1. Add route: POST /api/email/backfill?integrationId=<id>&days=90
+   - Enqueue email_backfill job to fetch historical messages (use List API for each provider)
+   - Backfill should be idempotent
+2. Expose integration status: GET /api/admin/email-integrations returns integrations with lastSyncCursor and status.
+
+E) Tests & verification
+1. Provide sample simulation scripts or run:
+   - Simulate Gmail push/poll (stub if secrets absent): should enqueue job and create Receipt
+   - Simulate Outlook notification: should enqueue job and create Receipt
+   - Use existing scripts to simulate forwarding inbox: bash scripts/simulate_webhook.sh
+2. Return test outputs, plus server & worker logs (last 200 lines).
+
+DELIVERABLES (exact, return these)
+1. Confirmation that OAuth endpoints exist and create EmailIntegration records (or stubs).
+2. Confirmation that push/poll endpoints enqueue `email_process.message` with messageId.
+3. Test outputs of the simulated flows (curl outputs).
+4. `GET /api/admin/email-integrations` output showing stored cursors (historyId/deltaToken).
+5. Any errors or missing secrets and exact steps needed (e.g., set GOOGLE_CLIENT_ID etc).
+
+ENV SECRETS YOU MUST SET BEFORE RUNNING THESE FULLY
+- GOOGLE_CLIENT_ID
+- GOOGLE_CLIENT_SECRET
+- GOOGLE_REDIRECT_URI
+- MICROSOFT_CLIENT_ID
+- MICROSOFT_CLIENT_SECRET
+- MICROSOFT_REDIRECT_URI
+- SENDGRID_INBOUND_API_KEY (or MAILGUN_INBOUND_KEY)
+- REDIS_URL
+- STORAGE_PROVIDER (s3|local) and S3 creds if using s3
+
+IMPORTANT
+- If provider secrets are not set, implement stubs that still simulate message ingestion and store realistic EmailIntegration records and cursors.
+- Do not make destructive changes to DB schema.
+- Stop after finishing A+B and return the deliverables above. Wait for confirmation before implementing UI pages or other tasks.
+
+Proceed and return a full report with the outputs, curl responses, and logs.

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { prisma } from "../lib/prisma";
+import { storage } from "./storage";
 import { buildAuthUrl, exchangeCodeForTokens } from "../utils/oauth";
 import { enqueueSimpleJob, JobType } from "../lib/simple-queue";
 
@@ -155,11 +155,11 @@ export function registerEmailRoutes(app: Express) {
       const address = `receipts+${Date.now()}@${domain}`;
       
       // Store forwarding address
-      await prisma.forwardingAddress.create({
-        data: {
-          address,
-          userId: 'test-user-id' // In real app, would use authenticated user
-        }
+      await storage.createForwardingAddress({
+        userId: 'test-user-id', // In real app, would use authenticated user
+        address,
+        token: `token_${Date.now()}`,
+        isActive: true
       });
       
       console.log('Generated forwarding address:', address);
@@ -177,14 +177,7 @@ export function registerEmailRoutes(app: Express) {
   // GET /api/email/pending
   app.get("/api/email/pending", async (req, res) => {
     try {
-      const pendingReceipts = await prisma.pendingReceipt.findMany({
-        where: {
-          status: 'pending'
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      const pendingReceipts = await storage.getPendingReceipts('test-user-id');
       
       console.log(`Found ${pendingReceipts.length} pending receipts`);
       

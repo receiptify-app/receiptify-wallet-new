@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerEmailRoutes } from "./email-routes";
+import { emailOAuthRouter } from "./email-oauth";
+import { forwardingInboxRouter } from "./forwarding-inbox";
+import { adminRouter } from "./admin-routes";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema,
@@ -22,8 +25,23 @@ const upload = multer({ storage: multer.memoryStorage() });
 export async function registerRoutes(app: Express): Promise<Server> {
   const defaultUserId = "default-user"; // For demo purposes
   
+  // Mock authentication middleware for testing
+  app.use((req, res, next) => {
+    req.user = { id: defaultUserId };
+    next();
+  });
+  
   // Register email import routes
   registerEmailRoutes(app);
+  
+  // Register OAuth routes
+  app.use("/api/email/oauth", emailOAuthRouter);
+  
+  // Register forwarding inbox routes
+  app.use("/api/email", forwardingInboxRouter);
+  
+  // Register admin routes
+  app.use("/api/admin", adminRouter);
 
   // Receipt routes
   app.get("/api/receipts", async (req, res) => {

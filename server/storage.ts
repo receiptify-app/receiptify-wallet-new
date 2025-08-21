@@ -12,10 +12,14 @@ import {
   type OtpVerification, type InsertOtpVerification,
   type KioskSession, type InsertKioskSession,
   type WarrantyClaim, type InsertWarrantyClaim,
+  type EmailIntegration, type InsertEmailIntegration,
+  type PendingReceipt, type InsertPendingReceipt,
+  type ProcessedMessage, type InsertProcessedMessage,
+  type ForwardingAddress, type InsertForwardingAddress,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims } from "@shared/schema";
+import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses } from "@shared/schema";
 import { eq, and, like, gte, lte, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -103,6 +107,31 @@ export interface IStorage {
 
   // Search
   searchReceipts(userId: string, query: string): Promise<Receipt[]>;
+
+  // Email integration operations
+  getEmailIntegrations(userId: string): Promise<EmailIntegration[]>;
+  getEmailIntegration(id: string): Promise<EmailIntegration | undefined>;
+  getEmailIntegrationsByProvider(provider: string): Promise<EmailIntegration[]>;
+  createEmailIntegration(integration: InsertEmailIntegration): Promise<EmailIntegration>;
+  updateEmailIntegration(id: string, updates: Partial<InsertEmailIntegration>): Promise<EmailIntegration | undefined>;
+
+  // Pending receipt operations
+  getPendingReceipts(userId: string): Promise<PendingReceipt[]>;
+  createPendingReceipt(receipt: InsertPendingReceipt): Promise<PendingReceipt>;
+  updatePendingReceipt(id: string, updates: Partial<InsertPendingReceipt>): Promise<PendingReceipt | undefined>;
+  deletePendingReceipt(id: string): Promise<boolean>;
+
+  // Processed message operations
+  createProcessedMessage(message: InsertProcessedMessage): Promise<ProcessedMessage>;
+  getProcessedMessage(emailIntegrationId: string, messageId: string): Promise<ProcessedMessage | undefined>;
+
+  // Job operations
+  createJob(job: { jobType: string; payload: any; status: string }): Promise<{ id: string }>;
+  updateJob(id: string, updates: { status: string }): Promise<void>;
+
+  // Forwarding address operations
+  getForwardingAddress(userId: string): Promise<ForwardingAddress | undefined>;
+  createForwardingAddress(address: InsertForwardingAddress): Promise<ForwardingAddress>;
 }
 
 export class MemStorage implements IStorage {
@@ -1112,6 +1141,91 @@ export class DatabaseStorage implements IStorage {
         like(receipts.merchantName, `%${query}%`)
       ))
       .orderBy(desc(receipts.date));
+  }
+
+  // Email integration operations
+  async getEmailIntegrations(userId: string): Promise<EmailIntegration[]> {
+    return await db.select().from(emailIntegrations).where(eq(emailIntegrations.userId, userId));
+  }
+
+  async getEmailIntegration(id: string): Promise<EmailIntegration | undefined> {
+    const [integration] = await db.select().from(emailIntegrations).where(eq(emailIntegrations.id, id));
+    return integration;
+  }
+
+  async getEmailIntegrationsByProvider(provider: string): Promise<EmailIntegration[]> {
+    return await db.select().from(emailIntegrations).where(eq(emailIntegrations.provider, provider));
+  }
+
+  async createEmailIntegration(integration: InsertEmailIntegration): Promise<EmailIntegration> {
+    const [newIntegration] = await db.insert(emailIntegrations).values(integration).returning();
+    return newIntegration;
+  }
+
+  async updateEmailIntegration(id: string, updates: Partial<InsertEmailIntegration>): Promise<EmailIntegration | undefined> {
+    const [updated] = await db.update(emailIntegrations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(emailIntegrations.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Pending receipt operations
+  async getPendingReceipts(userId: string): Promise<PendingReceipt[]> {
+    return await db.select().from(pendingReceipts).where(eq(pendingReceipts.userId, userId));
+  }
+
+  async createPendingReceipt(receipt: InsertPendingReceipt): Promise<PendingReceipt> {
+    const [newReceipt] = await db.insert(pendingReceipts).values(receipt).returning();
+    return newReceipt;
+  }
+
+  async updatePendingReceipt(id: string, updates: Partial<InsertPendingReceipt>): Promise<PendingReceipt | undefined> {
+    const [updated] = await db.update(pendingReceipts)
+      .set(updates)
+      .where(eq(pendingReceipts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePendingReceipt(id: string): Promise<boolean> {
+    const result = await db.delete(pendingReceipts).where(eq(pendingReceipts.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Processed message operations
+  async createProcessedMessage(message: InsertProcessedMessage): Promise<ProcessedMessage> {
+    const [newMessage] = await db.insert(processedMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async getProcessedMessage(emailIntegrationId: string, messageId: string): Promise<ProcessedMessage | undefined> {
+    const [message] = await db.select().from(processedMessages).where(
+      and(eq(processedMessages.emailIntegrationId, emailIntegrationId), eq(processedMessages.messageId, messageId))
+    );
+    return message;
+  }
+
+  // Job operations - simple in-memory queue for now
+  async createJob(job: { jobType: string; payload: any; status: string }): Promise<{ id: string }> {
+    const id = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`Created job ${id} with type ${job.jobType}`);
+    return { id };
+  }
+
+  async updateJob(id: string, updates: { status: string }): Promise<void> {
+    console.log(`Updated job ${id} status to ${updates.status}`);
+  }
+
+  // Forwarding address operations
+  async getForwardingAddress(userId: string): Promise<ForwardingAddress | undefined> {
+    const [address] = await db.select().from(forwardingAddresses).where(eq(forwardingAddresses.userId, userId));
+    return address;
+  }
+
+  async createForwardingAddress(address: InsertForwardingAddress): Promise<ForwardingAddress> {
+    const [newAddress] = await db.insert(forwardingAddresses).values(address).returning();
+    return newAddress;
   }
 }
 

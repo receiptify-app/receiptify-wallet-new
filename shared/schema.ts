@@ -215,12 +215,100 @@ export const warrantyClaims = pgTable("warranty_claims", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Email integration tables
+export const emailIntegrations = pgTable("email_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  provider: text("provider").notNull(), // gmail, outlook, forwarding
+  email: text("email").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  tokenExpiry: timestamp("token_expiry"),
+  syncCursor: text("sync_cursor"), // historyId for Gmail, deltaToken for Outlook
+  lastSyncAt: timestamp("last_sync_at"),
+  status: text("status").default("active"), // active, paused, error
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const pendingReceipts = pgTable("pending_receipts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  messageId: text("message_id").notNull(),
+  extractedData: jsonb("extracted_data").notNull(),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }).default("0.0"),
+  status: text("status").default("pending"), // pending, accepted, rejected
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const processedMessages = pgTable("processed_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailIntegrationId: varchar("email_integration_id").notNull(),
+  messageId: text("message_id").notNull(),
+  subject: text("subject"),
+  sender: text("sender"),
+  receivedAt: timestamp("received_at").notNull(),
+  processed: boolean("processed").default(false),
+  hasReceipt: boolean("has_receipt").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const forwardingAddresses = pgTable("forwarding_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  address: text("address").notNull().unique(),
+  token: text("token").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const emailSyncJobs = pgTable("email_sync_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  integrationId: varchar("integration_id").notNull(),
+  jobType: text("job_type").notNull(), // poll, backfill, push_notification
+  status: text("status").default("pending"), // pending, running, completed, failed
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
+  syncCursor: text("sync_cursor"),
+  messagesProcessed: integer("messages_processed").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   lastLoginAt: true,
+});
+
+export const insertEmailIntegrationSchema = createInsertSchema(emailIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPendingReceiptSchema = createInsertSchema(pendingReceipts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProcessedMessageSchema = createInsertSchema(processedMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertForwardingAddressSchema = createInsertSchema(forwardingAddresses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmailSyncJobSchema = createInsertSchema(emailSyncJobs).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
@@ -326,4 +414,20 @@ export type KioskSession = typeof kioskSessions.$inferSelect;
 export type InsertKioskSession = z.infer<typeof insertKioskSessionSchema>;
 
 export type WarrantyClaim = typeof warrantyClaims.$inferSelect;
+export type InsertWarrantyClaim = z.infer<typeof insertWarrantyClaimSchema>;
+
+export type EmailIntegration = typeof emailIntegrations.$inferSelect;
+export type InsertEmailIntegration = z.infer<typeof insertEmailIntegrationSchema>;
+
+export type PendingReceipt = typeof pendingReceipts.$inferSelect;
+export type InsertPendingReceipt = z.infer<typeof insertPendingReceiptSchema>;
+
+export type ProcessedMessage = typeof processedMessages.$inferSelect;
+export type InsertProcessedMessage = z.infer<typeof insertProcessedMessageSchema>;
+
+export type ForwardingAddress = typeof forwardingAddresses.$inferSelect;
+export type InsertForwardingAddress = z.infer<typeof insertForwardingAddressSchema>;
+
+export type EmailSyncJob = typeof emailSyncJobs.$inferSelect;
+export type InsertEmailSyncJob = z.infer<typeof insertEmailSyncJobSchema>;
 export type InsertWarrantyClaim = z.infer<typeof insertWarrantyClaimSchema>;
