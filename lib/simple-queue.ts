@@ -196,7 +196,11 @@ async function processEmailMessageSimple(data: EmailProcessMessageJob) {
           date: parsed.date || new Date().toISOString(),
           lineItems: parsed.lineItems || [],
           confidence: parsed.confidence,
-          attachments: parsed.attachments || []
+          attachments: parsed.attachments || [],
+          // Store original data for reprocessing
+          rawHtml: data.body || '',
+          subject: data.subject || '',
+          sender: data.sender || ''
         },
         confidence: parsed.confidence,
         status: 'pending'

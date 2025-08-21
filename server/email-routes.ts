@@ -285,6 +285,97 @@ export function registerEmailRoutes(app: Express) {
     }
   });
 
+  // POST /api/email/pending/reprocess
+  app.post("/api/email/pending/reprocess", async (req, res) => {
+    try {
+      // Get all pending receipts that need reprocessing
+      const pendingReceipts = await prisma.pendingReceipt.findMany({
+        where: {
+          status: 'pending'
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (pendingReceipts.length === 0) {
+        return res.json({ 
+          success: true,
+          message: 'No pending receipts to reprocess',
+          reprocessedCount: 0
+        });
+      }
+
+      console.log(`Reprocessing ${pendingReceipts.length} pending receipts`);
+      let reprocessedCount = 0;
+
+      for (const pendingReceipt of pendingReceipts) {
+        try {
+          // Get the original message data from extractedData
+          const extractedData = pendingReceipt.extractedData as any;
+          const messageData = {
+            messageId: pendingReceipt.messageId,
+            subject: extractedData?.subject || 'Reprocessed Email',
+            sender: extractedData?.sender || 'unknown@example.com',
+            body: extractedData?.rawHtml || extractedData?.body || '',
+            html: extractedData?.rawHtml || extractedData?.body || '',
+            attachments: extractedData?.attachments || []
+          };
+
+          // Re-parse using the new parser
+          let parsed = { merchant: 'Unknown', amount: '0.00', confidence: 0.3 };
+          
+          try {
+            const parserModule = await import(new URL('../utils/parser.js', import.meta.url).href);
+            const parseEmailMessage = parserModule.parseEmailMessage || parserModule.default?.parseEmailMessage;
+            
+            if (parseEmailMessage) {
+              parsed = parseEmailMessage(messageData);
+              console.log(`Reprocessed ${pendingReceipt.id}: ${parsed.merchant} - $${parsed.amount} (confidence: ${parsed.confidence})`);
+            }
+          } catch (parseError) {
+            console.warn(`Parser error for ${pendingReceipt.id}:`, parseError.message);
+          }
+
+          // Update the pending receipt with new parsed data
+          await prisma.pendingReceipt.update({
+            where: { id: pendingReceipt.id },
+            data: {
+              extractedData: {
+                merchant: parsed.merchant || 'Unknown',
+                amount: parsed.amount || '0.00',
+                date: parsed.date || new Date().toISOString(),
+                lineItems: parsed.lineItems || [],
+                confidence: parsed.confidence,
+                attachments: parsed.attachments || [],
+                // Preserve original raw data
+                rawHtml: pendingReceipt.extractedData?.rawHtml,
+                body: pendingReceipt.extractedData?.body
+              },
+              confidence: parsed.confidence
+            }
+          });
+
+          reprocessedCount++;
+        } catch (error) {
+          console.error(`Error reprocessing pending receipt ${pendingReceipt.id}:`, error);
+        }
+      }
+
+      console.log(`Successfully reprocessed ${reprocessedCount} pending receipts`);
+
+      res.json({
+        success: true,
+        message: `Reprocessed ${reprocessedCount} pending receipts`,
+        reprocessedCount,
+        totalPending: pendingReceipts.length
+      });
+    } catch (error) {
+      console.error('Error reprocessing pending receipts:', error);
+      res.status(500).json({ error: 'Failed to reprocess pending receipts' });
+    }
+  });
+
   // GET /api/email/forwarding-address
   app.get("/api/email/forwarding-address", async (req, res) => {
     try {

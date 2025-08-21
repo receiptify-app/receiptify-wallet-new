@@ -1,5 +1,13 @@
+Update the Receiptify project: replace the HTML parser with the provided robust version, add a reprocess-pending endpoint, restart server & worker, re-run the webhook/e2e simulations, and return logs and outputs.
+
+IMPORTANT: If any Prisma field names differ, adapt accordingly (for example some projects store raw HTML in a different column than `parsedFrom.rawHtml` — detect and use the correct column). Do not modify unrelated files.
+
+--- TASK 1 — Replace parser file
+Write the following exact content to `utils/parser.js` (overwrite any existing file):
+
+```js
 // utils/parser.js
-import * as cheerio from 'cheerio';
+const cheerio = require('cheerio');
 
 function parseCurrencyString(s) {
   if (!s) return null;
@@ -133,4 +141,4 @@ function parseEmailMessage(parsed) {
   };
 }
 
-export { parseEmailMessage, parseCurrencyString };
+module.exports = { parseEmailMessage, parseCurrencyString };
