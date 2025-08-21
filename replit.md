@@ -1,6 +1,6 @@
 # Overview
 
-This is a UK-focused, eco-friendly digital receipt management application with the tagline "OneTap Receipts. Zero Paper." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
+This is a UK-focused, eco-friendly digital receipt management application with the tagline "Your receipt wallet - store, track, return stress-free." The platform consolidates and organizes receipts from multiple sources while emphasizing environmental impact tracking. Built as a modern web application with a mobile-first approach, it provides a comprehensive receipt management experience through responsive design and intuitive navigation.
 
 The application features multi-channel receipt capture (QR codes, camera scans, file uploads), comprehensive receipt management with search and filtering, loyalty card integration for major UK retailers, real-time environmental impact tracking, and detailed analytics. The system uses device-based storage for privacy and supports all payment methods without requiring personal information.
 
@@ -35,6 +35,8 @@ The application features multi-channel receipt capture (QR codes, camera scans, 
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+App slogan: "Your receipt wallet - store, track, return stress-free"
 
 # System Architecture
 

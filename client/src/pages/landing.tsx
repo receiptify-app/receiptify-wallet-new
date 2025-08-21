@@ -14,7 +14,7 @@ export default function Landing() {
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Digital Receipts</h1>
-              <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+              <p className="text-sm text-gray-600">Your receipt wallet - store, track, return stress-free</p>
             </div>
           </div>
           
