@@ -277,6 +277,41 @@ export const emailSyncJobs = pgTable("email_sync_jobs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Receipt Design Customization
+export const receiptDesigns = pgTable("receipt_designs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  
+  // Theme settings
+  colorScheme: text("color_scheme").default("green"), // green, blue, purple, red, orange, dark
+  backgroundStyle: text("background_style").default("clean"), // clean, gradient, pattern, textured
+  
+  // Layout settings  
+  layoutStyle: text("layout_style").default("modern"), // modern, classic, minimal, detailed
+  showMap: boolean("show_map").default(true),
+  showEcoPoints: boolean("show_eco_points").default(true),
+  showAnalyticsToggle: boolean("show_analytics_toggle").default(true),
+  
+  // Typography settings
+  fontStyle: text("font_style").default("modern"), // modern, classic, monospace, handwritten
+  fontSize: text("font_size").default("medium"), // small, medium, large
+  
+  // Display settings
+  itemDisplayStyle: text("item_display_style").default("list"), // list, grid, compact
+  showItemCategories: boolean("show_item_categories").default(false),
+  showItemImages: boolean("show_item_images").default(false),
+  groupSimilarItems: boolean("group_similar_items").default(false),
+  
+  // Branding settings
+  showMerchantLogo: boolean("show_merchant_logo").default(true),
+  customWatermark: text("custom_watermark"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -309,6 +344,12 @@ export const insertForwardingAddressSchema = createInsertSchema(forwardingAddres
 export const insertEmailSyncJobSchema = createInsertSchema(emailSyncJobs).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertReceiptDesignSchema = createInsertSchema(receiptDesigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
@@ -430,4 +471,8 @@ export type InsertForwardingAddress = z.infer<typeof insertForwardingAddressSche
 
 export type EmailSyncJob = typeof emailSyncJobs.$inferSelect;
 export type InsertEmailSyncJob = z.infer<typeof insertEmailSyncJobSchema>;
+
+export type ReceiptDesign = typeof receiptDesigns.$inferSelect;
+export type InsertReceiptDesign = z.infer<typeof insertReceiptDesignSchema>;
+
 export type InsertWarrantyClaim = z.infer<typeof insertWarrantyClaimSchema>;

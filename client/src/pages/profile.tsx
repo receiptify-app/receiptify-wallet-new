@@ -13,7 +13,8 @@ import {
   Download,
   Receipt,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Palette
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -225,6 +226,21 @@ export default function Profile() {
                   <div className="flex items-center gap-4">
                     <ShieldCheck className="w-6 h-6 text-gray-700" />
                     <span className="text-lg font-medium text-gray-900">Warranties</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/receipt-customization')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Palette className="w-6 h-6 text-gray-700" />
+                    <div>
+                      <span className="text-lg font-medium text-gray-900">Receipt Design</span>
+                      <p className="text-sm text-gray-600">Customize receipt appearance</p>
+                    </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>

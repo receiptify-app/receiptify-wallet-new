@@ -25,6 +25,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import TestAuth from "@/pages/test-auth";
 import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
+import ReceiptCustomization from "@/pages/receipt-customization";
 import BottomNavigation from "@/components/bottom-navigation";
 
 function AuthenticatedRouter() {
@@ -71,6 +72,7 @@ function AuthenticatedRouter() {
         <Route path="/payment" component={Payment} />
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
+        <Route path="/receipt-customization" component={ReceiptCustomization} />
         <Route path="/test-auth" component={TestAuth} />
         <Route component={NotFound} />
       </Switch>

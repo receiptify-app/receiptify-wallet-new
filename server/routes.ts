@@ -935,6 +935,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Receipt design customization routes
+  app.get("/api/receipt-designs", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+      
+      const designs = await storage.getReceiptDesigns(userId);
+      res.json(designs);
+    } catch (error) {
+      console.error("Error getting receipt designs:", error);
+      res.status(500).json({ error: "Failed to get receipt designs" });
+    }
+  });
+
+  app.get("/api/receipt-designs/default", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+      
+      const design = await storage.getDefaultReceiptDesign(userId);
+      res.json(design);
+    } catch (error) {
+      console.error("Error getting default receipt design:", error);
+      res.status(500).json({ error: "Failed to get default receipt design" });
+    }
+  });
+
+  app.post("/api/receipt-designs", async (req, res) => {
+    try {
+      const { userId, name, isDefault, ...designSettings } = req.body;
+      
+      if (!userId || !name) {
+        return res.status(400).json({ error: "User ID and name are required" });
+      }
+
+      const design = await storage.createReceiptDesign({
+        userId,
+        name,
+        isDefault: isDefault || false,
+        ...designSettings
+      });
+      
+      res.status(201).json(design);
+    } catch (error) {
+      console.error("Error creating receipt design:", error);
+      res.status(500).json({ error: "Failed to create receipt design" });
+    }
+  });
+
+  app.put("/api/receipt-designs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const design = await storage.updateReceiptDesign(id, updates);
+      res.json(design);
+    } catch (error) {
+      console.error("Error updating receipt design:", error);
+      res.status(500).json({ error: "Failed to update receipt design" });
+    }
+  });
+
+  app.delete("/api/receipt-designs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteReceiptDesign(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting receipt design:", error);
+      res.status(500).json({ error: "Failed to delete receipt design" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

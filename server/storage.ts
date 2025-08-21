@@ -16,10 +16,11 @@ import {
   type PendingReceipt, type InsertPendingReceipt,
   type ProcessedMessage, type InsertProcessedMessage,
   type ForwardingAddress, type InsertForwardingAddress,
+  type ReceiptDesign, type InsertReceiptDesign,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses } from "@shared/schema";
+import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses, receiptDesigns } from "@shared/schema";
 import { eq, and, like, gte, lte, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -115,6 +116,14 @@ export interface IStorage {
   createEmailIntegration(integration: InsertEmailIntegration): Promise<EmailIntegration>;
   updateEmailIntegration(id: string, updates: Partial<InsertEmailIntegration>): Promise<EmailIntegration | undefined>;
 
+  // Receipt design operations
+  getReceiptDesigns(userId: string): Promise<ReceiptDesign[]>;
+  getReceiptDesign(id: string): Promise<ReceiptDesign | undefined>;
+  getDefaultReceiptDesign(userId: string): Promise<ReceiptDesign | undefined>;
+  createReceiptDesign(data: InsertReceiptDesign): Promise<ReceiptDesign>;
+  updateReceiptDesign(id: string, data: Partial<InsertReceiptDesign>): Promise<ReceiptDesign>;
+  deleteReceiptDesign(id: string): Promise<void>;
+
   // Pending receipt operations
   getPendingReceipts(userId: string): Promise<PendingReceipt[]>;
   createPendingReceipt(receipt: InsertPendingReceipt): Promise<PendingReceipt>;
@@ -145,6 +154,7 @@ export class MemStorage implements IStorage {
   private ecoMetrics: Map<string, EcoMetrics> = new Map();
   private comments: Map<string, Comment> = new Map();
   private splits: Map<string, Split> = new Map();
+  private receiptDesigns: Map<string, ReceiptDesign> = new Map();
 
   constructor() {
     this.seedData();
@@ -594,6 +604,75 @@ export class MemStorage implements IStorage {
       receipt.category?.toLowerCase().includes(lowerQuery) ||
       receipt.receiptNumber?.toLowerCase().includes(lowerQuery)
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  // Receipt design methods
+  async getReceiptDesigns(userId: string): Promise<ReceiptDesign[]> {
+    return Array.from(this.receiptDesigns.values()).filter(design => design.userId === userId);
+  }
+
+  async getReceiptDesign(id: string): Promise<ReceiptDesign | undefined> {
+    return this.receiptDesigns.get(id);
+  }
+
+  async getDefaultReceiptDesign(userId: string): Promise<ReceiptDesign | undefined> {
+    return Array.from(this.receiptDesigns.values()).find(
+      design => design.userId === userId && design.isDefault
+    );
+  }
+
+  async createReceiptDesign(data: InsertReceiptDesign): Promise<ReceiptDesign> {
+    const id = randomUUID();
+    const design: ReceiptDesign = {
+      ...data,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // If this is set as default, unset other defaults first
+    if (data.isDefault) {
+      for (const [designId, existingDesign] of this.receiptDesigns.entries()) {
+        if (existingDesign.userId === data.userId && existingDesign.isDefault) {
+          this.receiptDesigns.set(designId, { ...existingDesign, isDefault: false });
+        }
+      }
+    }
+
+    this.receiptDesigns.set(id, design);
+    return design;
+  }
+
+  async updateReceiptDesign(
+    id: string,
+    data: Partial<InsertReceiptDesign>
+  ): Promise<ReceiptDesign> {
+    const existing = this.receiptDesigns.get(id);
+    if (!existing) {
+      throw new Error("Receipt design not found");
+    }
+
+    // If this is being set as default, unset other defaults first
+    if (data.isDefault) {
+      for (const [designId, existingDesign] of this.receiptDesigns.entries()) {
+        if (existingDesign.userId === existing.userId && existingDesign.isDefault) {
+          this.receiptDesigns.set(designId, { ...existingDesign, isDefault: false });
+        }
+      }
+    }
+
+    const updated: ReceiptDesign = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    this.receiptDesigns.set(id, updated);
+    return updated;
+  }
+
+  async deleteReceiptDesign(id: string): Promise<void> {
+    this.receiptDesigns.delete(id);
   }
 
   // Stub implementations for new authentication and enhanced features
@@ -1226,6 +1305,64 @@ export class DatabaseStorage implements IStorage {
   async createForwardingAddress(address: InsertForwardingAddress): Promise<ForwardingAddress> {
     const [newAddress] = await db.insert(forwardingAddresses).values(address).returning();
     return newAddress;
+  }
+
+  // Receipt design methods
+  async getReceiptDesigns(userId: string): Promise<ReceiptDesign[]> {
+    return await db.select().from(receiptDesigns).where(eq(receiptDesigns.userId, userId));
+  }
+
+  async getReceiptDesign(id: string): Promise<ReceiptDesign | undefined> {
+    const [design] = await db.select().from(receiptDesigns).where(eq(receiptDesigns.id, id));
+    return design;
+  }
+
+  async getDefaultReceiptDesign(userId: string): Promise<ReceiptDesign | undefined> {
+    const [design] = await db
+      .select()
+      .from(receiptDesigns)
+      .where(and(eq(receiptDesigns.userId, userId), eq(receiptDesigns.isDefault, true)));
+    return design;
+  }
+
+  async createReceiptDesign(data: InsertReceiptDesign): Promise<ReceiptDesign> {
+    // If this is set as default, unset other defaults first
+    if (data.isDefault) {
+      await db
+        .update(receiptDesigns)
+        .set({ isDefault: false })
+        .where(eq(receiptDesigns.userId, data.userId));
+    }
+
+    const [design] = await db.insert(receiptDesigns).values(data).returning();
+    return design;
+  }
+
+  async updateReceiptDesign(
+    id: string,
+    data: Partial<InsertReceiptDesign>
+  ): Promise<ReceiptDesign> {
+    // If this is being set as default, unset other defaults first
+    if (data.isDefault) {
+      const currentDesign = await this.getReceiptDesign(id);
+      if (currentDesign) {
+        await db
+          .update(receiptDesigns)
+          .set({ isDefault: false })
+          .where(eq(receiptDesigns.userId, currentDesign.userId));
+      }
+    }
+
+    const [design] = await db
+      .update(receiptDesigns)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(receiptDesigns.id, id))
+      .returning();
+    return design;
+  }
+
+  async deleteReceiptDesign(id: string): Promise<void> {
+    await db.delete(receiptDesigns).where(eq(receiptDesigns.id, id));
   }
 }
 
