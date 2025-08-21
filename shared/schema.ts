@@ -31,22 +31,22 @@ export const merchants = pgTable("merchants", {
 
 export const receipts = pgTable("receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  merchantId: varchar("merchant_id"),
-  merchantName: text("merchant_name").notNull(),
+  userId: varchar("userId").notNull(),
+  merchantId: varchar("merchantId"),
+  merchantName: text("merchantName").notNull(),
   location: text("location"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("GBP"),
   date: timestamp("date").notNull(),
-  receiptNumber: text("receipt_number"),
-  paymentMethod: text("payment_method"),
+  receiptNumber: text("receiptNumber"),
+  paymentMethod: text("paymentMethod"),
   category: text("category"),
-  rawData: jsonb("raw_data"),
-  imageUrl: text("image_url"),
+  rawData: jsonb("rawData"),
+  imageUrl: text("imageUrl"),
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
-  ecoPoints: integer("eco_points").default(1),
-  createdAt: timestamp("created_at").defaultNow(),
+  ecoPoints: integer("ecoPoints").default(1),
+  createdAt: timestamp("createdAt").defaultNow(),
 });
 
 export const receiptItems = pgTable("receipt_items", {
