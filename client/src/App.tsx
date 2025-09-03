@@ -73,6 +73,7 @@ function AuthenticatedRouter() {
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
         <Route path="/receipt-customization" component={ReceiptCustomization} />
+        <Route path="/landing-preview" component={Landing} />
         <Route path="/test-auth" component={TestAuth} />
         <Route component={NotFound} />
       </Switch>
