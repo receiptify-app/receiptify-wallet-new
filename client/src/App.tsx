@@ -54,6 +54,15 @@ function AuthenticatedRouter() {
     );
   }
 
+  // Show landing page for root path to demonstrate the techy design
+  if (window.location.pathname === '/') {
+    return (
+      <div className="w-full h-screen">
+        <Landing />
+      </div>
+    );
+  }
+
   return (
     <>
       <Switch>
