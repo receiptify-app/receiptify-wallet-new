@@ -47,59 +47,6 @@ export default function Home() {
 
   return (
     <>
-      <style>{`
-        .tech-bg { 
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-          color: #e2e8f0; 
-          min-height: 100vh;
-        }
-        
-        .tech-card{ 
-          background: rgba(15, 23, 42, 0.8);
-          border: 1px solid rgba(0, 229, 255, 0.2);
-          backdrop-filter: blur(10px); 
-          transition: all 0.3s ease; 
-          position: relative;
-          z-index: 2;
-        }
-        
-        .tech-card:hover{ 
-          border-color: rgba(0, 229, 255, 0.4);
-          box-shadow: 0 4px 20px rgba(0, 229, 255, 0.1);
-          transform: translateY(-2px); 
-        }
-        
-        .accent-text { 
-          color: #00E5FF; 
-        }
-        
-        .glow-text { 
-          text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
-        }
-        
-        .mono-text { 
-          font-family: 'Courier New', monospace; 
-          letter-spacing: 0.05em;
-        }
-        
-        .feature-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 1rem;
-          margin: 2rem 0;
-        }
-        
-        .subtle-grid::before{ 
-          content:""; 
-          position:fixed; 
-          inset:0; 
-          pointer-events:none; 
-          background: 
-            repeating-linear-gradient(0deg, transparent 0 50px, rgba(0,229,255,.02) 50px 51px), 
-            repeating-linear-gradient(90deg, transparent 0 50px, rgba(0,229,255,.02) 50px 51px); 
-          z-index: 0;
-        }
-      `}</style>
       <div className="min-h-screen tech-bg subtle-grid pb-24 relative">
         <AppHeader />
 
