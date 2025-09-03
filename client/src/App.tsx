@@ -54,14 +54,7 @@ function AuthenticatedRouter() {
     );
   }
 
-  // Show landing page for root path to demonstrate the techy design
-  if (window.location.pathname === '/') {
-    return (
-      <div className="w-full h-screen">
-        <Landing />
-      </div>
-    );
-  }
+  // Remove the forced landing page redirect - let normal app flow work
 
   return (
     <>

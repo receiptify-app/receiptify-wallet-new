@@ -46,7 +46,7 @@ export default function Home() {
   const totalSpending = spendingData.reduce((sum, item) => sum + item.amount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-24">
       <AppHeader />
 
       <div className="px-6 py-4 space-y-6">
