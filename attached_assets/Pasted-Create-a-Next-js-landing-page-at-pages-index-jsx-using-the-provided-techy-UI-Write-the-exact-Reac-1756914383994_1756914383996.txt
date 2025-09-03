@@ -1,0 +1,137 @@
+Create a Next.js landing page at pages/index.jsx using the provided "techy" UI. Write the exact React component (JSX) below into pages/index.jsx, install nothing extra, and restart the dev server. After restart, return the dev URL (or localhost URL), HTTP status code for GET /, and the last 50 lines of server logs.
+
+--- file to create: pages/index.jsx ---
+(Insert the full file content between the triple backticks)
+
+```jsx
+// pages/index.jsx
+import Head from "next/head";
+import { useEffect } from "react";
+
+export default function Home() {
+  useEffect(() => {
+    const cards = Array.from(document.querySelectorAll(".card"));
+    function onMove(e) {
+      const el = e.currentTarget;
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `rotateX(${ -y * 4 }deg) rotateY(${ x * 6 }deg) translateY(-2px)`;
+    }
+    function onLeave(e) {
+      e.currentTarget.style.transform = "translateY(0)";
+    }
+    cards.forEach(el => {
+      el.addEventListener("mousemove", onMove);
+      el.addEventListener("mouseleave", onLeave);
+    });
+    return () => {
+      cards.forEach(el => {
+        el.removeEventListener("mousemove", onMove);
+        el.removeEventListener("mouseleave", onLeave);
+      });
+    };
+  }, []);
+
+  return (
+    <>
+      <Head>
+        <title>Receiptify — Dashboard</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap"
+          rel="stylesheet"
+        />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `tailwind.config = {
+              theme: {
+                extend: {
+                  fontFamily: {
+                    sans: ['Inter','system-ui','sans-serif'],
+                    mono: ['IBM Plex Mono','ui-monospace','SFMono-Regular','monospace'],
+                  },
+                  colors: { accent: '#00E5FF' },
+                  boxShadow: { glow: '0 0 0 1px rgba(0,229,255,.35), 0 0 30px rgba(0,229,255,.18)' }
+                }
+              }
+            }`,
+          }}
+        />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <style>{`
+:root{ --bg:#0b0f14; --card:#0f141b; --accent:#00E5FF; --ring:rgba(0,229,255,.35); }
+body { background: radial-gradient(1200px 600px at 70% -10%, rgba(0,229,255,.08), transparent 40%), var(--bg); color: #e6eef6; font-family: Inter, system-ui, sans-serif; }
+.grid-bg::before{ content:""; position:fixed; inset:0; pointer-events:none; background: linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,.02)), repeating-linear-gradient(0deg, transparent 0 24px, rgba(255,255,255,.035) 24px 25px), repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,.035) 24px 25px); mask: linear-gradient(180deg, rgba(0,0,0,.9), transparent 60%); }
+.card{ background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); border-radius:18px; backdrop-filter:saturate(120%) blur(8px); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.card:hover{ box-shadow:0 0 0 1px var(--ring), 0 0 40px rgba(0,229,255,.10); transform: translateY(-2px); }
+.scanline{ position:fixed; inset:0; pointer-events:none; background: repeating-linear-gradient(180deg, rgba(255,255,255,.03) 0 2px, transparent 2px 4px); mix-blend-mode: overlay; opacity:.35; }
+.glow-text{ text-shadow: 0 0 18px rgba(0,229,255,.25); }
+pre, code { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace; color: #bfefff; }
+`}</style>
+      </Head>
+
+      <body className="grid-bg">
+        <div className="scanline" aria-hidden="true"></div>
+
+        <nav className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl card flex items-center justify-center shadow-glow">
+              <span className="font-mono text-accent text-lg">{'>/'}</span>
+            </div>
+            <span className="font-semibold tracking-wide">Receiptify</span>
+          </div>
+          <div className="hidden md:flex gap-6 text-sm opacity-90">
+            <a href="#" className="hover:text-accent">Docs</a>
+            <a href="#" className="hover:text-accent">API</a>
+            <a href="#" className="hover:text-accent">Pricing</a>
+          </div>
+          <button className="px-4 py-2 rounded-xl border border-slate-700 hover:border-accent hover:text-accent transition">Sign in</button>
+        </nav>
+
+        <main className="max-w-6xl mx-auto px-6 py-20">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <span className="inline-block px-3 py-1 rounded-full text-xs tracking-wider border border-slate-700/60">BETA ACCESS</span>
+              <h1 className="mt-6 text-4xl md:text-6xl font-extrabold leading-tight glow-text">
+                Build faster with a <span style={{color: 'var(--accent)'}}>tech-forward</span> UI
+              </h1>
+              <p className="mt-4 text-slate-400 max-w-lg">
+                Dark base, neon accents, gridlines, glass cards, and tasteful micro-interactions.
+              </p>
+              <div className="mt-8 flex gap-4">
+                <a className="px-5 py-3 rounded-xl bg-accent text-black font-semibold shadow-glow hover:brightness-110 transition" href="#">Get Started</a>
+                <a className="px-5 py-3 rounded-xl border border-slate-700 hover:border-accent hover:text-accent transition" href="#">Live Demo</a>
+              </div>
+            </div>
+
+            <div className="card p-6 relative overflow-hidden">
+              <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full blur-3xl opacity-40"
+                   style={{background: 'radial-gradient(circle at center, var(--accent), transparent 60%)'}}></div>
+              <pre className="text-xs md:text-sm font-mono leading-6">
+{`// pseudo API response
+{
+  "status": "online",
+  "latency_ms": 23,
+  "version": "1.4.2"
+}`}
+              </pre>
+            </div>
+          </div>
+        </main>
+
+        <section className="max-w-6xl mx-auto px-6 pb-24 grid md:grid-cols-3 gap-6">
+          <div className="card p-6">
+            <h3 className="font-semibold">Glowing Borders</h3>
+            <p className="mt-2 text-sm text-slate-400">Neon rings on hover signal interactivity, without being gaudy.</p>
+          </div>
+          <div className="card p-6">
+            <h3 className="font-semibold">Grid Background</h3>
+            <p className="mt-2 text-sm text-slate-400">Retro-futuristic gridlines rendered with pure CSS.</p>
+          </div>
+          <div className="card p-6">
+            <h3 className="font-semibold">Mono Accents</h3>
+            <p className="mt-2 text-sm text-slate-400">Use a monospaced font for labels and metrics.</p>
+          </div>
+        </secti
