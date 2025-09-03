@@ -46,23 +46,51 @@ export default function Home() {
   const totalSpending = spendingData.reduce((sum, item) => sum + item.amount, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-24">
-      <AppHeader />
+    <>
+      <style>{`
+        .tech-bg { 
+          background: radial-gradient(1200px 600px at 70% -10%, rgba(0,229,255,.08), transparent 40%), #0b0f14; 
+          color: #e6eef6; 
+        }
+        .grid-bg::before{ 
+          content:""; 
+          position:fixed; 
+          inset:0; 
+          pointer-events:none; 
+          background: linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,.02)), repeating-linear-gradient(0deg, transparent 0 24px, rgba(255,255,255,.035) 24px 25px), repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,.035) 24px 25px); 
+          mask: linear-gradient(180deg, rgba(0,0,0,.9), transparent 60%); 
+        }
+        .tech-card{ 
+          background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); 
+          border:1px solid rgba(255,255,255,.08); 
+          backdrop-filter:saturate(120%) blur(8px); 
+          transition: all .18s ease; 
+        }
+        .tech-card:hover{ 
+          box-shadow:0 0 0 1px rgba(0,229,255,.35), 0 0 40px rgba(0,229,255,.10); 
+          transform: translateY(-2px); 
+        }
+        .accent-text { color: #00E5FF; }
+        .glow-text { text-shadow: 0 0 18px rgba(0,229,255,.25); }
+        .mono-text { font-family: 'Courier New', monospace; }
+      `}</style>
+        <div className="min-h-screen tech-bg grid-bg pb-24 relative">
+          <AppHeader />
 
-      <div className="px-6 py-4 space-y-6">
+          <div className="px-6 py-4 space-y-6">
         {/* Spending Summary */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" className="flex items-center gap-2 text-gray-700">
+            <Button variant="ghost" className="flex items-center gap-2 text-gray-300 hover:text-accent-text">
               {selectedPeriod}
               <ChevronDown className="h-4 w-4" />
             </Button>
-            <h2 className="text-4xl font-bold text-gray-900">£{totalSpending.toFixed(0)}</h2>
+            <h2 className="text-4xl font-bold accent-text glow-text mono-text">£{totalSpending.toFixed(0)}</h2>
           </div>
         </div>
 
         {/* Spending Chart Card */}
-        <Card className="bg-white shadow-sm">
+        <Card className="tech-card shadow-lg border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-center mb-6">
               {/* Simple donut chart representation */}
@@ -122,7 +150,7 @@ export default function Home() {
                       className="w-3 h-3 rounded-full" 
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-gray-900 font-medium">{item.category}</span>
+                    <span className="text-gray-300 font-medium">{item.category}</span>
                   </div>
                   <span className="font-semibold text-gray-900">£{item.amount.toFixed(2)}</span>
                 </div>
@@ -195,7 +223,7 @@ export default function Home() {
             ))}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+        </div>
+      </>
+    );
+  }
