@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
+import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard, Scan, BarChart3, Shield, Smartphone } from "lucide-react";
 import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
 
@@ -48,194 +48,59 @@ export default function Home() {
   return (
     <>
       <style>{`
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(0,229,255,.3); } 50% { box-shadow: 0 0 20px rgba(0,229,255,.6), 0 0 30px rgba(0,229,255,.4); } }
-        @keyframes data-stream { 0% { transform: translateY(-100%); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
-        @keyframes circuit { 0% { stroke-dashoffset: 1000; } 100% { stroke-dashoffset: 0; } }
-        
         .tech-bg { 
-          background: 
-            radial-gradient(ellipse at top, rgba(0,229,255,.15), transparent 50%),
-            radial-gradient(ellipse at bottom, rgba(138,43,226,.1), transparent 50%),
-            linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
-          color: #e6eef6; 
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+          color: #e2e8f0; 
+          min-height: 100vh;
+        }
+        
+        .tech-card{ 
+          background: rgba(15, 23, 42, 0.8);
+          border: 1px solid rgba(0, 229, 255, 0.2);
+          backdrop-filter: blur(10px); 
+          transition: all 0.3s ease; 
           position: relative;
-          overflow-x: hidden;
+          z-index: 2;
         }
         
-        .floating-particles::before {
-          content: '';
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: 
-            radial-gradient(2px 2px at 20% 30%, #00E5FF, transparent),
-            radial-gradient(2px 2px at 40% 70%, rgba(138,43,226,.8), transparent),
-            radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,.8), transparent),
-            radial-gradient(1px 1px at 50% 50%, #00E5FF, transparent);
-          animation: float 6s ease-in-out infinite;
-          pointer-events: none;
-          z-index: 1;
+        .tech-card:hover{ 
+          border-color: rgba(0, 229, 255, 0.4);
+          box-shadow: 0 4px 20px rgba(0, 229, 255, 0.1);
+          transform: translateY(-2px); 
         }
         
-        .grid-bg::before{ 
+        .accent-text { 
+          color: #00E5FF; 
+        }
+        
+        .glow-text { 
+          text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        
+        .mono-text { 
+          font-family: 'Courier New', monospace; 
+          letter-spacing: 0.05em;
+        }
+        
+        .feature-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 1rem;
+          margin: 2rem 0;
+        }
+        
+        .subtle-grid::before{ 
           content:""; 
           position:fixed; 
           inset:0; 
           pointer-events:none; 
           background: 
-            linear-gradient(rgba(0,229,255,.03), rgba(0,229,255,.01)), 
-            repeating-linear-gradient(0deg, transparent 0 40px, rgba(0,229,255,.05) 40px 41px), 
-            repeating-linear-gradient(90deg, transparent 0 40px, rgba(0,229,255,.05) 40px 41px); 
-          mask: linear-gradient(180deg, rgba(0,0,0,.8), transparent 70%); 
+            repeating-linear-gradient(0deg, transparent 0 50px, rgba(0,229,255,.02) 50px 51px), 
+            repeating-linear-gradient(90deg, transparent 0 50px, rgba(0,229,255,.02) 50px 51px); 
           z-index: 0;
         }
-        
-        .tech-card{ 
-          background: linear-gradient(135deg, rgba(0,229,255,.08) 0%, rgba(255,255,255,.02) 50%, rgba(138,43,226,.04) 100%); 
-          border: 1px solid transparent;
-          background-clip: padding-box;
-          backdrop-filter: saturate(120%) blur(20px); 
-          transition: all .3s cubic-bezier(0.4, 0, 0.2, 1); 
-          position: relative;
-          overflow: hidden;
-          z-index: 2;
-        }
-        
-        .tech-card::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          padding: 1px;
-          background: linear-gradient(45deg, transparent, rgba(0,229,255,.3), transparent);
-          border-radius: inherit;
-          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
-          opacity: 0;
-          transition: opacity .3s ease;
-        }
-        
-        .tech-card:hover::before { opacity: 1; }
-        .tech-card:hover{ 
-          box-shadow: 
-            0 0 0 1px rgba(0,229,255,.4), 
-            0 8px 32px rgba(0,229,255,.15),
-            inset 0 1px 0 rgba(255,255,255,.1); 
-          transform: translateY(-8px) scale(1.02); 
-          background: linear-gradient(135deg, rgba(0,229,255,.12) 0%, rgba(255,255,255,.04) 50%, rgba(138,43,226,.08) 100%);
-        }
-        
-        .cyber-border {
-          position: relative;
-        }
-        .cyber-border::before {
-          content: '';
-          position: absolute;
-          inset: -2px;
-          background: linear-gradient(45deg, #00E5FF, transparent, #8A2BE2, transparent, #00E5FF);
-          border-radius: inherit;
-          animation: circuit 3s linear infinite;
-          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
-        }
-        
-        .accent-text { 
-          color: #00E5FF; 
-          background: linear-gradient(135deg, #00E5FF 0%, #40E0D0 50%, #00E5FF 100%);
-          background-clip: text;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .glow-text { 
-          text-shadow: 
-            0 0 10px rgba(0,229,255,.5),
-            0 0 20px rgba(0,229,255,.3),
-            0 0 40px rgba(0,229,255,.1); 
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-        .mono-text { 
-          font-family: 'Courier New', 'SF Mono', 'Monaco', monospace; 
-          letter-spacing: 0.05em;
-        }
-        
-        .holographic {
-          background: linear-gradient(45deg, 
-            rgba(0,229,255,.1) 0%, 
-            rgba(138,43,226,.1) 25%, 
-            rgba(0,229,255,.1) 50%, 
-            rgba(255,20,147,.1) 75%, 
-            rgba(0,229,255,.1) 100%);
-          background-size: 200% 200%;
-          animation: holographic 4s ease infinite;
-        }
-        
-        @keyframes holographic {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        
-        .data-visualization {
-          position: relative;
-          overflow: hidden;
-        }
-        .data-visualization::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(0,229,255,.1), transparent);
-          animation: data-stream 3s ease-in-out infinite;
-        }
-
-        .geometric-pattern {
-          background-image: 
-            radial-gradient(circle at 1px 1px, rgba(0,229,255,.15) 1px, transparent 0);
-          background-size: 20px 20px;
-          position: relative;
-        }
-
-        .geometric-pattern::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: 
-            linear-gradient(45deg, transparent 40%, rgba(138,43,226,.1) 50%, transparent 60%),
-            linear-gradient(-45deg, transparent 40%, rgba(0,229,255,.1) 50%, transparent 60%);
-          background-size: 40px 40px;
-          animation: geometric-shift 8s linear infinite;
-        }
-
-        @keyframes geometric-shift {
-          0% { background-position: 0 0, 0 0; }
-          100% { background-position: 40px 40px, -40px 40px; }
-        }
-
-        .neon-pulse {
-          animation: neon-pulse 2s ease-in-out infinite alternate;
-        }
-
-        @keyframes neon-pulse {
-          from {
-            text-shadow: 
-              0 0 5px rgba(0,229,255,.8),
-              0 0 10px rgba(0,229,255,.8),
-              0 0 15px rgba(0,229,255,.8),
-              0 0 20px rgba(0,229,255,.8);
-          }
-          to {
-            text-shadow: 
-              0 0 2px rgba(0,229,255,.8),
-              0 0 5px rgba(0,229,255,.8),
-              0 0 8px rgba(0,229,255,.8),
-              0 0 12px rgba(0,229,255,.8);
-          }
-        }
       `}</style>
-      <div className="min-h-screen tech-bg grid-bg floating-particles geometric-pattern pb-24 relative">
+      <div className="min-h-screen tech-bg subtle-grid pb-24 relative">
         <AppHeader />
 
         <div className="px-6 py-4 space-y-6">
@@ -246,16 +111,16 @@ export default function Home() {
                 {selectedPeriod}
                 <ChevronDown className="h-4 w-4" />
               </Button>
-              <h2 className="text-4xl font-bold accent-text glow-text mono-text cyber-border">£{totalSpending.toFixed(0)}</h2>
+              <h2 className="text-4xl font-bold accent-text glow-text mono-text">£{totalSpending.toFixed(0)}</h2>
             </div>
           </div>
 
           {/* Spending Chart Card */}
-          <Card className="tech-card shadow-lg border-0 holographic data-visualization">
+          <Card className="tech-card shadow-lg border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-center mb-6">
-                {/* Enhanced donut chart with glow effects */}
-                <div className="relative w-32 h-32" style={{filter: 'drop-shadow(0 0 20px rgba(0,229,255,0.3))'}}>
+                {/* Simple donut chart */}
+                <div className="relative w-32 h-32">
                   <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                     <circle
                       cx="50"
@@ -322,7 +187,7 @@ export default function Home() {
 
           {/* Quick Actions */}
           <div className="space-y-3">
-            <Card className="tech-card shadow-sm cursor-pointer cyber-border" onClick={() => navigate('/eco')}>
+            <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/eco')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -339,7 +204,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="tech-card shadow-sm cursor-pointer holographic" onClick={() => navigate('/cards')}>
+            <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/cards')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -359,19 +224,16 @@ export default function Home() {
 
           {/* Recent Activity */}
           <div>
-            <h3 className="text-xl font-bold text-gray-300 mb-4 neon-pulse">Recent Activity</h3>
+            <h3 className="text-xl font-bold text-gray-300 mb-4">Recent Activity</h3>
             <div className="space-y-3">
               {recentActivity.map((activity) => (
-                <Card key={activity.id} className="tech-card shadow-sm cursor-pointer data-visualization" onClick={() => navigate('/receipt/1')}>
+                <Card key={activity.id} className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/receipt/1')}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div 
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-lg"
-                          style={{ 
-                            backgroundColor: activity.color,
-                            boxShadow: `0 0 20px ${activity.color}40`
-                          }}
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                          style={{ backgroundColor: activity.color }}
                         >
                           {activity.logo}
                         </div>
@@ -385,6 +247,72 @@ export default function Home() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+
+          {/* App Features Section */}
+          <div className="mt-8">
+            <h3 className="text-xl font-bold text-gray-300 mb-4">App Features</h3>
+            <div className="feature-grid">
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/scan')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Scan className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">QR Scanner</h4>
+                  <p className="text-sm text-gray-400">Instantly capture receipts with QR codes</p>
+                </CardContent>
+              </Card>
+
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/analytics')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <BarChart3 className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Analytics</h4>
+                  <p className="text-sm text-gray-400">Track spending patterns and insights</p>
+                </CardContent>
+              </Card>
+
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/eco')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Leaf className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Eco Impact</h4>
+                  <p className="text-sm text-gray-400">Track your environmental savings</p>
+                </CardContent>
+              </Card>
+
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/warranties')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Shield className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Warranties</h4>
+                  <p className="text-sm text-gray-400">Never miss warranty expiration dates</p>
+                </CardContent>
+              </Card>
+
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/cards')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CreditCard className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Loyalty Cards</h4>
+                  <p className="text-sm text-gray-400">Store all your loyalty cards digitally</p>
+                </CardContent>
+              </Card>
+
+              <Card className="tech-card shadow-sm cursor-pointer" onClick={() => navigate('/manual')}>
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Smartphone className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Manual Entry</h4>
+                  <p className="text-sm text-gray-400">Add receipts manually with camera</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
