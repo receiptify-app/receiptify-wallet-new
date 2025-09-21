@@ -26,7 +26,7 @@ export const merchants = pgTable("merchants", {
   name: text("name").notNull(),
   logo: text("logo"),
   category: text("category"),
-  brandColor: text("brand_color"),
+  brandColor: text("brandColor"),
 });
 
 export const receipts = pgTable("receipts", {
@@ -474,5 +474,3 @@ export type InsertEmailSyncJob = z.infer<typeof insertEmailSyncJobSchema>;
 
 export type ReceiptDesign = typeof receiptDesigns.$inferSelect;
 export type InsertReceiptDesign = z.infer<typeof insertReceiptDesignSchema>;
-
-export type InsertWarrantyClaim = z.infer<typeof insertWarrantyClaimSchema>;
