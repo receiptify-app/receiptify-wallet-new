@@ -157,7 +157,18 @@ export class MemStorage implements IStorage {
   private receiptDesigns: Map<string, ReceiptDesign> = new Map();
 
   constructor() {
-    this.seedData();
+    // Create default user (required for the app to work)
+    const defaultUser = {
+      id: "default-user",
+      username: "demo",
+      email: "demo@receiptify.com",
+      phone: "+44 7700 900123",
+      createdAt: new Date(),
+    };
+    this.users.set(defaultUser.id, defaultUser);
+    
+    // Seed data disabled to show only real captured receipts
+    // this.seedData();
   }
 
   private seedData() {
