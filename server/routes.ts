@@ -147,6 +147,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           merchantName: extractedData.merchantName,
           location: extractedData.location,
           total: extractedData.total,
+          subtotal: extractedData.subtotal,
+          tax: extractedData.tax,
           date: extractedData.date || new Date(),
           category: "Shopping",
           paymentMethod: extractedData.paymentMethod || "Unknown",

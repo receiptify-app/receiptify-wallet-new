@@ -36,6 +36,8 @@ export const receipts = pgTable("receipts", {
   merchantName: text("merchantName").notNull(),
   location: text("location"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
+  tax: decimal("tax", { precision: 10, scale: 2 }),
   currency: text("currency").default("GBP"),
   date: timestamp("date").notNull(),
   receiptNumber: text("receiptNumber"),

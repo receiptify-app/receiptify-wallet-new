@@ -104,7 +104,16 @@ export default function ReceiptDetailPage() {
               </div>
             ))}
             
-            <div className="border-t border-gray-200 pt-4 mt-4">
+            {receipt.tax && (
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center justify-between text-gray-900">
+                  <span>Tax</span>
+                  <span>${parseFloat(receipt.tax).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+            
+            <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
                 <span>${parseFloat(receipt.total).toFixed(2)}</span>

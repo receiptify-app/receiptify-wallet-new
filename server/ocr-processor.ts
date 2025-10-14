@@ -5,6 +5,8 @@ interface ExtractedReceiptData {
   merchantName: string;
   location: string;
   total: string;
+  subtotal?: string;
+  tax?: string;
   items: Array<{
     name: string;
     price: string;
@@ -45,6 +47,8 @@ export class OCRProcessor {
     let merchantName = '[UNKNOWN MERCHANT]';
     let location = 'Unknown Location';
     let total = '0.00';
+    let subtotal: string | undefined;
+    let tax: string | undefined;
     let receiptNumber = '';
     let paymentMethod = 'Unknown';
     const items: Array<{ name: string; price: string; quantity?: number }> = [];
@@ -55,29 +59,25 @@ export class OCRProcessor {
       merchantName = lines[0].length > 2 ? lines[0] : (lines[1] || '[UNKNOWN MERCHANT]');
     }
 
-    // Look for total amount patterns
-    const totalPatterns = [
-      /total[:\s]*£?(\d+\.?\d*)/i,
-      /amount[:\s]*£?(\d+\.?\d*)/i,
-      /£(\d+\.\d{2})/g,
-      /(\d+\.\d{2})/g
-    ];
+    // Extract tax
+    const taxPattern = /tax[:\s]*[$£]?\s*(\d+\.\d{2})/i;
+    const taxMatch = text.match(taxPattern);
+    if (taxMatch) {
+      tax = parseFloat(taxMatch[1]).toFixed(2);
+    }
 
-    for (const pattern of totalPatterns) {
-      const matches = text.match(pattern);
-      if (matches) {
-        // Extract numbers that look like prices
-        const amounts = matches.map(match => {
-          const numMatch = match.match(/(\d+\.?\d*)/);
-          return numMatch ? parseFloat(numMatch[1]) : 0;
-        }).filter(amount => amount > 0);
+    // Extract subtotal
+    const subtotalPattern = /subtotal[:\s]*[$£]?\s*(\d+\.\d{2})/i;
+    const subtotalMatch = text.match(subtotalPattern);
+    if (subtotalMatch) {
+      subtotal = parseFloat(subtotalMatch[1]).toFixed(2);
+    }
 
-        if (amounts.length > 0) {
-          // Take the largest amount as the total
-          total = Math.max(...amounts).toFixed(2);
-          break;
-        }
-      }
+    // Look for explicit total
+    const totalPattern = /total[:\s]*[$£]?\s*(\d+\.\d{2})/i;
+    const totalMatch = text.match(totalPattern);
+    if (totalMatch) {
+      total = parseFloat(totalMatch[1]).toFixed(2);
     }
 
     // Extract location information
@@ -121,10 +121,21 @@ export class OCRProcessor {
       }
     }
 
+    // If total wasn't found explicitly, calculate it
+    if (total === '0.00' && items.length > 0) {
+      const itemsTotal = items.reduce((sum, item) => {
+        return sum + (parseFloat(item.price) * (item.quantity || 1));
+      }, 0);
+      const taxAmount = tax ? parseFloat(tax) : 0;
+      total = (itemsTotal + taxAmount).toFixed(2);
+    }
+
     return {
       merchantName: merchantName.substring(0, 100), // Limit length
       location: location.substring(0, 200),
       total,
+      subtotal,
+      tax,
       items: items.slice(0, 20), // Limit items
       receiptNumber,
       paymentMethod
