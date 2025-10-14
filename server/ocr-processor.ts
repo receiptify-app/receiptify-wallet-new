@@ -99,18 +99,24 @@ export class OCRProcessor {
     else if (text.toLowerCase().includes('cash')) paymentMethod = 'Cash';
     else if (text.toLowerCase().includes('contactless')) paymentMethod = 'Contactless';
 
-    // Extract line items (simple pattern matching)
-    const itemPattern = /^(.+?)\s+£?(\d+\.?\d*)$/gm;
+    // Extract line items - look for patterns like "1x Item Name $10.00" or "Item Name $10.00"
+    const itemPattern = /^(?:(\d+)\s*x?\s*)?(.+?)\s+[$£]?\s*(\d+\.\d{2})$/gm;
     let itemMatch;
     while ((itemMatch = itemPattern.exec(text)) !== null) {
-      const itemName = itemMatch[1].trim();
-      const itemPrice = parseFloat(itemMatch[2]).toFixed(2);
+      const quantity = itemMatch[1] ? parseInt(itemMatch[1]) : 1;
+      const itemName = itemMatch[2].trim();
+      const itemPrice = parseFloat(itemMatch[3]).toFixed(2);
       
-      if (itemName.length > 2 && itemName.length < 50 && parseFloat(itemPrice) > 0) {
+      // Filter out common non-item lines
+      const lowerName = itemName.toLowerCase();
+      const skipPatterns = ['total', 'subtotal', 'tax', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt'];
+      const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
+      
+      if (!shouldSkip && itemName.length > 1 && itemName.length < 50 && parseFloat(itemPrice) > 0) {
         items.push({
           name: itemName,
           price: itemPrice,
-          quantity: 1
+          quantity: quantity
         });
       }
     }
