@@ -1,5 +1,6 @@
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -10,29 +11,34 @@ import {
   Utensils
 } from "lucide-react";
 import AppHeader from "@/components/app-header";
-
-// Sample receipt data to match the Waitrose design
-const sampleReceipt = {
-  id: "1",
-  merchantName: "Waitrose & Partners",
-  date: "12 Jul 2025, 16:34",
-  location: "Harrow Weald, London",
-  items: [
-    { name: "Baguette", price: 2.00 },
-    { name: "Mozzarella", price: 1.70 },
-    { name: "Mozzarella", price: 1.70 },
-    { name: "Smoked Salmon", price: 4.87 }
-  ],
-  total: 12.02,
-  paymentMethod: "VISA Debit",
-  cashback: 0.09,
-  category: "Food",
-  ecoPoints: 1
-};
+import type { Receipt, ReceiptItem } from "@shared/schema";
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
+  const params = useParams();
+  const receiptId = params.id;
   const [includeInAnalytics, setIncludeInAnalytics] = useState(true);
+
+  const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
+    queryKey: ["/api/receipts", receiptId],
+  });
+
+  if (isLoading || !receipt) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const items = receipt.items || [];
+  const receiptDate = new Date(receipt.date).toLocaleDateString('en-US', { 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -45,10 +51,10 @@ export default function ReceiptDetailPage() {
         {/* Store Info */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {sampleReceipt.merchantName}
+            {receipt.merchantName}
           </h1>
           <p className="text-gray-600">
-            {sampleReceipt.date}  {sampleReceipt.location}
+            {receiptDate} • {receipt.location}
           </p>
         </div>
 
@@ -77,7 +83,7 @@ export default function ReceiptDetailPage() {
                   <MapPin className="w-6 h-6 text-white fill-white" />
                 </div>
                 <div className="mt-2 text-center">
-                  <p className="text-sm font-semibold text-gray-900">Harrow Weald</p>
+                  <p className="text-sm font-semibold text-gray-900">{receipt.location}</p>
                 </div>
               </div>
             </div>
@@ -87,11 +93,13 @@ export default function ReceiptDetailPage() {
         {/* Items List */}
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6 space-y-4">
-            {sampleReceipt.items.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <span className="text-gray-900 font-medium">{item.name}</span>
+            {items.map((item) => (
+              <div key={item.id} className="flex items-center justify-between">
+                <span className="text-gray-900 font-medium">
+                  {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
+                </span>
                 <span className="text-gray-900 font-semibold">
-                  ${item.price.toFixed(2)}
+                  ${parseFloat(item.price).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -99,38 +107,27 @@ export default function ReceiptDetailPage() {
             <div className="border-t border-gray-200 pt-4 mt-4">
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
-                <span>£{sampleReceipt.total.toFixed(2)}</span>
+                <span>${parseFloat(receipt.total).toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Payment Method */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-900 text-white px-2 py-1 rounded text-sm font-bold">
-                  VISA
+        {receipt.paymentMethod && (
+          <Card className="bg-white shadow-sm border-0">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-900 font-medium">{receipt.paymentMethod}</span>
                 </div>
-                <span className="text-gray-900 font-medium">Debit</span>
+                <Button variant="ghost" size="sm">
+                  <Download className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="sm">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cashback */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-900 font-medium">Cashback</span>
-              <span className="text-gray-900 font-semibold">£{sampleReceipt.cashback.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Category & Eco Points */}
         <Card className="bg-white shadow-sm border-0">
@@ -140,9 +137,9 @@ export default function ReceiptDetailPage() {
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                   <Utensils className="h-4 w-4 text-green-600" />
                 </div>
-                <span className="text-gray-900 font-medium">{sampleReceipt.category}</span>
+                <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
               </div>
-              <span className="text-sm text-gray-600">+{sampleReceipt.ecoPoints} Eco Points Saved</span>
+              <span className="text-sm text-gray-600">+{receipt.ecoPoints} Eco Points Saved</span>
             </div>
           </CardContent>
         </Card>
