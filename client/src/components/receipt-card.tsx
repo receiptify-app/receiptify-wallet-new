@@ -8,13 +8,11 @@ import { Split, Eye, Star } from "lucide-react";
 import type { Receipt, ReceiptItem } from "@shared/schema";
 
 interface ReceiptCardProps {
-  receipt: Receipt;
+  receipt: Receipt & { items?: ReceiptItem[] };
 }
 
 export default function ReceiptCard({ receipt }: ReceiptCardProps) {
-  const { data: items = [] } = useQuery<ReceiptItem[]>({
-    queryKey: ["/api/receipts", receipt.id, "items"],
-  });
+  const items = receipt.items || [];
 
   const getMerchantInfo = (merchantName: string) => {
     const name = merchantName.toLowerCase();
@@ -51,7 +49,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
           </div>
           <div className="text-right">
             <div className="font-bold text-gray-900">
-              £{parseFloat(receipt.total).toFixed(2)}
+              ${parseFloat(receipt.total).toFixed(2)}
             </div>
             <div className="text-xs text-gray-500">
               {new Date(receipt.date).toLocaleDateString('en-UK')}
@@ -65,8 +63,10 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
             <div className="space-y-2">
               {visibleItems.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span className="text-gray-600 truncate">{item.name}</span>
-                  <span className="font-medium">£{parseFloat(item.price).toFixed(2)}</span>
+                  <span className="text-gray-600 truncate">
+                    {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
+                  </span>
+                  <span className="font-medium">${parseFloat(item.price).toFixed(2)}</span>
                 </div>
               ))}
               {remainingItems > 0 && (

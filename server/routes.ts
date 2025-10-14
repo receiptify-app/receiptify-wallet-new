@@ -59,7 +59,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (maxAmount && typeof maxAmount === 'string') filters.maxAmount = parseFloat(maxAmount);
 
       const receipts = await storage.getReceipts(defaultUserId, filters);
-      res.json(receipts);
+      
+      // Attach items to each receipt
+      const receiptsWithItems = await Promise.all(
+        receipts.map(async (receipt) => {
+          const items = await storage.getReceiptItems(receipt.id);
+          return { ...receipt, items };
+        })
+      );
+      
+      res.json(receiptsWithItems);
     } catch (error) {
       console.error("Error fetching receipts:", error);
       res.status(500).json({ error: "Failed to fetch receipts" });
