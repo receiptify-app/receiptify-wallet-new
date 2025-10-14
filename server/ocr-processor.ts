@@ -73,11 +73,30 @@ export class OCRProcessor {
       subtotal = parseFloat(subtotalMatch[1]).toFixed(2);
     }
 
-    // Look for explicit total
-    const totalPattern = /total[:\s]*[$£]?\s*(\d+\.\d{2})/i;
-    const totalMatch = text.match(totalPattern);
-    if (totalMatch) {
-      total = parseFloat(totalMatch[1]).toFixed(2);
+    // Look for explicit total with multiple patterns
+    const totalPatterns = [
+      /total[:\s]*[$£]?\s*(\d+\.\d{2})/i,
+      /amount\s+due[:\s]*[$£]?\s*(\d+\.\d{2})/i,
+      /balance[:\s]*[$£]?\s*(\d+\.\d{2})/i,
+    ];
+    
+    for (const pattern of totalPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        total = parseFloat(match[1]).toFixed(2);
+        break;
+      }
+    }
+    
+    // If still no total, look for a price after "Tax" line (might be the total)
+    if (total === '0.00' && tax) {
+      const afterTax = text.split(/tax[:\s]*[$£]?\s*\d+\.\d{2}/i)[1];
+      if (afterTax) {
+        const priceAfterTax = afterTax.match(/\$(\d+\.\d{2})/);
+        if (priceAfterTax) {
+          total = parseFloat(priceAfterTax[1]).toFixed(2);
+        }
+      }
     }
 
     // Extract location information
@@ -99,25 +118,37 @@ export class OCRProcessor {
     else if (text.toLowerCase().includes('cash')) paymentMethod = 'Cash';
     else if (text.toLowerCase().includes('contactless')) paymentMethod = 'Contactless';
 
-    // Extract line items - look for patterns like "1x Item Name $10.00" or "Item Name $10.00"
-    const itemPattern = /^(?:(\d+)\s*x?\s*)?(.+?)\s+[$£]?\s*(\d+\.\d{2})$/gm;
-    let itemMatch;
-    while ((itemMatch = itemPattern.exec(text)) !== null) {
-      const quantity = itemMatch[1] ? parseInt(itemMatch[1]) : 1;
-      const itemName = itemMatch[2].trim();
-      const itemPrice = parseFloat(itemMatch[3]).toFixed(2);
-      
-      // Filter out common non-item lines
-      const lowerName = itemName.toLowerCase();
-      const skipPatterns = ['total', 'subtotal', 'tax', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt'];
-      const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
-      
-      if (!shouldSkip && itemName.length > 1 && itemName.length < 50 && parseFloat(itemPrice) > 0) {
-        items.push({
-          name: itemName,
-          price: itemPrice,
-          quantity: quantity
-        });
+    // Extract line items - improved to handle multiple prices on same line
+    // Pattern matches: "1x Item Name $7.00 $10.00" or "1x Item Name $10.00"
+    for (const line of lines) {
+      // Look for lines with quantity and prices
+      const qtyMatch = line.match(/^(\d+)\s*x?\s*(.+)/i);
+      if (qtyMatch) {
+        const quantity = parseInt(qtyMatch[1]);
+        const restOfLine = qtyMatch[2].trim();
+        
+        // Find all prices in the line
+        const priceMatches = restOfLine.match(/\$(\d+\.\d{2})/g);
+        if (priceMatches && priceMatches.length > 0) {
+          // Take the LAST price as the line total
+          const lineTotal = priceMatches[priceMatches.length - 1].replace('$', '');
+          
+          // Remove all prices to get item name
+          let itemName = restOfLine.replace(/\$\d+\.\d{2}/g, '').trim();
+          
+          // Filter out common non-item keywords
+          const lowerName = itemName.toLowerCase();
+          const skipPatterns = ['total', 'subtotal', 'tax', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt'];
+          const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
+          
+          if (!shouldSkip && itemName.length > 1 && itemName.length < 50) {
+            items.push({
+              name: itemName,
+              price: lineTotal,
+              quantity: quantity
+            });
+          }
+        }
       }
     }
 
