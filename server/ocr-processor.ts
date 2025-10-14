@@ -30,13 +30,27 @@ export class OCRProcessor {
   static async processReceiptImage(imagePath: string): Promise<ExtractedReceiptData> {
     try {
       const worker = await this.getWorker();
-      const { data: { text } } = await worker.recognize(imagePath);
+      
+      // Add timeout and better error handling
+      const recognitionPromise = worker.recognize(imagePath);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('OCR timeout after 30 seconds')), 30000)
+      );
+      
+      const result = await Promise.race([recognitionPromise, timeoutPromise]) as any;
+      const text = result?.data?.text || '';
+      
+      if (!text || text.trim().length === 0) {
+        console.error('OCR returned empty text');
+        return this.getDefaultReceiptData();
+      }
       
       console.log('OCR extracted text:', text);
       
       return this.parseReceiptText(text);
     } catch (error) {
       console.error('OCR processing error:', error);
+      // Return default data instead of throwing - prevents server crash
       return this.getDefaultReceiptData();
     }
   }
