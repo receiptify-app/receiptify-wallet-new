@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
@@ -20,6 +20,8 @@ export default function Scan() {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
@@ -29,6 +31,7 @@ export default function Scan() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      console.log('Starting upload for file:', file.name, file.size, 'bytes');
       const formData = new FormData();
       formData.append('receipt', file);
       
@@ -43,6 +46,7 @@ export default function Scan() {
         
         formData.append('latitude', position.coords.latitude.toString());
         formData.append('longitude', position.coords.longitude.toString());
+        console.log('Location added:', position.coords.latitude, position.coords.longitude);
       } catch (error) {
         console.log('Location not available:', error);
       }
@@ -51,18 +55,39 @@ export default function Scan() {
         method: 'POST',
         body: formData,
       });
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload failed:', response.status, errorText);
+        throw new Error('Upload failed');
+      }
+      
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Receipt created successfully:', data.id);
+      
+      // Reset file inputs
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      
       toast({
         title: t('scan.uploadSuccess'),
         description: t('scan.uploadSuccessDesc'),
       });
+      
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics/spending'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Upload mutation error:', error);
+      
+      // Reset file inputs even on error
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      
       toast({
         title: t('scan.uploadError'),
         description: t('scan.uploadErrorDesc'),
@@ -73,6 +98,7 @@ export default function Scan() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log('File selected:', file?.name, file?.size);
     if (file) {
       uploadMutation.mutate(file);
     }
@@ -143,6 +169,7 @@ export default function Scan() {
           <CardContent className="p-0">
             <label className="block w-full cursor-pointer">
               <input
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
@@ -173,6 +200,7 @@ export default function Scan() {
           <CardContent className="p-0">
             <label className="block w-full cursor-pointer">
               <input
+                ref={galleryInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
