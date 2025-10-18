@@ -9,11 +9,13 @@ import {
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem } from "@shared/schema";
+import { useCurrency } from "@/hooks/use-currency";
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
   const params = useParams();
   const receiptId = params.id;
+  const { format: formatCurrency } = useCurrency();
 
   const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
     queryKey: ["/api/receipts", receiptId],
@@ -74,7 +76,7 @@ export default function ReceiptDetailPage() {
                   {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
                 </span>
                 <span className="text-gray-900 font-semibold">
-                  £{parseFloat(item.price).toFixed(2)}
+                  {formatCurrency(parseFloat(item.price))}
                 </span>
               </div>
             ))}
@@ -83,7 +85,7 @@ export default function ReceiptDetailPage() {
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
                   <span>Tax</span>
-                  <span>£{parseFloat(receipt.tax).toFixed(2)}</span>
+                  <span>{formatCurrency(parseFloat(receipt.tax))}</span>
                 </div>
               </div>
             )}
@@ -91,7 +93,7 @@ export default function ReceiptDetailPage() {
             <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
-                <span>£{parseFloat(receipt.total).toFixed(2)}</span>
+                <span>{formatCurrency(parseFloat(receipt.total))}</span>
               </div>
             </div>
           </CardContent>

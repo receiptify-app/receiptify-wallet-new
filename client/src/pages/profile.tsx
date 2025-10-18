@@ -24,6 +24,8 @@ import {
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import AppHeader from "@/components/app-header";
+import { useCurrency } from "@/hooks/use-currency";
+import { CURRENCIES } from "@/lib/currency";
 
 // Sample user data matching the mockup
 const sampleUser = {
@@ -34,15 +36,19 @@ const sampleUser = {
 
 export default function Profile() {
   const [, navigate] = useLocation();
-  const [gbpCurrency, setGbpCurrency] = useState(true);
   const { currentUser, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  const { currency, symbol, updateCurrency } = useCurrency();
   
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
     i18n.changeLanguage(lang);
     localStorage.setItem('language', lang);
+  };
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    updateCurrency(currencyCode);
   };
 
   const { data: user = sampleUser } = useQuery<typeof sampleUser>({
@@ -135,16 +141,22 @@ export default function Profile() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Euro className="w-6 h-6 text-gray-700" />
-                    <div>
-                      <span className="text-lg font-medium text-gray-900">{t('profile.currency')}</span>
-                      <p className="text-sm text-gray-600">£ GBP</p>
+                    <div className="flex-1">
+                      <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.currency')}</span>
+                      <Select value={currency} onValueChange={handleCurrencyChange}>
+                        <SelectTrigger className="w-full" data-testid="select-currency">
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {CURRENCIES.map((curr) => (
+                            <SelectItem key={curr.code} value={curr.code}>
+                              {curr.symbol} {curr.code} - {curr.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <Switch 
-                    checked={gbpCurrency}
-                    onCheckedChange={setGbpCurrency}
-                    className="data-[state=checked]:bg-green-600"
-                  />
                 </div>
               </CardContent>
             </Card>

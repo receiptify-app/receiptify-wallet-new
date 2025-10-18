@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import CategoryPickerModal from "@/components/category-picker-modal";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Receipt {
   id: string;
@@ -28,6 +29,7 @@ export default function ReceiptsPage() {
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const { toast } = useToast();
+  const { format: formatCurrency } = useCurrency();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ['/api/receipts'],
@@ -286,7 +288,7 @@ export default function ReceiptsPage() {
                           <div className="flex items-center space-x-2">
                             <div className="text-right">
                               <p className="text-sm font-semibold text-gray-900">
-                                £{receipt.total}
+                                {formatCurrency(receipt.total)}
                               </p>
                               {receipt.paymentMethod && (
                                 <p className="text-xs text-gray-500">

@@ -15,6 +15,7 @@ import { queryClient } from "@/lib/queryClient";
 import { CATEGORIES, getCategoryColor } from "@shared/categories";
 import { computeAnalytics, DateRange } from "@/utils/analytics";
 import type { Receipt } from "@shared/schema";
+import { useCurrency } from "@/hooks/use-currency";
 
 export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState<DateRange>("month");
@@ -25,6 +26,7 @@ export default function Home() {
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { format: formatCurrency } = useCurrency();
 
   // Fetch all receipts
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
@@ -196,7 +198,7 @@ export default function Home() {
           <div className="text-right">
             <p className="text-sm text-gray-600">Total Spending</p>
             <h2 className="text-4xl font-bold text-gray-900" data-testid="text-total-spending">
-              £{analytics.total.toFixed(2)}
+              {formatCurrency(analytics.total)}
             </h2>
           </div>
         </div>
@@ -232,7 +234,7 @@ export default function Home() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => `£${value.toFixed(2)}`}
+                      formatter={(value: number) => formatCurrency(value)}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                     />
                   </PieChart>
@@ -258,7 +260,7 @@ export default function Home() {
                         <span className="text-xs text-gray-500">({item.count})</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-semibold text-gray-900 text-sm">£{item.amount.toFixed(2)}</span>
+                        <span className="font-semibold text-gray-900 text-sm">{formatCurrency(item.amount)}</span>
                         <span className="text-xs text-gray-500 ml-2">{item.percentage.toFixed(0)}%</span>
                       </div>
                     </div>

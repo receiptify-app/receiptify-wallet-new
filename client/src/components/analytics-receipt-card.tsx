@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface AnalyticsReceiptCardProps {
   receipt: {
@@ -38,6 +39,7 @@ export default function AnalyticsReceiptCard({
   onShare,
   onClick
 }: AnalyticsReceiptCardProps) {
+  const { format: formatCurrency } = useCurrency();
   const amount = typeof receipt.total === 'string' ? parseFloat(receipt.total) : receipt.total;
   const receiptDate = new Date(receipt.date);
   const categoryColor = receipt.category ? getCategoryColor(receipt.category) : '#757575';
@@ -107,7 +109,7 @@ export default function AnalyticsReceiptCard({
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="font-bold text-gray-900" data-testid={`text-amount-${receipt.id}`}>
-                  £{amount.toFixed(2)}
+                  {formatCurrency(amount)}
                 </p>
               </div>
             </div>
