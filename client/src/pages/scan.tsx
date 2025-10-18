@@ -215,12 +215,12 @@ export default function Scan() {
             <div>
               <h3 className="font-semibold text-primary mb-1">Smart Receipt Processing</h3>
               <p className="text-sm text-gray-700 mb-3">
-                Capture receipts with your camera or upload from your gallery. Our OCR technology automatically extracts receipt details.
+                Your receipts, one digital wallet. Receipts organised your way.
               </p>
               <div className="text-xs text-gray-600 space-y-1">
                 <div>✓ Automatic data extraction from photos</div>
-                <div>✓ Secure local storage</div>
-                <div>✓ Works with any payment method</div>
+                <div>✓ Secure image + data storage</div>
+                <div>✓ Simplified management</div>
               </div>
             </div>
           </div>
