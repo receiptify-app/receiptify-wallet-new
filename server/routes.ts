@@ -27,6 +27,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 export async function registerRoutes(app: Express): Promise<Server> {
   const defaultUserId = "default-user"; // For demo purposes
   
+  // Serve static files from public directory (for uploaded receipt images)
+  const express = require('express');
+  app.use('/uploads', express.static('public/uploads'));
+  
   // Mock authentication middleware for testing
   app.use((req, res, next) => {
     req.user = { id: defaultUserId };
@@ -310,13 +314,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Processing uploaded receipt image: ${req.file.originalname}`);
       console.log(`Image size: ${req.file.size} bytes`);
       
-      // Save the uploaded file temporarily for OCR processing
-      const tempPath = `/tmp/${Date.now()}_${req.file.originalname}`;
-      fs.writeFileSync(tempPath, req.file.buffer);
+      // Save the image permanently
+      const timestamp = Date.now();
+      const filename = `${timestamp}_${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const permanentPath = `public/uploads/${filename}`;
+      const imageUrl = `/uploads/${filename}`;
+      
+      // Create uploads directory if it doesn't exist
+      if (!fs.existsSync('public/uploads')) {
+        fs.mkdirSync('public/uploads', { recursive: true });
+      }
+      
+      // Save the uploaded file permanently
+      fs.writeFileSync(permanentPath, req.file.buffer);
+      console.log(`Receipt image saved to: ${permanentPath}`);
       
       try {
         // Extract real data from the receipt image
-        const extractedData = await OCRProcessor.processReceiptImage(tempPath);
+        const extractedData = await OCRProcessor.processReceiptImage(permanentPath);
         console.log('Extracted receipt data:', extractedData);
         
         const receiptData = {
@@ -332,6 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
           latitude: latitude || null,
           longitude: longitude || null,
+          imageUrl: imageUrl,
           ecoPoints: 1
         };
 
@@ -352,15 +368,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Clean up temp file
-        fs.unlinkSync(tempPath);
-        
         res.status(201).json(receipt);
       } catch (error) {
         console.error('OCR processing error:', error);
         
-        // Fallback: create basic receipt with OCR error indication
-        console.log('OCR extraction failed, creating placeholder receipt');
+        // Fallback: create basic receipt with OCR error indication but keep the image
+        console.log('OCR extraction failed, creating placeholder receipt with image');
         const receiptData = {
           userId: defaultUserId,
           merchantName: "Receipt (OCR Failed)",
@@ -372,13 +385,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptNumber: `ERR${Date.now()}`,
           latitude: latitude || null,
           longitude: longitude || null,
+          imageUrl: imageUrl,
           ecoPoints: 1
         };
         
         const receipt = await storage.createReceipt(receiptData);
-        
-        // Clean up temp file if it exists
-        try { fs.unlinkSync(tempPath); } catch {}
         
         res.status(201).json(receipt);
       }
