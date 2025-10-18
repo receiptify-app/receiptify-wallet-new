@@ -20,12 +20,9 @@ export default function AppHeader({ showBackButton = false, onBackClick, title }
       )}
       
       <div className="flex flex-col items-center">
-        <div className="flex items-center gap-3 mb-1">
-          <Receipt className="w-8 h-8 text-green-600" />
-          <h1 className="text-xl font-bold text-green-800">Digital Receipts</h1>
-        </div>
+        <h1 className="text-2xl font-bold text-green-800">Receiptify</h1>
         {!title && (
-          <p className="text-xs text-gray-600">OneTap Receipts. Zero Paper.</p>
+          <p className="text-xs text-gray-600">Your Digital Wallet</p>
         )}
         {title && (
           <p className="text-sm font-medium text-gray-700">{title}</p>
