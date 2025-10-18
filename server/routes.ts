@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerEmailRoutes } from "./email-routes";
@@ -28,7 +29,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const defaultUserId = "default-user"; // For demo purposes
   
   // Serve static files from public directory (for uploaded receipt images)
-  const express = require('express');
   app.use('/uploads', express.static('public/uploads'));
   
   // Mock authentication middleware for testing
