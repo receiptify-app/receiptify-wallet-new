@@ -45,6 +45,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin routes
   app.use("/api/admin", adminRouter);
 
+  // Analytics routes
+  app.get("/api/analytics/spending", async (req, res) => {
+    try {
+      const { period = 'month' } = req.query;
+      
+      // Get current month's date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      const receipts = await storage.getReceipts(defaultUserId, {
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+      });
+      
+      // Aggregate by category
+      const categoryTotals: { [key: string]: number } = {};
+      let totalSpending = 0;
+      
+      for (const receipt of receipts) {
+        const category = receipt.category || 'Other';
+        const amount = parseFloat(receipt.total);
+        
+        categoryTotals[category] = (categoryTotals[category] || 0) + amount;
+        totalSpending += amount;
+      }
+      
+      // Format response
+      const spendingData = Object.entries(categoryTotals).map(([category, amount]) => ({
+        category,
+        amount: parseFloat(amount.toFixed(2)),
+        percentage: totalSpending > 0 ? (amount / totalSpending) * 100 : 0,
+      }));
+      
+      res.json({
+        period: 'This month',
+        total: parseFloat(totalSpending.toFixed(2)),
+        categories: spendingData,
+        receipts: receipts.map(r => ({
+          id: r.id,
+          merchant: r.merchantName,
+          amount: parseFloat(r.total).toFixed(2),
+          date: r.date,
+          category: r.category,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching spending analytics:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
   // Receipt routes
   app.get("/api/receipts", async (req, res) => {
     try {
