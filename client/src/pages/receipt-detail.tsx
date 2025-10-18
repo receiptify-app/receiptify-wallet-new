@@ -1,11 +1,8 @@
 import { useLocation, useParams } from "wouter";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { 
-  ArrowLeft, 
   Download, 
   MapPin,
   Utensils
@@ -17,7 +14,6 @@ export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
   const params = useParams();
   const receiptId = params.id;
-  const [includeInAnalytics, setIncludeInAnalytics] = useState(true);
 
   const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
     queryKey: ["/api/receipts", receiptId],
@@ -138,31 +134,14 @@ export default function ReceiptDetailPage() {
           </Card>
         )}
 
-        {/* Category & Eco Points */}
+        {/* Category */}
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <Utensils className="h-4 w-4 text-green-600" />
-                </div>
-                <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <Utensils className="h-4 w-4 text-green-600" />
               </div>
-              <span className="text-sm text-gray-600">+{receipt.ecoPoints} Eco Points Saved</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Analytics Toggle */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-900 font-medium">Include in Monthly Analytics</span>
-              <Switch 
-                checked={includeInAnalytics}
-                onCheckedChange={setIncludeInAnalytics}
-                className="data-[state=checked]:bg-green-600"
-              />
+              <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
             </div>
           </CardContent>
         </Card>
