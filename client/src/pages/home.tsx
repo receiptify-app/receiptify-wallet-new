@@ -1,49 +1,93 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
 import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
 
-// Sample data to match the design
-const spendingData = [
-  { category: "Food", amount: 17.20, color: "#4CAF50" },
-  { category: "Tech", amount: 1.99, color: "#FFC107" },
-  { category: "Transport", amount: 103.00, color: "#9C27B0" }
-];
+// Category colors
+const categoryColors: { [key: string]: string } = {
+  "Food": "#4CAF50",
+  "Tech": "#FFC107",
+  "Transport": "#9C27B0",
+  "Shopping": "#2196F3",
+  "Other": "#757575",
+};
 
-const recentActivity = [
-  {
-    id: "1",
-    merchant: "Waitrose",
-    logo: "W", // Placeholder for Waitrose logo
-    amount: "12.02",
-    date: "12 July 2025",
-    color: "#1B5E20"
-  },
-  {
-    id: "2", 
-    merchant: "Argos",
-    logo: "A", // Placeholder for Argos logo
-    amount: "59.99",
-    date: "25 June 2025", 
-    color: "#D32F2F"
-  },
-  {
-    id: "3",
-    merchant: "Shell", 
-    logo: "🛢️", // Shell icon
-    amount: "23.80",
-    date: "22 June 2025",
-    color: "#FF9800"
-  }
-];
+// Merchant logo letters/icons
+const merchantLogos: { [key: string]: string } = {
+  "Waitrose": "W",
+  "Argos": "A",
+  "Shell": "🛢️",
+  "Tesco": "T",
+  "BP": "BP",
+};
+
+const merchantColors: { [key: string]: string } = {
+  "Waitrose": "#1B5E20",
+  "Argos": "#D32F2F",
+  "Shell": "#FF9800",
+  "Tesco": "#0050AA",
+  "BP": "#00843D",
+};
+
+interface AnalyticsData {
+  period: string;
+  total: number;
+  categories: Array<{
+    category: string;
+    amount: number;
+    percentage: number;
+  }>;
+  receipts: Array<{
+    id: string;
+    merchant: string;
+    amount: string;
+    date: string;
+    category: string;
+  }>;
+}
 
 export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState("This month");
   const [, navigate] = useLocation();
 
-  const totalSpending = spendingData.reduce((sum, item) => sum + item.amount, 0);
+  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ["/api/analytics/spending"],
+  });
+
+  if (isLoading || !analytics) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const spendingData = analytics.categories.map(cat => ({
+    category: cat.category,
+    amount: cat.amount,
+    color: categoryColors[cat.category] || categoryColors["Other"],
+  }));
+
+  const recentActivity = analytics.receipts
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 3)
+    .map(receipt => ({
+      id: receipt.id,
+      merchant: receipt.merchant,
+      logo: merchantLogos[receipt.merchant] || receipt.merchant[0],
+      amount: receipt.amount,
+      date: new Date(receipt.date).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      }),
+      color: merchantColors[receipt.merchant] || categoryColors[receipt.category || "Other"],
+    }));
+
+  const totalSpending = analytics.total;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -173,7 +217,7 @@ export default function Home() {
           <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h3>
           <div className="space-y-3">
             {recentActivity.map((activity) => (
-              <Card key={activity.id} className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/receipt/1')}>
+              <Card key={activity.id} className="bg-white shadow-sm cursor-pointer" onClick={() => navigate(`/receipt/${activity.id}`)}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
