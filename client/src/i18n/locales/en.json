@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "Your Digital Wallet"
+  },
+  "nav": {
+    "scan": "Scan",
+    "receipts": "My Receipts",
+    "analytics": "Analytics",
+    "account": "Account"
+  },
+  "scan": {
+    "title": "Scan Receipt",
+    "cameraCapture": "Camera Capture",
+    "galleryUpload": "Gallery Upload",
+    "manualEntry": "Manual Entry",
+    "uploadSuccess": "Receipt captured successfully",
+    "uploadSuccessDesc": "Your receipt has been processed and added to your collection.",
+    "uploadError": "Capture failed",
+    "uploadErrorDesc": "Failed to process your receipt. Please try again."
+  },
+  "receipts": {
+    "title": "My Receipts",
+    "noReceipts": "No receipts yet",
+    "noReceiptsDesc": "Start by scanning your first receipt",
+    "total": "Total"
+  },
+  "receiptDetail": {
+    "receiptImage": "Receipt Image",
+    "items": "Items",
+    "tax": "Tax",
+    "total": "Total",
+    "paymentMethod": "Payment Method",
+    "category": "Category",
+    "splitReceipt": "Split Receipt"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "spending": "Spending",
+    "thisMonth": "This month",
+    "categories": "Categories",
+    "trends": "Trends"
+  },
+  "profile": {
+    "title": "Account",
+    "myData": "My Data",
+    "receiptsOrders": "My Receipts & Orders",
+    "appPreferences": "App Preferences",
+    "notifications": "Notifications",
+    "currency": "Currency",
+    "language": "Language Preferences",
+    "autoCategorize": "Auto-Categorise",
+    "data": "Data",
+    "exportReceipts": "Export Receipts",
+    "signOut": "Sign Out"
+  },
+  "manual": {
+    "title": "Manual Receipt Entry",
+    "merchantName": "Merchant Name",
+    "location": "Location",
+    "date": "Date",
+    "total": "Total Amount",
+    "category": "Category",
+    "paymentMethod": "Payment Method",
+    "addItem": "Add Item",
+    "itemName": "Item Name",
+    "price": "Price",
+    "quantity": "Quantity",
+    "save": "Save Receipt",
+    "cancel": "Cancel"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "on": "ON",
+    "off": "OFF",
+    "loading": "Loading..."
+  }
+}

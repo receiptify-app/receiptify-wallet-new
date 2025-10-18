@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "محفظتك الرقمية"
+  },
+  "nav": {
+    "scan": "مسح",
+    "receipts": "إيصالاتي",
+    "analytics": "التحليلات",
+    "account": "الحساب"
+  },
+  "scan": {
+    "title": "مسح الإيصال",
+    "cameraCapture": "التقاط بالكاميرا",
+    "galleryUpload": "رفع من المعرض",
+    "manualEntry": "إدخال يدوي",
+    "uploadSuccess": "تم التقاط الإيصال بنجاح",
+    "uploadSuccessDesc": "تمت معالجة إيصالك وإضافته إلى مجموعتك.",
+    "uploadError": "فشل الالتقاط",
+    "uploadErrorDesc": "فشلت معالجة إيصالك. يرجى المحاولة مرة أخرى."
+  },
+  "receipts": {
+    "title": "إيصالاتي",
+    "noReceipts": "لا توجد إيصالات بعد",
+    "noReceiptsDesc": "ابدأ بمسح أول إيصال لك",
+    "total": "المجموع"
+  },
+  "receiptDetail": {
+    "receiptImage": "صورة الإيصال",
+    "items": "العناصر",
+    "tax": "الضريبة",
+    "total": "المجموع",
+    "paymentMethod": "طريقة الدفع",
+    "category": "الفئة",
+    "splitReceipt": "تقسيم الإيصال"
+  },
+  "analytics": {
+    "title": "التحليلات",
+    "spending": "الإنفاق",
+    "thisMonth": "هذا الشهر",
+    "categories": "الفئات",
+    "trends": "الاتجاهات"
+  },
+  "profile": {
+    "title": "الحساب",
+    "myData": "بياناتي",
+    "receiptsOrders": "إيصالاتي وطلباتي",
+    "appPreferences": "تفضيلات التطبيق",
+    "notifications": "الإشعارات",
+    "currency": "العملة",
+    "language": "تفضيلات اللغة",
+    "autoCategorize": "التصنيف التلقائي",
+    "data": "البيانات",
+    "exportReceipts": "تصدير الإيصالات",
+    "signOut": "تسجيل الخروج"
+  },
+  "manual": {
+    "title": "إدخال الإيصال يدوياً",
+    "merchantName": "اسم التاجر",
+    "location": "الموقع",
+    "date": "التاريخ",
+    "total": "المبلغ الإجمالي",
+    "category": "الفئة",
+    "paymentMethod": "طريقة الدفع",
+    "addItem": "إضافة عنصر",
+    "itemName": "اسم العنصر",
+    "price": "السعر",
+    "quantity": "الكمية",
+    "save": "حفظ الإيصال",
+    "cancel": "إلغاء"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تحرير",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "on": "مفعّل",
+    "off": "معطّل",
+    "loading": "جار التحميل..."
+  }
+}

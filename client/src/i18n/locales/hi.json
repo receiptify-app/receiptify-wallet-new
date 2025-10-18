@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "आपका डिजिटल वॉलेट"
+  },
+  "nav": {
+    "scan": "स्कैन",
+    "receipts": "मेरी रसीदें",
+    "analytics": "विश्लेषण",
+    "account": "खाता"
+  },
+  "scan": {
+    "title": "रसीद स्कैन करें",
+    "cameraCapture": "कैमरा कैप्चर",
+    "galleryUpload": "गैलरी से अपलोड",
+    "manualEntry": "मैनुअल एंट्री",
+    "uploadSuccess": "रसीद सफलतापूर्वक कैप्चर की गई",
+    "uploadSuccessDesc": "आपकी रसीद संसाधित की गई और आपके संग्रह में जोड़ दी गई।",
+    "uploadError": "कैप्चर विफल",
+    "uploadErrorDesc": "आपकी रसीद को संसाधित करने में विफल। कृपया पुन: प्रयास करें।"
+  },
+  "receipts": {
+    "title": "मेरी रसीदें",
+    "noReceipts": "अभी तक कोई रसीद नहीं",
+    "noReceiptsDesc": "अपनी पहली रसीद स्कैन करके शुरू करें",
+    "total": "कुल"
+  },
+  "receiptDetail": {
+    "receiptImage": "रसीद की तस्वीर",
+    "items": "आइटम",
+    "tax": "कर",
+    "total": "कुल",
+    "paymentMethod": "भुगतान विधि",
+    "category": "श्रेणी",
+    "splitReceipt": "रसीद विभाजित करें"
+  },
+  "analytics": {
+    "title": "विश्लेषण",
+    "spending": "खर्च",
+    "thisMonth": "इस महीने",
+    "categories": "श्रेणियां",
+    "trends": "रुझान"
+  },
+  "profile": {
+    "title": "खाता",
+    "myData": "मेरा डेटा",
+    "receiptsOrders": "मेरी रसीदें और ऑर्डर",
+    "appPreferences": "ऐप प्राथमिकताएं",
+    "notifications": "सूचनाएं",
+    "currency": "मुद्रा",
+    "language": "भाषा प्राथमिकताएं",
+    "autoCategorize": "स्वतः वर्गीकृत करें",
+    "data": "डेटा",
+    "exportReceipts": "रसीदें निर्यात करें",
+    "signOut": "साइन आउट"
+  },
+  "manual": {
+    "title": "मैनुअल रसीद प्रविष्टि",
+    "merchantName": "व्यापारी का नाम",
+    "location": "स्थान",
+    "date": "तारीख",
+    "total": "कुल राशि",
+    "category": "श्रेणी",
+    "paymentMethod": "भुगतान विधि",
+    "addItem": "आइटम जोड़ें",
+    "itemName": "आइटम का नाम",
+    "price": "कीमत",
+    "quantity": "मात्रा",
+    "save": "रसीद सहेजें",
+    "cancel": "रद्द करें"
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "close": "बंद करें",
+    "back": "वापस",
+    "on": "चालू",
+    "off": "बंद",
+    "loading": "लोड हो रहा है..."
+  }
+}

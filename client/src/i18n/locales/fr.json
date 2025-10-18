@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "Votre Portefeuille Numérique"
+  },
+  "nav": {
+    "scan": "Scanner",
+    "receipts": "Mes Reçus",
+    "analytics": "Analytique",
+    "account": "Compte"
+  },
+  "scan": {
+    "title": "Scanner le Reçu",
+    "cameraCapture": "Capture par Caméra",
+    "galleryUpload": "Télécharger depuis la Galerie",
+    "manualEntry": "Saisie Manuelle",
+    "uploadSuccess": "Reçu capturé avec succès",
+    "uploadSuccessDesc": "Votre reçu a été traité et ajouté à votre collection.",
+    "uploadError": "Échec de la capture",
+    "uploadErrorDesc": "Impossible de traiter votre reçu. Veuillez réessayer."
+  },
+  "receipts": {
+    "title": "Mes Reçus",
+    "noReceipts": "Pas encore de reçus",
+    "noReceiptsDesc": "Commencez par scanner votre premier reçu",
+    "total": "Total"
+  },
+  "receiptDetail": {
+    "receiptImage": "Image du Reçu",
+    "items": "Articles",
+    "tax": "Taxe",
+    "total": "Total",
+    "paymentMethod": "Méthode de Paiement",
+    "category": "Catégorie",
+    "splitReceipt": "Diviser le Reçu"
+  },
+  "analytics": {
+    "title": "Analytique",
+    "spending": "Dépenses",
+    "thisMonth": "Ce mois-ci",
+    "categories": "Catégories",
+    "trends": "Tendances"
+  },
+  "profile": {
+    "title": "Compte",
+    "myData": "Mes Données",
+    "receiptsOrders": "Mes Reçus et Commandes",
+    "appPreferences": "Préférences de l'Application",
+    "notifications": "Notifications",
+    "currency": "Devise",
+    "language": "Préférences de Langue",
+    "autoCategorize": "Auto-Catégoriser",
+    "data": "Données",
+    "exportReceipts": "Exporter les Reçus",
+    "signOut": "Se Déconnecter"
+  },
+  "manual": {
+    "title": "Saisie Manuelle du Reçu",
+    "merchantName": "Nom du Commerçant",
+    "location": "Emplacement",
+    "date": "Date",
+    "total": "Montant Total",
+    "category": "Catégorie",
+    "paymentMethod": "Méthode de Paiement",
+    "addItem": "Ajouter un Article",
+    "itemName": "Nom de l'Article",
+    "price": "Prix",
+    "quantity": "Quantité",
+    "save": "Enregistrer le Reçu",
+    "cancel": "Annuler"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "back": "Retour",
+    "on": "ACTIVÉ",
+    "off": "DÉSACTIVÉ",
+    "loading": "Chargement..."
+  }
+}

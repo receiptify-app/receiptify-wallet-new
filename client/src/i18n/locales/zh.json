@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "您的数字钱包"
+  },
+  "nav": {
+    "scan": "扫描",
+    "receipts": "我的收据",
+    "analytics": "分析",
+    "account": "账户"
+  },
+  "scan": {
+    "title": "扫描收据",
+    "cameraCapture": "相机拍摄",
+    "galleryUpload": "从图库上传",
+    "manualEntry": "手动输入",
+    "uploadSuccess": "成功捕获收据",
+    "uploadSuccessDesc": "您的收据已被处理并添加到您的收藏中。",
+    "uploadError": "捕获失败",
+    "uploadErrorDesc": "无法处理您的收据。请重试。"
+  },
+  "receipts": {
+    "title": "我的收据",
+    "noReceipts": "还没有收据",
+    "noReceiptsDesc": "开始扫描您的第一张收据",
+    "total": "总计"
+  },
+  "receiptDetail": {
+    "receiptImage": "收据图片",
+    "items": "项目",
+    "tax": "税金",
+    "total": "总计",
+    "paymentMethod": "支付方式",
+    "category": "类别",
+    "splitReceipt": "分摊收据"
+  },
+  "analytics": {
+    "title": "分析",
+    "spending": "支出",
+    "thisMonth": "本月",
+    "categories": "类别",
+    "trends": "趋势"
+  },
+  "profile": {
+    "title": "账户",
+    "myData": "我的数据",
+    "receiptsOrders": "我的收据和订单",
+    "appPreferences": "应用偏好",
+    "notifications": "通知",
+    "currency": "货币",
+    "language": "语言偏好",
+    "autoCategorize": "自动分类",
+    "data": "数据",
+    "exportReceipts": "导出收据",
+    "signOut": "登出"
+  },
+  "manual": {
+    "title": "手动收据输入",
+    "merchantName": "商家名称",
+    "location": "位置",
+    "date": "日期",
+    "total": "总金额",
+    "category": "类别",
+    "paymentMethod": "支付方式",
+    "addItem": "添加项目",
+    "itemName": "项目名称",
+    "price": "价格",
+    "quantity": "数量",
+    "save": "保存收据",
+    "cancel": "取消"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "close": "关闭",
+    "back": "返回",
+    "on": "开启",
+    "off": "关闭",
+    "loading": "加载中..."
+  }
+}
