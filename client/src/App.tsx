@@ -58,8 +58,8 @@ function AuthenticatedRouter() {
   return (
     <>
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/scan" component={Scan} />
+        <Route path="/" component={Scan} />
+        <Route path="/analytics" component={Home} />
         <Route path="/receipts" component={Receipts} />
         <Route path="/map" component={Map} />
         <Route path="/profile" component={Profile} />

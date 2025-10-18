@@ -9,12 +9,13 @@ import {
   User,
   RefreshCw,
   Shield,
-  Receipt
+  Receipt,
+  BarChart3
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", icon: Home, label: "Home" },
-  { path: "/scan", icon: QrCode, label: "Scan" },
+  { path: "/", icon: QrCode, label: "Scan" },
+  { path: "/analytics", icon: BarChart3, label: "Analytics" },
   { path: "/receipts", icon: Receipt, label: "My Receipts" },
   { path: "/profile", icon: User, label: "More" },
 ];
