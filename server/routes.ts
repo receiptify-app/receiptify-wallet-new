@@ -307,9 +307,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      // Extract location data from request body if provided by frontend
-      const { latitude, longitude } = req.body;
-
       // Process the receipt image with OCR
       console.log(`Processing uploaded receipt image: ${req.file.originalname}`);
       console.log(`Image size: ${req.file.size} bytes`);
@@ -345,8 +342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Shopping",
           paymentMethod: extractedData.paymentMethod || "Unknown",
           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-          latitude: latitude || null,
-          longitude: longitude || null,
           imageUrl: imageUrl,
           ecoPoints: 1
         };
@@ -383,8 +378,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Other",
           paymentMethod: "Unknown",
           receiptNumber: `ERR${Date.now()}`,
-          latitude: latitude || null,
-          longitude: longitude || null,
           imageUrl: imageUrl,
           ecoPoints: 1
         };

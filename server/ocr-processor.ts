@@ -34,6 +34,12 @@ export class OCRProcessor {
       
       const worker = await this.getWorker();
       
+      // Configure Tesseract for better accuracy
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,£$€-:/ ',
+        tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
+      });
+      
       // Add timeout and better error handling
       const recognitionPromise = worker.recognize(imagePath);
       const timeoutPromise = new Promise((_, reject) => 
@@ -83,16 +89,42 @@ export class OCRProcessor {
 
     console.log(`Parsing ${lines.length} lines of text`);
 
-    // Extract merchant name (usually first few lines, look for capitalized text)
+    // Extract merchant name - improved filtering for cleaner names
     if (lines.length > 0) {
-      // Try first 3 lines to find a good merchant name
-      for (let i = 0; i < Math.min(3, lines.length); i++) {
+      // Try first 5 lines to find a good merchant name
+      for (let i = 0; i < Math.min(5, lines.length); i++) {
         const line = lines[i];
-        // Skip lines with only numbers, dates, or very short text
-        if (line.length > 3 && !/^\d+$/.test(line) && !/^\d{2}\/\d{2}\/\d{4}/.test(line)) {
-          merchantName = line;
-          console.log('Found merchant name:', merchantName);
-          break;
+        
+        // Skip if line contains too many special characters (likely OCR noise)
+        const specialCharCount = (line.match(/[^a-zA-Z0-9\s&'-]/g) || []).length;
+        const totalChars = line.length;
+        const specialRatio = specialCharCount / totalChars;
+        
+        // Skip lines with:
+        // - Only numbers
+        // - Dates
+        // - Too many special characters (>30% of line)
+        // - Very short text (< 3 chars)
+        // - Too long (> 50 chars - likely not a merchant name)
+        const isValidMerchantName = 
+          line.length >= 3 && 
+          line.length <= 50 &&
+          !/^\d+$/.test(line) && 
+          !/^\d{2}\/\d{2}\/\d{4}/.test(line) &&
+          !/^[\d\s]+$/.test(line) &&
+          specialRatio < 0.3;
+        
+        if (isValidMerchantName) {
+          // Clean up the merchant name
+          merchantName = line
+            .replace(/[^\w\s&'-]/g, ' ')  // Remove special chars except &, ', -
+            .replace(/\s+/g, ' ')          // Normalize whitespace
+            .trim();
+          
+          if (merchantName.length >= 3) {
+            console.log('Found merchant name:', merchantName);
+            break;
+          }
         }
       }
     }
