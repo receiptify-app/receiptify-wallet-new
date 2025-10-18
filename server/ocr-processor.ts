@@ -29,6 +29,9 @@ export class OCRProcessor {
 
   static async processReceiptImage(imagePath: string): Promise<ExtractedReceiptData> {
     try {
+      console.log('=== Starting OCR Processing ===');
+      console.log('Image path:', imagePath);
+      
       const worker = await this.getWorker();
       
       // Add timeout and better error handling
@@ -40,16 +43,27 @@ export class OCRProcessor {
       const result = await Promise.race([recognitionPromise, timeoutPromise]) as any;
       const text = result?.data?.text || '';
       
+      console.log('OCR text length:', text.length);
+      console.log('OCR confidence:', result?.data?.confidence || 'unknown');
+      
       if (!text || text.trim().length === 0) {
         console.error('OCR returned empty text');
         return this.getDefaultReceiptData();
       }
       
-      console.log('OCR extracted text:', text);
+      console.log('=== OCR Extracted Text ===');
+      console.log(text);
+      console.log('=== End OCR Text ===');
       
-      return this.parseReceiptText(text);
+      const parsedData = this.parseReceiptText(text);
+      console.log('=== Parsed Receipt Data ===');
+      console.log(JSON.stringify(parsedData, null, 2));
+      console.log('=== End Parsed Data ===');
+      
+      return parsedData;
     } catch (error) {
       console.error('OCR processing error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       // Return default data instead of throwing - prevents server crash
       return this.getDefaultReceiptData();
     }
@@ -58,7 +72,7 @@ export class OCRProcessor {
   private static parseReceiptText(text: string): ExtractedReceiptData {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
-    let merchantName = '[UNKNOWN MERCHANT]';
+    let merchantName = 'Store Receipt';
     let location = 'Unknown Location';
     let total = '0.00';
     let subtotal: string | undefined;
@@ -67,49 +81,63 @@ export class OCRProcessor {
     let paymentMethod = 'Unknown';
     const items: Array<{ name: string; price: string; quantity?: number }> = [];
 
-    // Extract merchant name (usually first few lines)
+    console.log(`Parsing ${lines.length} lines of text`);
+
+    // Extract merchant name (usually first few lines, look for capitalized text)
     if (lines.length > 0) {
-      // Take first non-empty line as merchant
-      merchantName = lines[0].length > 2 ? lines[0] : (lines[1] || '[UNKNOWN MERCHANT]');
+      // Try first 3 lines to find a good merchant name
+      for (let i = 0; i < Math.min(3, lines.length); i++) {
+        const line = lines[i];
+        // Skip lines with only numbers, dates, or very short text
+        if (line.length > 3 && !/^\d+$/.test(line) && !/^\d{2}\/\d{2}\/\d{4}/.test(line)) {
+          merchantName = line;
+          console.log('Found merchant name:', merchantName);
+          break;
+        }
+      }
     }
 
-    // Extract tax
-    const taxPattern = /tax[:\s]*[$£]?\s*(\d+\.\d{2})/i;
+    // Extract tax - support both $ and £
+    const taxPattern = /(?:tax|vat)[:\s]*[$£€]?\s*(\d+\.\d{2})/i;
     const taxMatch = text.match(taxPattern);
     if (taxMatch) {
       tax = parseFloat(taxMatch[1]).toFixed(2);
+      console.log('Found tax:', tax);
     }
 
-    // Extract subtotal
-    const subtotalPattern = /subtotal[:\s]*[$£]?\s*(\d+\.\d{2})/i;
+    // Extract subtotal - support both $ and £
+    const subtotalPattern = /subtotal[:\s]*[$£€]?\s*(\d+\.\d{2})/i;
     const subtotalMatch = text.match(subtotalPattern);
     if (subtotalMatch) {
       subtotal = parseFloat(subtotalMatch[1]).toFixed(2);
+      console.log('Found subtotal:', subtotal);
     }
 
-    // Look for explicit total with multiple patterns
+    // Look for explicit total with multiple patterns - support both $ and £
     const totalPatterns = [
-      /total[:\s]*[$£]?\s*(\d+\.\d{2})/i,
-      /amount\s+due[:\s]*[$£]?\s*(\d+\.\d{2})/i,
-      /balance[:\s]*[$£]?\s*(\d+\.\d{2})/i,
+      /total[:\s]*[$£€]?\s*(\d+\.\d{2})/i,
+      /amount\s+due[:\s]*[$£€]?\s*(\d+\.\d{2})/i,
+      /balance[:\s]*[$£€]?\s*(\d+\.\d{2})/i,
+      /to\s+pay[:\s]*[$£€]?\s*(\d+\.\d{2})/i,
+      /grand\s+total[:\s]*[$£€]?\s*(\d+\.\d{2})/i,
     ];
     
     for (const pattern of totalPatterns) {
       const match = text.match(pattern);
       if (match) {
         total = parseFloat(match[1]).toFixed(2);
+        console.log('Found total with pattern:', pattern, '=', total);
         break;
       }
     }
     
-    // If still no total, look for a price after "Tax" line (might be the total)
-    if (total === '0.00' && tax) {
-      const afterTax = text.split(/tax[:\s]*[$£]?\s*\d+\.\d{2}/i)[1];
-      if (afterTax) {
-        const priceAfterTax = afterTax.match(/\$(\d+\.\d{2})/);
-        if (priceAfterTax) {
-          total = parseFloat(priceAfterTax[1]).toFixed(2);
-        }
+    // If still no total, look for any price-like number that's larger (likely the total)
+    if (total === '0.00') {
+      const allPrices = text.match(/[$£€]\s*(\d+\.\d{2})/g);
+      if (allPrices && allPrices.length > 0) {
+        const prices = allPrices.map(p => parseFloat(p.replace(/[$£€]/g, '')));
+        total = Math.max(...prices).toFixed(2);
+        console.log('Using largest price as total:', total);
       }
     }
 
@@ -132,30 +160,31 @@ export class OCRProcessor {
     else if (text.toLowerCase().includes('cash')) paymentMethod = 'Cash';
     else if (text.toLowerCase().includes('contactless')) paymentMethod = 'Contactless';
 
-    // Extract line items - improved to handle multiple prices on same line
-    // Pattern matches: "1x Item Name $7.00 $10.00" or "1x Item Name $10.00"
+    // Extract line items - support both $ and £, with and without quantity
+    console.log('Extracting line items...');
     for (const line of lines) {
-      // Look for lines with quantity and prices
+      // Pattern 1: Lines with quantity like "1x Item Name £7.00" or "2 Item Name $10.00"
       const qtyMatch = line.match(/^(\d+)\s*x?\s*(.+)/i);
       if (qtyMatch) {
         const quantity = parseInt(qtyMatch[1]);
         const restOfLine = qtyMatch[2].trim();
         
-        // Find all prices in the line
-        const priceMatches = restOfLine.match(/\$(\d+\.\d{2})/g);
+        // Find all prices in the line (support $, £, €)
+        const priceMatches = restOfLine.match(/[$£€]\s*(\d+\.\d{2})/g);
         if (priceMatches && priceMatches.length > 0) {
           // Take the LAST price as the line total
-          const lineTotal = priceMatches[priceMatches.length - 1].replace('$', '');
+          const lineTotal = priceMatches[priceMatches.length - 1].replace(/[$£€]/g, '').trim();
           
           // Remove all prices to get item name
-          let itemName = restOfLine.replace(/\$\d+\.\d{2}/g, '').trim();
+          let itemName = restOfLine.replace(/[$£€]\s*\d+\.\d{2}/g, '').trim();
           
           // Filter out common non-item keywords
           const lowerName = itemName.toLowerCase();
-          const skipPatterns = ['total', 'subtotal', 'tax', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt'];
+          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card'];
           const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
           
           if (!shouldSkip && itemName.length > 1 && itemName.length < 50) {
+            console.log(`  Item found: ${itemName} x${quantity} @ ${lineTotal}`);
             items.push({
               name: itemName,
               price: lineTotal,
@@ -164,7 +193,31 @@ export class OCRProcessor {
           }
         }
       }
+      // Pattern 2: Lines without quantity but with item name and price like "Item Name £7.00"
+      else if (line.match(/[$£€]\s*\d+\.\d{2}/)) {
+        const priceMatches = line.match(/[$£€]\s*(\d+\.\d{2})/g);
+        if (priceMatches && priceMatches.length > 0) {
+          const lineTotal = priceMatches[priceMatches.length - 1].replace(/[$£€]/g, '').trim();
+          let itemName = line.replace(/[$£€]\s*\d+\.\d{2}/g, '').trim();
+          
+          // Filter out common non-item keywords
+          const lowerName = itemName.toLowerCase();
+          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card', 'balance', 'amount', 'due'];
+          const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
+          
+          if (!shouldSkip && itemName.length > 2 && itemName.length < 50 && parseFloat(lineTotal) > 0) {
+            console.log(`  Item found (no qty): ${itemName} @ ${lineTotal}`);
+            items.push({
+              name: itemName,
+              price: lineTotal,
+              quantity: 1
+            });
+          }
+        }
+      }
     }
+    
+    console.log(`Extracted ${items.length} items`);
 
     // If total wasn't found explicitly, calculate it
     if (total === '0.00' && items.length > 0) {
