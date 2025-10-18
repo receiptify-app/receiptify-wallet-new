@@ -11,7 +11,7 @@ async function seed() {
     merchantName: "Waitrose",
     location: "Harrow Weald, London",
     total: "12.02",
-    date: new Date("2025-07-12T16:34:00"),
+    date: new Date("2025-10-12T16:34:00"),
     category: "Food",
     paymentMethod: "VISA Debit",
     receiptNumber: "WAIT-2025-001",
@@ -60,7 +60,7 @@ async function seed() {
     merchantName: "Tesco",
     location: "London, UK",
     total: "5.18",
-    date: new Date("2025-07-10T10:30:00"),
+    date: new Date("2025-10-10T10:30:00"),
     category: "Food",
     paymentMethod: "Card",
     receiptNumber: "TESCO-2025-004",
@@ -94,13 +94,13 @@ async function seed() {
   
   console.log("✓ Created Tesco receipt");
   
-  // Create Argos receipt - Tech category (£1.99)
+  // Create Argos receipt - Tech category (£59.99 total but showing in June for "Recent Activities")
   const argosReceipt = await storage.createReceipt({
     userId,
     merchantName: "Argos",
     location: "London, UK",
     total: "59.99",
-    date: new Date("2025-06-25T14:20:00"),
+    date: new Date("2025-09-25T14:20:00"),
     category: "Tech",
     paymentMethod: "Mastercard",
     receiptNumber: "ARGOS-2025-002",
@@ -111,37 +111,61 @@ async function seed() {
   // Argos items
   await storage.createReceiptItem({
     receiptId: argosReceipt.id,
-    name: "USB Cable",
-    price: "1.99",
-    quantity: "1",
-    category: "Tech",
-  });
-  
-  await storage.createReceiptItem({
-    receiptId: argosReceipt.id,
     name: "Wireless Mouse",
-    price: "29.00",
+    price: "29.99",
     quantity: "1",
     category: "Tech",
   });
   
   await storage.createReceiptItem({
     receiptId: argosReceipt.id,
-    name: "Keyboard",
-    price: "29.00",
+    name: "Phone Stand",
+    price: "15.00",
+    quantity: "1",
+    category: "Tech",
+  });
+  
+  await storage.createReceiptItem({
+    receiptId: argosReceipt.id,
+    name: "Cable",
+    price: "15.00",
     quantity: "1",
     category: "Tech",
   });
   
   console.log("✓ Created Argos receipt");
   
-  // Create Shell receipt - Transport category (£103.00)
+  // Create Tech receipt for October to reach £1.99
+  const currysReceipt = await storage.createReceipt({
+    userId,
+    merchantName: "Currys",
+    location: "London, UK",
+    total: "1.99",
+    date: new Date("2025-10-05T14:00:00"),
+    category: "Tech",
+    paymentMethod: "Card",
+    receiptNumber: "CURRYS-2025-006",
+    currency: "GBP",
+    ecoPoints: 1,
+  });
+  
+  await storage.createReceiptItem({
+    receiptId: currysReceipt.id,
+    name: "USB Cable",
+    price: "1.99",
+    quantity: "1",
+    category: "Tech",
+  });
+  
+  console.log("✓ Created Currys receipt");
+  
+  // Create Shell receipt - Transport category (October for monthly total)
   const shellReceipt = await storage.createReceipt({
     userId,
     merchantName: "Shell",
     location: "M25 Service Station",
     total: "23.80",
-    date: new Date("2025-06-22T09:15:00"),
+    date: new Date("2025-10-22T09:15:00"),
     category: "Transport",
     paymentMethod: "Contactless",
     receiptNumber: "SHELL-2025-003",
@@ -166,7 +190,7 @@ async function seed() {
     merchantName: "BP",
     location: "London, UK",
     total: "79.20",
-    date: new Date("2025-07-15T08:00:00"),
+    date: new Date("2025-10-15T08:00:00"),
     category: "Transport",
     paymentMethod: "Card",
     receiptNumber: "BP-2025-005",
@@ -185,14 +209,15 @@ async function seed() {
   console.log("✓ Created BP receipt");
   
   console.log("\n✅ Seed completed successfully!");
-  console.log("\nSummary:");
+  console.log("\nOctober 2025 Summary (This Month):");
   console.log("- Food: £17.20 (Waitrose £12.02 + Tesco £5.18)");
-  console.log("- Tech: £1.99 (Argos - only USB Cable counted for monthly)");
-  console.log("- Transport: £103.00 (Shell £23.80 + BP £79.20)");
-  console.log("\nRecent Activities:");
-  console.log("- Waitrose — 12 July 2025 — £12.02");
-  console.log("- Argos — 25 June 2025 — £59.99");
-  console.log("- Shell — 22 June 2025 — £23.80");
+  console.log("- Tech: £1.99 (Currys £1.99)");
+  console.log("- Transport: £103.00 (BP £79.20 + Shell £23.80)");
+  console.log("- TOTAL: £122.19");
+  console.log("\nRecent Activities (All Time):");
+  console.log("- Shell — 22 October 2025 — £23.80 (Transport)");
+  console.log("- BP — 15 October 2025 — £79.20 (Transport)");
+  console.log("- Waitrose — 12 October 2025 — £12.02 (Food)");
   
   process.exit(0);
 }
