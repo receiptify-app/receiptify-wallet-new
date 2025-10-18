@@ -35,36 +35,30 @@ export default function Scan() {
       const formData = new FormData();
       formData.append('receipt', file);
       
-      // Get current location if available
+      // Skip location for faster upload
+      console.log('Uploading without location to speed up process...');
+      
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            enableHighAccuracy: true
-          });
+        const response = await fetch('/api/receipts/upload', {
+          method: 'POST',
+          body: formData,
         });
         
-        formData.append('latitude', position.coords.latitude.toString());
-        formData.append('longitude', position.coords.longitude.toString());
-        console.log('Location added:', position.coords.latitude, position.coords.longitude);
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Upload failed:', response.status, errorText);
+          throw new Error('Upload failed');
+        }
+        
+        const result = await response.json();
+        console.log('Upload successful:', result);
+        return result;
       } catch (error) {
-        console.log('Location not available:', error);
+        console.error('Fetch error:', error);
+        throw error;
       }
-      
-      const response = await fetch('/api/receipts/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Upload failed:', response.status, errorText);
-        throw new Error('Upload failed');
-      }
-      
-      const result = await response.json();
-      console.log('Upload successful:', result);
-      return result;
     },
     onSuccess: (data) => {
       console.log('Receipt created successfully:', data.id);
