@@ -4,17 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { 
-  CreditCard, 
-  Star, 
   Bell, 
   Euro, 
   ChevronRight,
   RefreshCw,
   Download,
   Receipt,
-  ShieldCheck,
-  LogOut,
-  Palette
+  LogOut
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,7 +25,6 @@ const sampleUser = {
 
 export default function Profile() {
   const [, navigate] = useLocation();
-  const [darkMode, setDarkMode] = useState(false);
   const [gbpCurrency, setGbpCurrency] = useState(true);
   const { currentUser, logout } = useAuth();
 
@@ -58,7 +53,7 @@ export default function Profile() {
       <AppHeader 
         showBackButton={true}
         onBackClick={() => navigate('/')}
-        title="Settings"
+        title="RECEIPTIFY"
       />
 
       <div className="px-6 py-6 space-y-8">
@@ -84,20 +79,6 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Dark Mode */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Dark Mode</h3>
-              <Switch 
-                checked={darkMode}
-                onCheckedChange={setDarkMode}
-                className="data-[state=checked]:bg-green-600"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
         {/* My Data Section */}
         <div>
           <h3 className="text-lg font-semibold text-gray-700 mb-4">My Data</h3>
@@ -108,54 +89,6 @@ export default function Profile() {
                   <div className="flex items-center gap-4">
                     <Receipt className="w-6 h-6 text-gray-700" />
                     <span className="text-lg font-medium text-gray-900">My Receipts & Orders</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Subscriptions Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Subscriptions</h3>
-          <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/subscriptions')}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <RefreshCw className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Subscription Tracker</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Payment & Loyalty Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Payment & Loyalty</h3>
-          <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/linked-cards')}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <CreditCard className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Linked Cards</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/cards')}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Star className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Linked Loyalty Cards</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
@@ -216,37 +149,10 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Receipts & Warranties Section */}
+        {/* Export Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Receipts & Warranties</h3>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Data</h3>
           <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/warranties')}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <ShieldCheck className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Warranties</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/receipt-customization')}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Palette className="w-6 h-6 text-gray-700" />
-                    <div>
-                      <span className="text-lg font-medium text-gray-900">Receipt Design</span>
-                      <p className="text-sm text-gray-600">Customize receipt appearance</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-
             <Card className="bg-white shadow-sm border-0">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
