@@ -116,7 +116,7 @@ export default function ReceiptDetailPage() {
                   {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
                 </span>
                 <span className="text-gray-900 font-semibold">
-                  ${parseFloat(item.price).toFixed(2)}
+                  £{parseFloat(item.price).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -125,7 +125,7 @@ export default function ReceiptDetailPage() {
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
                   <span>Tax</span>
-                  <span>${parseFloat(receipt.tax).toFixed(2)}</span>
+                  <span>£{parseFloat(receipt.tax).toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -133,7 +133,7 @@ export default function ReceiptDetailPage() {
             <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
-                <span>${parseFloat(receipt.total).toFixed(2)}</span>
+                <span>£{parseFloat(receipt.total).toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
