@@ -1,13 +1,21 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Edit, Camera, Upload } from "lucide-react";
+import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -64,6 +72,50 @@ export default function Scan() {
 
   return (
     <div className="px-6 py-4 pb-24">
+      {/* Language Selector - Small Tab */}
+      <div className="flex justify-end mb-4">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
+          <Languages className="w-4 h-4 text-gray-600" />
+          <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <SelectTrigger className="w-[120px] h-7 text-xs border-0 focus:ring-0 p-0" data-testid="select-language-scan">
+              <SelectValue placeholder="Language" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="es">Español</SelectItem>
+              <SelectItem value="fr">Français</SelectItem>
+              <SelectItem value="de">Deutsch</SelectItem>
+              <SelectItem value="it">Italiano</SelectItem>
+              <SelectItem value="pt">Português</SelectItem>
+              <SelectItem value="nl">Nederlands</SelectItem>
+              <SelectItem value="pl">Polski</SelectItem>
+              <SelectItem value="ru">Русский</SelectItem>
+              <SelectItem value="ja">日本語</SelectItem>
+              <SelectItem value="zh">中文</SelectItem>
+              <SelectItem value="ko">한국어</SelectItem>
+              <SelectItem value="ar">العربية</SelectItem>
+              <SelectItem value="hi">हिन्दी</SelectItem>
+              <SelectItem value="tr">Türkçe</SelectItem>
+              <SelectItem value="sv">Svenska</SelectItem>
+              <SelectItem value="no">Norsk</SelectItem>
+              <SelectItem value="da">Dansk</SelectItem>
+              <SelectItem value="fi">Suomi</SelectItem>
+              <SelectItem value="el">Ελληνικά</SelectItem>
+              <SelectItem value="cs">Čeština</SelectItem>
+              <SelectItem value="hu">Magyar</SelectItem>
+              <SelectItem value="ro">Română</SelectItem>
+              <SelectItem value="th">ไทย</SelectItem>
+              <SelectItem value="vi">Tiếng Việt</SelectItem>
+              <SelectItem value="id">Bahasa Indonesia</SelectItem>
+              <SelectItem value="ms">Bahasa Melayu</SelectItem>
+              <SelectItem value="uk">Українська</SelectItem>
+              <SelectItem value="he">עברית</SelectItem>
+              <SelectItem value="bn">বাংলা</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold text-primary mb-2">Add Receipt</h1>
