@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ZoomIn, ZoomOut, RotateCw, Crop, X, Check } from 'lucide-react';
@@ -12,6 +12,13 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isCropMode, setIsCropMode] = useState(false);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropStart, setCropStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.25, 3));
@@ -19,6 +26,9 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
 
   const handleZoomOut = () => {
     setZoom(prev => Math.max(prev - 0.25, 0.5));
+    if (zoom <= 0.75) {
+      setPanPosition({ x: 0, y: 0 });
+    }
   };
 
   const handleRotate = () => {
@@ -29,10 +39,113 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
     setZoom(1);
     setRotation(0);
     setIsCropMode(false);
+    setPanPosition({ x: 0, y: 0 });
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
   };
 
   const toggleCropMode = () => {
     setIsCropMode(prev => !prev);
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+  };
+
+  // Handle mouse down for panning or cropping
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isCropMode) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        setCropStart({ x, y });
+        setIsCropping(true);
+        setCropArea({ x, y, width: 0, height: 0 });
+      }
+    } else if (zoom > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+    }
+  };
+
+  // Handle mouse move for panning or cropping
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isCropping && isCropMode) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        setCropArea({
+          x: Math.min(cropStart.x, x),
+          y: Math.min(cropStart.y, y),
+          width: Math.abs(x - cropStart.x),
+          height: Math.abs(y - cropStart.y)
+        });
+      }
+    } else if (isDragging && zoom > 1) {
+      setPanPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  };
+
+  // Handle mouse up
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setIsCropping(false);
+  };
+
+  // Handle touch events for mobile
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (isCropMode) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          setCropStart({ x, y });
+          setIsCropping(true);
+          setCropArea({ x, y, width: 0, height: 0 });
+        }
+      } else if (zoom > 1) {
+        setIsDragging(true);
+        setDragStart({ x: touch.clientX - panPosition.x, y: touch.clientY - panPosition.y });
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (isCropping && isCropMode) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          setCropArea({
+            x: Math.min(cropStart.x, x),
+            y: Math.min(cropStart.y, y),
+            width: Math.abs(x - cropStart.x),
+            height: Math.abs(y - cropStart.y)
+          });
+        }
+      } else if (isDragging && zoom > 1) {
+        setPanPosition({
+          x: touch.clientX - dragStart.x,
+          y: touch.clientY - dragStart.y
+        });
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    setIsCropping(false);
+  };
+
+  const applyCrop = () => {
+    console.log('Crop area:', cropArea);
+    setIsCropMode(false);
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
   };
 
   return (
@@ -102,41 +215,98 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
           </div>
 
           {/* Image Container */}
-          <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          <div 
+            ref={containerRef}
+            className="relative rounded-lg overflow-hidden bg-gray-100"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div 
-              className="overflow-auto max-h-[600px] flex items-center justify-center"
+              className="overflow-hidden max-h-[600px] flex items-center justify-center select-none"
               style={{ 
-                cursor: isCropMode ? 'crosshair' : zoom > 1 ? 'move' : 'default'
+                cursor: isCropMode ? 'crosshair' : (zoom > 1 && isDragging) ? 'grabbing' : zoom > 1 ? 'grab' : 'default'
               }}
             >
               <img 
                 src={imageUrl} 
                 alt={alt} 
-                className="transition-transform duration-200 ease-out"
+                className="transition-transform duration-100 ease-out pointer-events-none"
                 style={{
-                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoom}) rotate(${rotation}deg)`,
                   transformOrigin: 'center center',
                   maxWidth: zoom === 1 ? '100%' : 'none',
                   height: 'auto',
-                  touchAction: 'pan-y pinch-zoom'
+                  touchAction: 'none'
                 }}
                 data-testid="img-receipt-viewer"
+                draggable={false}
               />
               
-              {isCropMode && (
-                <div className="absolute inset-0 border-2 border-dashed border-green-500 bg-black bg-opacity-10 pointer-events-none">
-                  <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                    Crop Mode - Coming Soon
+              {/* Crop Selection Box */}
+              {isCropMode && cropArea.width > 0 && cropArea.height > 0 && (
+                <div 
+                  className="absolute border-2 border-green-500 bg-green-500 bg-opacity-20 pointer-events-none"
+                  style={{
+                    left: cropArea.x,
+                    top: cropArea.y,
+                    width: cropArea.width,
+                    height: cropArea.height
+                  }}
+                >
+                  <div className="absolute -top-6 left-0 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                    {Math.round(cropArea.width)} × {Math.round(cropArea.height)}
                   </div>
+                </div>
+              )}
+              
+              {/* Crop Mode Indicator */}
+              {isCropMode && cropArea.width === 0 && (
+                <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded pointer-events-none">
+                  Click and drag to select area to crop
                 </div>
               )}
             </div>
           </div>
 
+          {/* Crop Actions */}
+          {isCropMode && cropArea.width > 0 && (
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={applyCrop}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-apply-crop"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Apply Crop
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCropArea({ x: 0, y: 0, width: 0, height: 0 })}
+                data-testid="button-cancel-crop"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+            </div>
+          )}
+
           {/* Instructions */}
-          {zoom > 1 && (
+          {zoom > 1 && !isCropMode && (
             <p className="text-xs text-gray-500 text-center">
-              Pinch or scroll to zoom • Drag to pan
+              Drag with mouse or finger to pan around the image
+            </p>
+          )}
+          {isCropMode && (
+            <p className="text-xs text-gray-500 text-center">
+              Draw a rectangle to select the area you want to crop
             </p>
           )}
         </div>
