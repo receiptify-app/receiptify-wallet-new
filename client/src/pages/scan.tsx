@@ -79,7 +79,6 @@ export default function Scan() {
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/analytics/spending'] });
     },
     onError: (error) => {
       console.error('Upload mutation error:', error);
