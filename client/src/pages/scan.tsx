@@ -1,191 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Upload, QrCode, FileText, ScanLine, Edit } from "lucide-react";
-import RealQrScanner from "@/components/real-qr-scanner";
-import ScannerModal from "@/components/scanner-modal";
+import { FileText, Edit } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
-import BarcodeScanner from "@/components/barcode-scanner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 export default function Scan() {
-  const [showQrScanner, setShowQrScanner] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('receipt', file);
-      const response = await apiRequest('POST', '/api/receipts/upload', formData);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Receipt uploaded successfully",
-        description: "Your receipt has been processed and added to your collection.",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
-    },
-    onError: () => {
-      toast({
-        title: "Upload failed",
-        description: "Failed to process your receipt. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      uploadMutation.mutate(file);
-    }
-  };
-
-  const handleBarcodeDetected = (barcode: string) => {
-    setDetectedBarcode(barcode);
-    toast({
-      title: "Barcode Detected",
-      description: `Barcode: ${barcode}`,
-    });
-    
-    // Auto-open manual form with barcode data
-    setShowManualForm(true);
-  };
-
-  // Listen for custom event from scanner modal
-  useEffect(() => {
-    const handleOpenManualForm = () => {
-      setShowManualForm(true);
-    };
-
-    window.addEventListener('openManualReceiptForm', handleOpenManualForm);
-    return () => window.removeEventListener('openManualReceiptForm', handleOpenManualForm);
-  }, []);
 
   return (
     <div className="px-6 py-4 pb-24">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary mb-2">Capture Receipt</h1>
-        <p className="text-gray-600">Choose how you'd like to add your receipt</p>
+      <div className="mb-8 text-center">
+        <h1 className="text-2xl font-bold text-primary mb-2">Add Receipt</h1>
+        <p className="text-gray-600">Enter your receipt details manually</p>
       </div>
 
-      {/* Scan Options */}
+      {/* Manual Entry Option */}
       <div className="space-y-4 mb-8">
-        <Card className="border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowQrScanner(true)}
-              className="w-full h-auto py-6 bg-primary hover:bg-primary/90 text-left"
-              disabled={showQrScanner}
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-primary-foreground/20 rounded-xl flex items-center justify-center">
-                  <QrCode className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg">QR Code Scan</div>
-                  <div className="text-sm opacity-90">Scan merchant QR code for instant receipt</div>
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowCamera(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-2"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-gray-700" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Take Photo</div>
-                  <div className="text-sm text-gray-600">Capture receipt with camera</div>
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <label className="block w-full cursor-pointer">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={uploadMutation.isPending}
-              />
-              <div className="flex items-center space-x-4 py-6">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-gray-700" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">
-                    {uploadMutation.isPending ? "Uploading..." : "Upload from Gallery"}
-                  </div>
-                  <div className="text-sm text-gray-600">Choose existing photo from device</div>
-                </div>
-              </div>
-            </label>
-          </CardContent>
-        </Card>
-
-        {/* Barcode Scanner Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-blue-200">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowBarcodeScanner(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-0 hover:bg-blue-50"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <ScanLine className="w-6 h-6 text-blue-700" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Scan Barcode</div>
-                  <div className="text-sm text-gray-600">Scan product barcode on receipt</div>
-                  {detectedBarcode && (
-                    <div className="text-xs text-blue-600 mt-1">
-                      Last detected: {detectedBarcode}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Manual Entry Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-green-200">
+        <Card className="hover:shadow-md transition-shadow border-2 border-primary">
           <CardContent className="p-6">
             <Button
               onClick={() => setShowManualForm(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-0 hover:bg-green-50"
+              className="w-full h-auto py-6 bg-primary hover:bg-primary/90"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Edit className="w-6 h-6 text-green-700" />
+              <div className="flex items-center justify-center space-x-4">
+                <div className="w-12 h-12 bg-primary-foreground/20 rounded-xl flex items-center justify-center">
+                  <Edit className="w-6 h-6 text-primary-foreground" />
                 </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Enter Details Manually</div>
-                  <div className="text-sm text-gray-600">Type receipt information by hand</div>
+                <div className="text-left">
+                  <div className="font-semibold text-lg text-primary-foreground">Import Receipt</div>
+                  <div className="text-sm text-primary-foreground/80">Enter receipt information manually</div>
                 </div>
               </div>
             </Button>
@@ -203,11 +47,11 @@ export default function Scan() {
             <div>
               <h3 className="font-semibold text-primary mb-1">Privacy First</h3>
               <p className="text-sm text-gray-700 mb-3">
-                All receipts are stored locally on your device. We use advanced OCR to extract receipt data while keeping your information private.
+                All receipts are stored securely. Manual entry ensures complete control over your data.
               </p>
               <div className="text-xs text-gray-600 space-y-1">
                 <div>✓ Support for all major UK retailers</div>
-                <div>✓ Automatic categorization and eco-impact tracking</div>
+                <div>✓ Automatic categorization</div>
                 <div>✓ Works with any payment method</div>
               </div>
             </div>
@@ -215,36 +59,10 @@ export default function Scan() {
         </CardContent>
       </Card>
 
-      {/* QR Scanner Modal */}
-      {showQrScanner && (
-        <RealQrScanner
-          onClose={() => setShowQrScanner(false)}
-          onScan={(data) => {
-            console.log("QR Code scanned:", data);
-            setShowQrScanner(false);
-            toast({
-              title: "QR Code detected",
-              description: "Processing receipt data...",
-            });
-          }}
-        />
-      )}
-
-      {/* Camera Scanner Modal */}
-      <ScannerModal open={showCamera} onOpenChange={setShowCamera} />
-
       {/* Manual Receipt Form */}
       <ManualReceiptForm 
         open={showManualForm} 
         onOpenChange={setShowManualForm}
-        initialData={detectedBarcode ? { notes: `Barcode detected: ${detectedBarcode}` } : undefined}
-      />
-
-      {/* Barcode Scanner */}
-      <BarcodeScanner
-        open={showBarcodeScanner}
-        onOpenChange={setShowBarcodeScanner}
-        onBarcodeDetected={handleBarcodeDetected}
       />
     </div>
   );
