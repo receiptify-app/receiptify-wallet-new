@@ -1,0 +1,124 @@
+TASK: Remove UI elements / screens from Receiptify mobile app
+
+GOAL:
+Remove the following UI items and screens from the React Native Expo app (frontend only). Do not change backend logic except to remove or guard any front-end calls so the app doesn't crash. Leave backend cleanup (deleting loyalty/subscriptions/warranty endpoints) as TODOs in comments.
+
+REMOVE the following from the app UI (every occurrence across all screens & navigation):
+
+1) Global / Home
+- Remove: **Loyal usage**
+- Remove: **Eco points**
+- Remove: **Dark mode** toggle or icon (anywhere on Home)
+
+2) Scan page (the Scan tab)
+- Remove options / buttons:
+  - **Capture Receipt**
+  - **QR code scan**
+  - **Scan Barcode**
+- Replace them with a single simplified CTA if desired (keep "Import Receipt" only) — otherwise remove the UI nodes entirely.
+
+3) Receipt / Receipt Detail screen
+- Remove: **monthly analytics toggle**
+- Remove: **eco points** display/badge
+
+4) More page
+- Remove the top bar elements:
+  - **$ receipt logo**
+  - **"digital receipts"** header text (top bar)
+Replace it with the name of the company  Receiptify in capital letters
+- Remove entire sections:
+  - **Subscription Tracker**
+  - **Payment & loyalty cards** (entire section; remove route and navigation to it)
+
+5) Receipts & Warranties area
+- Remove: the duplicate **Warranties** section (keep only one, or remove entirely if asked)
+- Remove: **Receipt Design** option
+
+GENERAL REQUIREMENTS:
+- Update navigation so there are no broken links to removed screens.
+- Remove imports and components that become unused because of these removals.
+- Replace or hide UI elements gracefully (not crash). If removal would leave an empty page, either remove the page entirely or show a minimal placeholder saying "Coming soon" (only if you cannot remove the whole route).
+- Add clear commit messages for each change and add TODO comments where backend cleanup would be required (e.g., routes for loyalty, subscriptions, warranties).
+- Add a short report at the end listing every file changed and the exact lines or components removed.
+
+CONSTRAINTS:
+- Frontend stack: React Native (Expo) + TypeScript.
+- Keep changes minimal and isolated to UI/navigation; do not remove database models.
+- If a removed section had tests that now fail, update or delete those tests accordingly.
+
+FILES / LOCATIONS TO MODIFY (search-and-edit targets):
+(Adapt these file paths to your repo structure; the AI should search by filename patterns and component names.)
+
+- `app/screens/HomeScreen.tsx` (remove loyalty, eco points, dark mode toggles)
+- `app/screens/ScanScreen.tsx` (remove Capture Receipt, QR code scan, Scan Barcode UI nodes)
+- `app/screens/ReceiptDetail.tsx` (remove monthly analytics toggle & eco points)
+- `app/screens/MoreScreen.tsx` OR `app/navigation/MoreStack/*` (remove top bar logo + "digital receipts" text and the Subscription Tracker & Payment & loyalty cards sections)
+- `app/screens/WarrantiesScreen.tsx` and any other `Warranties*` screens (remove duplicates or remove routing)
+- `app/screens/ReceiptDesign.tsx` (delete or remove link)
+- `app/navigation/TabNavigator.tsx` and any other navigation files — remove routes and references to the removed screens
+- `app/components/*` (search for components named `EcoPoints`, `LoyaltyUsage`, `DarkModeToggle`, `SubscriptionTracker`, `PaymentCards`, `ReceiptDesignCard`, `CaptureReceiptButton`, `QRCodeScan`, `BarcodeScan`) — remove or refactor them out
+- `app/styles/*` (remove unused styles if referenced only by removed components)
+- `__tests__/*` (update/delete tests referencing removed components)
+
+CODE ACTIONS (what Replit AI should do exactly)
+1. Search the codebase for the following identifiers and remove/hide usages:
+   - `EcoPoints`, `ecoPoints`, `LoyalUsage`, `LoyaltyUsage`, `DarkModeToggle`, `CaptureReceipt`, `QRCodeScan`, `BarcodeScan`, `MonthlyAnalyticsToggle`, `SubscriptionTracker`, `PaymentCards`, `PaymentAndLoyalty`, `Warranties`, `ReceiptDesign`, `ReceiptLogo`, `DigitalReceiptsText`
+
+2. For each file where these appear:
+   - Remove the import lines.
+   - Remove the JSX nodes that render these components or the code block that computes their values.
+   - If a screen becomes empty because its primary content was removed, remove the entire screen and the route pointing to it (update navigation), or replace with a small placeholder: `<View style={{padding:16}}><Text>Feature removed</Text></View>`.
+
+3. Update navigation:
+   - Remove routes and stack entries that reference deleted screens.
+   - Ensure `TabNavigator` reorders or keeps tabs working — no broken links remain.
+
+4. Update top bars and headers:
+   - On `MoreScreen` or anywhere the `$ receipt logo` and `digital receipts` text appear in the top bar, remove those elements and restore a plain title only (e.g., `More`).
+
+5. Run a repo-wide linter/fixer:
+   - Run TypeScript compiler and ESLint autofix to remove unused imports and highlight any leftover references.
+   - If TypeScript errors remain because of backend hooks, guard the calls with safe checks (e.g., `if (someVariable) { ... }`).
+
+6. Tests:
+   - Run `npm test`. For failing tests that are about removed UI elements, update or delete them and explain what was removed.
+
+7. Create commits:
+   - `chore(ui): remove eco points, loyalty usage and dark mode from Home`
+   - `chore(scan): remove capture/QR/barcode scan options and simplify import CTA`
+   - `chore(receipt): remove monthly analytics toggle and eco points from receipt detail`
+   - `chore(more): remove receipt logo, digital receipts text, subscription tracker, payment & loyalty section`
+   - `chore(receipts): remove duplicate warranties & receipt design option`
+   - `refactor(nav): remove routes to deleted screens and clean up navigation`
+
+ACCEPTANCE CRITERIA (what to verify)
+1. App builds and runs with `expo start` after changes (no TypeScript compile errors).
+2. The following **must NOT appear** anywhere in the app UI:
+   - Loyalty usage
+   - Eco points
+   - Dark mode toggle on Home
+   - Capture Receipt / QR code scan / Scan Barcode options on Scan screen
+   - Monthly analytics toggle on Receipt screen
+   - Eco points on Receipt screen
+   - $ receipt logo and "digital receipts" text in More screen top bar
+   - Subscription Tracker section in More
+   - Payment & loyalty cards section in More
+   - Duplicate Warranties sections and Receipt Design option
+3. Navigation has no broken links or errors when trying to open removed screens.
+4. Unit / integration tests updated to no longer refer to removed components (or removed if not relevant).
+5. At the end of the run, print a concise report listing:
+   - Files changed
+   - Components removed
+   - Tests updated/removed
+   - Any TODOs left for backend cleanup (with file and line numbers)
+
+OUTPUT (what Replit AI should return in the response)
+- A commit summary with the commit messages and files changed.
+- The textual report described in Acceptance Criteria step 5.
+- If errors occurred (TypeScript/lint/tests), include the error output and suggested fixes.
+
+NOTES / SAFETY
+- Do not delete backend DB tables or delete server-side routes. Only remove frontend screens, UI components, and navigation.
+- For backend integrations used only by removed UI (e.g., loyalty UI calling `/api/loyalty`), add a TODO comment or a safe guard in the frontend where the call was made.
+
+END.

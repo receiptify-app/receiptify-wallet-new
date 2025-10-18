@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronRight, Menu, Leaf, CreditCard } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import AppHeader from "@/components/app-header";
 
@@ -174,43 +174,6 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Stats Cards */}
-        <div className="space-y-3">
-          <Card className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/eco')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                    <Leaf className="h-4 w-4 text-green-600" />
-                  </div>
-                  <span className="text-gray-900 font-medium">Eco Points</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">40</span>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm cursor-pointer" onClick={() => navigate('/cards')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                    <CreditCard className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <span className="text-gray-900 font-medium">Loyalty usage</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">6x uses</span>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Recent Activity */}
         <div>
