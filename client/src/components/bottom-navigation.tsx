@@ -17,7 +17,7 @@ const navItems = [
   { path: "/", icon: QrCode, label: "Scan" },
   { path: "/analytics", icon: BarChart3, label: "Analytics" },
   { path: "/receipts", icon: Receipt, label: "My Receipts" },
-  { path: "/profile", icon: User, label: "More" },
+  { path: "/profile", icon: User, label: "Account" },
 ];
 
 export default function BottomNavigation() {
