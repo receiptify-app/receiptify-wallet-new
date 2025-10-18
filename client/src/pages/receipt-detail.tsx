@@ -7,6 +7,7 @@ import {
   Utensils
 } from "lucide-react";
 import AppHeader from "@/components/app-header";
+import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem } from "@shared/schema";
 
 export default function ReceiptDetailPage() {
@@ -53,25 +54,14 @@ export default function ReceiptDetailPage() {
           </p>
         </div>
 
-        {/* Receipt Image */}
+        {/* Receipt Image with Zoom, Rotate, Crop */}
         {receipt.imageUrl && (
-          <Card className="bg-white shadow-sm border-0">
-            <CardContent className="p-4">
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  Receipt Image
-                </h3>
-                <div className="relative rounded-lg overflow-hidden bg-gray-100">
-                  <img 
-                    src={receipt.imageUrl} 
-                    alt="Receipt" 
-                    className="w-full h-auto max-h-[600px] object-contain"
-                    data-testid="img-receipt"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Receipt Image
+            </h3>
+            <ImageViewer imageUrl={receipt.imageUrl} alt="Receipt" />
+          </div>
         )}
 
 

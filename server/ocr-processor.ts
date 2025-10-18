@@ -1,5 +1,6 @@
 import { createWorker } from 'tesseract.js';
 import * as fs from 'fs';
+import sharp from 'sharp';
 
 interface ExtractedReceiptData {
   merchantName: string;
@@ -23,8 +24,56 @@ export class OCRProcessor {
   private static async getWorker() {
     if (!this.worker) {
       this.worker = await createWorker('eng');
+      
+      // Configure Tesseract for receipt scanning
+      await this.worker.setParameters({
+        tessedit_pageseg_mode: '6', // Uniform block of text (best for receipts)
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,£$€-:/ ()@&',
+        load_system_dawg: '0', // Disable dictionary
+        load_freq_dawg: '0', // Disable frequency-based dictionary
+      });
     }
     return this.worker;
+  }
+  
+  private static async preprocessImage(imagePath: string): Promise<Buffer> {
+    console.log('=== Starting Image Preprocessing ===');
+    
+    // Read original image metadata
+    const metadata = await sharp(imagePath).metadata();
+    console.log('Original image size:', metadata.width, 'x', metadata.height);
+    
+    // Preprocessing pipeline for optimal OCR
+    const preprocessed = await sharp(imagePath)
+      // 1. Scale up to improve resolution (150% works best for receipts)
+      .resize(
+        Math.round((metadata.width || 1000) * 1.5),
+        Math.round((metadata.height || 1000) * 1.5),
+        {
+          kernel: sharp.kernel.lanczos3,
+          fit: 'fill'
+        }
+      )
+      // 2. Convert to grayscale
+      .grayscale()
+      // 3. Normalize contrast (auto-adjust levels)
+      .normalise()
+      // 4. Apply median filter to remove noise
+      .median(3)
+      // 5. Sharpen text edges
+      .sharpen({
+        sigma: 1.0,
+        m1: 1.0,
+        m2: 0.5
+      })
+      // 6. Apply threshold for clear black and white
+      .threshold(128)
+      // Output as PNG buffer
+      .png()
+      .toBuffer();
+    
+    console.log('Preprocessing complete - image enhanced for OCR');
+    return preprocessed;
   }
 
   static async processReceiptImage(imagePath: string): Promise<ExtractedReceiptData> {
@@ -32,16 +81,15 @@ export class OCRProcessor {
       console.log('=== Starting OCR Processing ===');
       console.log('Image path:', imagePath);
       
+      // Preprocess the image for better OCR accuracy
+      const preprocessedBuffer = await this.preprocessImage(imagePath);
+      
       const worker = await this.getWorker();
       
-      // Configure Tesseract for better accuracy
-      await worker.setParameters({
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,£$€-:/ ',
-        tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
-      });
-      
       // Add timeout and better error handling
-      const recognitionPromise = worker.recognize(imagePath);
+      const recognitionPromise = worker.recognize(preprocessedBuffer, {
+        rotateAuto: true, // Auto-rotate for better accuracy
+      });
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('OCR timeout after 30 seconds')), 30000)
       );
@@ -50,7 +98,7 @@ export class OCRProcessor {
       const text = result?.data?.text || '';
       
       console.log('OCR text length:', text.length);
-      console.log('OCR confidence:', result?.data?.confidence || 'unknown');
+      console.log('OCR confidence:', Math.round(result?.data?.confidence || 0));
       
       if (!text || text.trim().length === 0) {
         console.error('OCR returned empty text');
