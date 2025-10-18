@@ -10,8 +10,16 @@ import {
   RefreshCw,
   Download,
   Receipt,
-  LogOut
+  LogOut,
+  Languages
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import AppHeader from "@/components/app-header";
@@ -26,6 +34,7 @@ const sampleUser = {
 export default function Profile() {
   const [, navigate] = useLocation();
   const [gbpCurrency, setGbpCurrency] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const { currentUser, logout } = useAuth();
 
   const { data: user = sampleUser } = useQuery<typeof sampleUser>({
@@ -128,6 +137,56 @@ export default function Profile() {
                     onCheckedChange={setGbpCurrency}
                     className="data-[state=checked]:bg-green-600"
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Languages className="w-6 h-6 text-gray-700" />
+                    <div className="flex-1">
+                      <span className="text-lg font-medium text-gray-900 block mb-2">Language Preferences</span>
+                      <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                        <SelectTrigger className="w-full" data-testid="select-language">
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="es">Español (Spanish)</SelectItem>
+                          <SelectItem value="fr">Français (French)</SelectItem>
+                          <SelectItem value="de">Deutsch (German)</SelectItem>
+                          <SelectItem value="it">Italiano (Italian)</SelectItem>
+                          <SelectItem value="pt">Português (Portuguese)</SelectItem>
+                          <SelectItem value="nl">Nederlands (Dutch)</SelectItem>
+                          <SelectItem value="pl">Polski (Polish)</SelectItem>
+                          <SelectItem value="ru">Русский (Russian)</SelectItem>
+                          <SelectItem value="ja">日本語 (Japanese)</SelectItem>
+                          <SelectItem value="zh">中文 (Chinese)</SelectItem>
+                          <SelectItem value="ko">한국어 (Korean)</SelectItem>
+                          <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                          <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+                          <SelectItem value="tr">Türkçe (Turkish)</SelectItem>
+                          <SelectItem value="sv">Svenska (Swedish)</SelectItem>
+                          <SelectItem value="no">Norsk (Norwegian)</SelectItem>
+                          <SelectItem value="da">Dansk (Danish)</SelectItem>
+                          <SelectItem value="fi">Suomi (Finnish)</SelectItem>
+                          <SelectItem value="el">Ελληνικά (Greek)</SelectItem>
+                          <SelectItem value="cs">Čeština (Czech)</SelectItem>
+                          <SelectItem value="hu">Magyar (Hungarian)</SelectItem>
+                          <SelectItem value="ro">Română (Romanian)</SelectItem>
+                          <SelectItem value="th">ไทย (Thai)</SelectItem>
+                          <SelectItem value="vi">Tiếng Việt (Vietnamese)</SelectItem>
+                          <SelectItem value="id">Bahasa Indonesia (Indonesian)</SelectItem>
+                          <SelectItem value="ms">Bahasa Melayu (Malay)</SelectItem>
+                          <SelectItem value="uk">Українська (Ukrainian)</SelectItem>
+                          <SelectItem value="he">עברית (Hebrew)</SelectItem>
+                          <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
