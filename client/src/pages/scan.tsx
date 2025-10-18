@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from 'react-i18next';
 import {
   Select,
   SelectContent,
@@ -15,9 +16,16 @@ import {
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  
+  const handleLanguageChange = (lang: string) => {
+    setSelectedLanguage(lang);
+    i18n.changeLanguage(lang);
+    localStorage.setItem('language', lang);
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -48,16 +56,16 @@ export default function Scan() {
     },
     onSuccess: () => {
       toast({
-        title: "Receipt captured successfully",
-        description: "Your receipt has been processed and added to your collection.",
+        title: t('scan.uploadSuccess'),
+        description: t('scan.uploadSuccessDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics/spending'] });
     },
     onError: () => {
       toast({
-        title: "Capture failed",
-        description: "Failed to process your receipt. Please try again.",
+        title: t('scan.uploadError'),
+        description: t('scan.uploadErrorDesc'),
         variant: "destructive",
       });
     }
@@ -74,14 +82,14 @@ export default function Scan() {
     <div className="px-6 py-4 pb-24">
       {/* App Title Header */}
       <div className="mb-6 text-center">
-        <h1 className="text-3xl font-bold text-green-800 mb-1">Receiptify</h1>
-        <p className="text-sm text-gray-600 mb-3">Your Digital Wallet</p>
+        <h1 className="text-3xl font-bold text-green-800 mb-1">{t('app.title')}</h1>
+        <p className="text-sm text-gray-600 mb-3">{t('app.subtitle')}</p>
         
         {/* Language Selector - Small Dropdown */}
         <div className="flex justify-center">
           <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
             <Languages className="w-3.5 h-3.5 text-gray-600" />
-            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
               <SelectTrigger className="w-[100px] h-6 text-xs border-0 focus:ring-0 p-0" data-testid="select-language-scan">
                 <SelectValue placeholder="Language" />
               </SelectTrigger>

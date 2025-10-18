@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { useTranslation } from 'react-i18next';
 import { 
   Bell, 
   Euro, 
@@ -34,8 +35,15 @@ const sampleUser = {
 export default function Profile() {
   const [, navigate] = useLocation();
   const [gbpCurrency, setGbpCurrency] = useState(true);
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const { currentUser, logout } = useAuth();
+  const { t, i18n } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  
+  const handleLanguageChange = (lang: string) => {
+    setSelectedLanguage(lang);
+    i18n.changeLanguage(lang);
+    localStorage.setItem('language', lang);
+  };
 
   const { data: user = sampleUser } = useQuery<typeof sampleUser>({
     queryKey: ["/api/user"],
@@ -62,7 +70,7 @@ export default function Profile() {
       <AppHeader 
         showBackButton={true}
         onBackClick={() => navigate('/')}
-        title="RECEIPTIFY"
+        title={t('app.title').toUpperCase()}
       />
 
       <div className="px-6 py-6 space-y-8">
@@ -90,14 +98,14 @@ export default function Profile() {
 
         {/* My Data Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">My Data</h3>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.myData')}</h3>
           <div className="space-y-3">
             <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/receipts')}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Receipt className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">My Receipts & Orders</span>
+                    <span className="text-lg font-medium text-gray-900">{t('profile.receiptsOrders')}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
@@ -108,14 +116,14 @@ export default function Profile() {
 
         {/* App Preferences Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">App Preferences</h3>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.appPreferences')}</h3>
           <div className="space-y-3">
             <Card className="bg-white shadow-sm border-0">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Bell className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Notifications</span>
+                    <span className="text-lg font-medium text-gray-900">{t('profile.notifications')}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
@@ -128,7 +136,7 @@ export default function Profile() {
                   <div className="flex items-center gap-4">
                     <Euro className="w-6 h-6 text-gray-700" />
                     <div>
-                      <span className="text-lg font-medium text-gray-900">Currency</span>
+                      <span className="text-lg font-medium text-gray-900">{t('profile.currency')}</span>
                       <p className="text-sm text-gray-600">£ GBP</p>
                     </div>
                   </div>
@@ -147,8 +155,8 @@ export default function Profile() {
                   <div className="flex items-center gap-4">
                     <Languages className="w-6 h-6 text-gray-700" />
                     <div className="flex-1">
-                      <span className="text-lg font-medium text-gray-900 block mb-2">Language Preferences</span>
-                      <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.language')}</span>
+                      <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
                         <SelectTrigger className="w-full" data-testid="select-language">
                           <SelectValue placeholder="Select language" />
                         </SelectTrigger>
@@ -196,10 +204,10 @@ export default function Profile() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <RefreshCw className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Auto-Categorise</span>
+                    <span className="text-lg font-medium text-gray-900">{t('profile.autoCategorize')}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">ON</span>
+                    <span className="text-sm text-gray-600">{t('common.on')}</span>
                     <ChevronRight className="w-5 h-5 text-gray-400" />
                   </div>
                 </div>
@@ -210,14 +218,14 @@ export default function Profile() {
 
         {/* Export Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Data</h3>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.data')}</h3>
           <div className="space-y-3">
             <Card className="bg-white shadow-sm border-0">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Download className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">Export Receipts</span>
+                    <span className="text-lg font-medium text-gray-900">{t('profile.exportReceipts')}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
@@ -236,7 +244,7 @@ export default function Profile() {
                 className="w-full h-12 text-red-600 border-red-200 hover:bg-red-50"
               >
                 <LogOut className="w-5 h-5 mr-3" />
-                Sign Out
+                {t('profile.signOut')}
               </Button>
             </CardContent>
           </Card>
