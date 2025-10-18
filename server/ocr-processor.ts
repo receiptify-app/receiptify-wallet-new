@@ -155,6 +155,42 @@ export class OCRProcessor {
       receiptNumber = receiptMatch[1];
     }
 
+    // Extract date
+    let extractedDate: Date | undefined;
+    
+    // Pattern 1: "12 March 2025" or "12 Mar 2025"
+    const datePattern1 = /(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+(\d{4})/i;
+    const dateMatch1 = text.match(datePattern1);
+    if (dateMatch1) {
+      const dateStr = `${dateMatch1[1]} ${dateMatch1[2]} ${dateMatch1[3]}`;
+      extractedDate = new Date(dateStr);
+      console.log('Found date (format 1):', dateStr, '→', extractedDate);
+    }
+    
+    // Pattern 2: "12/03/2025" or "03/12/2025" (DD/MM/YYYY or MM/DD/YYYY)
+    if (!extractedDate) {
+      const datePattern2 = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+      const dateMatch2 = text.match(datePattern2);
+      if (dateMatch2) {
+        // Assume DD/MM/YYYY (UK format)
+        const day = parseInt(dateMatch2[1]);
+        const month = parseInt(dateMatch2[2]) - 1; // JS months are 0-indexed
+        const year = parseInt(dateMatch2[3]);
+        extractedDate = new Date(year, month, day);
+        console.log('Found date (format 2):', `${day}/${month + 1}/${year}`, '→', extractedDate);
+      }
+    }
+    
+    // Pattern 3: "2025-03-12" (ISO format)
+    if (!extractedDate) {
+      const datePattern3 = /(\d{4})-(\d{2})-(\d{2})/;
+      const dateMatch3 = text.match(datePattern3);
+      if (dateMatch3) {
+        extractedDate = new Date(dateMatch3[0]);
+        console.log('Found date (format 3):', dateMatch3[0], '→', extractedDate);
+      }
+    }
+
     // Extract payment method
     if (text.toLowerCase().includes('card')) paymentMethod = 'Card';
     else if (text.toLowerCase().includes('cash')) paymentMethod = 'Cash';
@@ -178,9 +214,12 @@ export class OCRProcessor {
           // Remove all prices to get item name
           let itemName = restOfLine.replace(/[$£€]\s*\d+\.\d{2}/g, '').trim();
           
+          // Remove reference numbers (long sequences of digits)
+          itemName = itemName.replace(/\b\d{5,}\b/g, '').trim();
+          
           // Filter out common non-item keywords
           const lowerName = itemName.toLowerCase();
-          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card'];
+          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card', 'amount', 'account'];
           const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
           
           if (!shouldSkip && itemName.length > 1 && itemName.length < 50) {
@@ -200,12 +239,18 @@ export class OCRProcessor {
           const lineTotal = priceMatches[priceMatches.length - 1].replace(/[$£€]/g, '').trim();
           let itemName = line.replace(/[$£€]\s*\d+\.\d{2}/g, '').trim();
           
+          // Remove reference numbers (long sequences of digits)
+          itemName = itemName.replace(/\b\d{5,}\b/g, '').trim();
+          
           // Filter out common non-item keywords
           const lowerName = itemName.toLowerCase();
-          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card', 'balance', 'amount', 'due'];
+          const skipPatterns = ['total', 'subtotal', 'tax', 'vat', 'thank', 'visit', 'date:', 'phone:', 'ref:', 'receipt', 'change', 'cash', 'card', 'balance', 'amount', 'due', 'paid', 'account'];
           const shouldSkip = skipPatterns.some(pattern => lowerName.includes(pattern));
           
-          if (!shouldSkip && itemName.length > 2 && itemName.length < 50 && parseFloat(lineTotal) > 0) {
+          // Additional check: skip if item name is just "name" or similar generic words
+          const tooGeneric = ['name', 'item', 'description', 'reference'].includes(lowerName);
+          
+          if (!shouldSkip && !tooGeneric && itemName.length > 2 && itemName.length < 50 && parseFloat(lineTotal) > 0) {
             console.log(`  Item found (no qty): ${itemName} @ ${lineTotal}`);
             items.push({
               name: itemName,
@@ -236,7 +281,8 @@ export class OCRProcessor {
       tax,
       items: items.slice(0, 20), // Limit items
       receiptNumber,
-      paymentMethod
+      paymentMethod,
+      date: extractedDate
     };
   }
 
