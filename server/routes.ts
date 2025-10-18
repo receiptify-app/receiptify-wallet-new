@@ -634,6 +634,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update receipt category
+  app.post("/api/receipts/:id/move", async (req, res) => {
+    try {
+      const { categoryId } = req.body;
+      if (!categoryId) {
+        return res.status(400).json({ error: "Category ID is required" });
+      }
+
+      const receipt = await storage.updateReceipt(req.params.id, { category: categoryId });
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+      
+      res.json(receipt);
+    } catch (error) {
+      console.error("Error moving receipt:", error);
+      res.status(500).json({ error: "Failed to move receipt" });
+    }
+  });
+
+  // Bulk move receipts to category
+  app.post("/api/receipts/bulk-move", async (req, res) => {
+    try {
+      const { receiptIds, categoryId } = req.body;
+      
+      if (!Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ error: "Receipt IDs array is required" });
+      }
+      if (!categoryId) {
+        return res.status(400).json({ error: "Category ID is required" });
+      }
+
+      const updatedReceipts = [];
+      for (const receiptId of receiptIds) {
+        const receipt = await storage.updateReceipt(receiptId, { category: categoryId });
+        if (receipt) {
+          updatedReceipts.push(receipt);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        updated: updatedReceipts.length,
+        receipts: updatedReceipts 
+      });
+    } catch (error) {
+      console.error("Error bulk moving receipts:", error);
+      res.status(500).json({ error: "Failed to bulk move receipts" });
+    }
+  });
+
   app.delete("/api/receipts/:id", async (req, res) => {
     try {
       const success = await storage.deleteReceipt(req.params.id);
