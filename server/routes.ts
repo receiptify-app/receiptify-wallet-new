@@ -330,8 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Shopping",
           paymentMethod: extractedData.paymentMethod || "Unknown",
           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          latitude: latitude || null,
+          longitude: longitude || null,
           ecoPoints: 1
         };
 
@@ -359,7 +359,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error('OCR processing error:', error);
         
-        // Fallback: create basic receipt
+        // Fallback: create basic receipt with OCR error indication
+        console.log('OCR extraction failed, creating placeholder receipt');
         const receiptData = {
           userId: defaultUserId,
           merchantName: "Receipt (OCR Failed)",
@@ -369,8 +370,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Other",
           paymentMethod: "Unknown",
           receiptNumber: `ERR${Date.now()}`,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          latitude: latitude || null,
+          longitude: longitude || null,
           ecoPoints: 1
         };
         
