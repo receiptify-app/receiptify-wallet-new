@@ -8,15 +8,10 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Scan from "@/pages/scan";
 import Receipts from "@/pages/receipts";
-import Cards from "@/pages/cards";
-import Eco from "@/pages/eco";
 import Profile from "@/pages/profile";
 import Map from "@/pages/map";
 import ReceiptDetail from "@/pages/receipt-detail";
 import SplitReceipt from "@/pages/split-receipt";
-import Subscriptions from "@/pages/subscriptions";
-import Warranties from "@/pages/warranties";
-import LinkedCards from "@/pages/linked-cards";
 import Payment from "@/pages/payment";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
@@ -25,8 +20,14 @@ import ForgotPassword from "@/pages/forgot-password";
 import TestAuth from "@/pages/test-auth";
 import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
-import ReceiptCustomization from "@/pages/receipt-customization";
 import BottomNavigation from "@/components/bottom-navigation";
+
+// TODO: Backend cleanup needed - remove these API endpoints:
+// - /api/loyalty-cards (loyalty cards management)
+// - /api/subscriptions (subscription tracking)
+// - /api/warranties (warranty management)
+// - /api/eco-metrics (eco points tracking)
+// - /api/receipt-designs (receipt customization)
 
 function AuthenticatedRouter() {
   const { currentUser, loading } = useAuth();
@@ -57,22 +58,16 @@ function AuthenticatedRouter() {
   return (
     <>
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/scan" component={Scan} />
+        <Route path="/" component={Scan} />
+        <Route path="/analytics" component={Home} />
         <Route path="/receipts" component={Receipts} />
-        <Route path="/cards" component={Cards} />
-        <Route path="/eco" component={Eco} />
         <Route path="/map" component={Map} />
         <Route path="/profile" component={Profile} />
         <Route path="/receipt/:id" component={ReceiptDetail} />
         <Route path="/split-receipt" component={SplitReceipt} />
-        <Route path="/subscriptions" component={Subscriptions} />
-        <Route path="/warranties" component={Warranties} />
-        <Route path="/linked-cards" component={LinkedCards} />
         <Route path="/payment" component={Payment} />
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
-        <Route path="/receipt-customization" component={ReceiptCustomization} />
         <Route path="/test-auth" component={TestAuth} />
         <Route component={NotFound} />
       </Switch>

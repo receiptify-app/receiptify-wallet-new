@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "あなたのデジタルウォレット"
+  },
+  "nav": {
+    "scan": "スキャン",
+    "receipts": "マイレシート",
+    "analytics": "分析",
+    "account": "アカウント"
+  },
+  "scan": {
+    "title": "レシートをスキャン",
+    "cameraCapture": "カメラキャプチャ",
+    "galleryUpload": "ギャラリーからアップロード",
+    "manualEntry": "手動入力",
+    "uploadSuccess": "レシートの取得に成功しました",
+    "uploadSuccessDesc": "レシートが処理され、コレクションに追加されました。",
+    "uploadError": "取得に失敗しました",
+    "uploadErrorDesc": "レシートの処理に失敗しました。もう一度お試しください。"
+  },
+  "receipts": {
+    "title": "マイレシート",
+    "noReceipts": "まだレシートがありません",
+    "noReceiptsDesc": "最初のレシートをスキャンして始めましょう",
+    "total": "合計"
+  },
+  "receiptDetail": {
+    "receiptImage": "レシート画像",
+    "items": "アイテム",
+    "tax": "税金",
+    "total": "合計",
+    "paymentMethod": "支払い方法",
+    "category": "カテゴリー",
+    "splitReceipt": "レシートを分割"
+  },
+  "analytics": {
+    "title": "分析",
+    "spending": "支出",
+    "thisMonth": "今月",
+    "categories": "カテゴリー",
+    "trends": "トレンド"
+  },
+  "profile": {
+    "title": "アカウント",
+    "myData": "マイデータ",
+    "receiptsOrders": "マイレシートと注文",
+    "appPreferences": "アプリの設定",
+    "notifications": "通知",
+    "currency": "通貨",
+    "language": "言語設定",
+    "autoCategorize": "自動分類",
+    "data": "データ",
+    "exportReceipts": "レシートをエクスポート",
+    "signOut": "サインアウト"
+  },
+  "manual": {
+    "title": "手動レシート入力",
+    "merchantName": "加盟店名",
+    "location": "場所",
+    "date": "日付",
+    "total": "合計金額",
+    "category": "カテゴリー",
+    "paymentMethod": "支払い方法",
+    "addItem": "アイテムを追加",
+    "itemName": "アイテム名",
+    "price": "価格",
+    "quantity": "数量",
+    "save": "レシートを保存",
+    "cancel": "キャンセル"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "edit": "編集",
+    "close": "閉じる",
+    "back": "戻る",
+    "on": "オン",
+    "off": "オフ",
+    "loading": "読み込み中..."
+  }
+}

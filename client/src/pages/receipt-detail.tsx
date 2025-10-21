@@ -1,23 +1,21 @@
 import { useLocation, useParams } from "wouter";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { 
-  ArrowLeft, 
   Download, 
-  MapPin,
   Utensils
 } from "lucide-react";
 import AppHeader from "@/components/app-header";
+import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem } from "@shared/schema";
+import { useCurrency } from "@/hooks/use-currency";
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
   const params = useParams();
   const receiptId = params.id;
-  const [includeInAnalytics, setIncludeInAnalytics] = useState(true);
+  const { format: formatCurrency } = useCurrency();
 
   const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
     queryKey: ["/api/receipts", receiptId],
@@ -58,37 +56,16 @@ export default function ReceiptDetailPage() {
           </p>
         </div>
 
-        {/* Map Card */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <div className="relative h-48 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
-              {/* Simple map representation */}
-              <div className="absolute inset-0 rounded-lg">
-                <svg 
-                  viewBox="0 0 300 200" 
-                  className="w-full h-full opacity-20"
-                  fill="none"
-                >
-                  {/* Road lines */}
-                  <line x1="0" y1="80" x2="300" y2="120" stroke="white" strokeWidth="2" />
-                  <line x1="100" y1="0" x2="150" y2="200" stroke="white" strokeWidth="2" />
-                  <line x1="200" y1="0" x2="250" y2="200" stroke="white" strokeWidth="2" />
-                  <line x1="0" y1="150" x2="300" y2="150" stroke="white" strokeWidth="2" />
-                </svg>
-              </div>
-              
-              {/* Location pin */}
-              <div className="relative z-10">
-                <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center shadow-lg">
-                  <MapPin className="w-6 h-6 text-white fill-white" />
-                </div>
-                <div className="mt-2 text-center">
-                  <p className="text-sm font-semibold text-gray-900">{receipt.location}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Receipt Image with Zoom, Rotate, Crop */}
+        {receipt.imageUrl && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Receipt Image
+            </h3>
+            <ImageViewer imageUrl={receipt.imageUrl} alt="Receipt" />
+          </div>
+        )}
+
 
         {/* Items List */}
         <Card className="bg-white shadow-sm border-0">
@@ -99,7 +76,7 @@ export default function ReceiptDetailPage() {
                   {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
                 </span>
                 <span className="text-gray-900 font-semibold">
-                  ${parseFloat(item.price).toFixed(2)}
+                  {formatCurrency(parseFloat(item.price))}
                 </span>
               </div>
             ))}
@@ -108,7 +85,7 @@ export default function ReceiptDetailPage() {
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
                   <span>Tax</span>
-                  <span>${parseFloat(receipt.tax).toFixed(2)}</span>
+                  <span>{formatCurrency(parseFloat(receipt.tax))}</span>
                 </div>
               </div>
             )}
@@ -116,7 +93,7 @@ export default function ReceiptDetailPage() {
             <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
-                <span>${parseFloat(receipt.total).toFixed(2)}</span>
+                <span>{formatCurrency(parseFloat(receipt.total))}</span>
               </div>
             </div>
           </CardContent>
@@ -138,31 +115,14 @@ export default function ReceiptDetailPage() {
           </Card>
         )}
 
-        {/* Category & Eco Points */}
+        {/* Category */}
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <Utensils className="h-4 w-4 text-green-600" />
-                </div>
-                <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <Utensils className="h-4 w-4 text-green-600" />
               </div>
-              <span className="text-sm text-gray-600">+{receipt.ecoPoints} Eco Points Saved</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Analytics Toggle */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-900 font-medium">Include in Monthly Analytics</span>
-              <Switch 
-                checked={includeInAnalytics}
-                onCheckedChange={setIncludeInAnalytics}
-                className="data-[state=checked]:bg-green-600"
-              />
+              <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
             </div>
           </CardContent>
         </Card>

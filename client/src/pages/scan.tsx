@@ -1,42 +1,89 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Upload, QrCode, FileText, ScanLine, Edit } from "lucide-react";
-import RealQrScanner from "@/components/real-qr-scanner";
-import ScannerModal from "@/components/scanner-modal";
+import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
-import BarcodeScanner from "@/components/barcode-scanner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useTranslation } from 'react-i18next';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Scan() {
-  const [showQrScanner, setShowQrScanner] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleLanguageChange = (lang: string) => {
+    setSelectedLanguage(lang);
+    i18n.changeLanguage(lang);
+    localStorage.setItem('language', lang);
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      console.log('Starting upload for file:', file.name, file.size, 'bytes');
       const formData = new FormData();
       formData.append('receipt', file);
-      const response = await apiRequest('POST', '/api/receipts/upload', formData);
-      return response.json();
+      
+      // Skip location for faster upload
+      console.log('Uploading without location to speed up process...');
+      
+      try {
+        const response = await fetch('/api/receipts/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Upload failed:', response.status, errorText);
+          throw new Error('Upload failed');
+        }
+        
+        const result = await response.json();
+        console.log('Upload successful:', result);
+        return result;
+      } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Receipt created successfully:', data.id);
+      
+      // Reset file inputs
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      
       toast({
-        title: "Receipt uploaded successfully",
-        description: "Your receipt has been processed and added to your collection.",
+        title: t('scan.uploadSuccess'),
+        description: t('scan.uploadSuccessDesc'),
       });
+      
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Upload mutation error:', error);
+      
+      // Reset file inputs even on error
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      
       toast({
-        title: "Upload failed",
-        description: "Failed to process your receipt. Please try again.",
+        title: t('scan.uploadError'),
+        description: t('scan.uploadErrorDesc'),
         variant: "destructive",
       });
     }
@@ -44,148 +91,148 @@ export default function Scan() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log('File selected:', file?.name, file?.size);
     if (file) {
       uploadMutation.mutate(file);
     }
   };
 
-  const handleBarcodeDetected = (barcode: string) => {
-    setDetectedBarcode(barcode);
-    toast({
-      title: "Barcode Detected",
-      description: `Barcode: ${barcode}`,
-    });
-    
-    // Auto-open manual form with barcode data
-    setShowManualForm(true);
-  };
-
-  // Listen for custom event from scanner modal
-  useEffect(() => {
-    const handleOpenManualForm = () => {
-      setShowManualForm(true);
-    };
-
-    window.addEventListener('openManualReceiptForm', handleOpenManualForm);
-    return () => window.removeEventListener('openManualReceiptForm', handleOpenManualForm);
-  }, []);
-
   return (
     <div className="px-6 py-4 pb-24">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary mb-2">Capture Receipt</h1>
-        <p className="text-gray-600">Choose how you'd like to add your receipt</p>
+      {/* App Title Header */}
+      <div className="mb-6 text-center">
+        <h1 className="text-3xl font-bold text-green-800 mb-1">{t('app.title')}</h1>
+        <p className="text-sm text-gray-600 mb-3">{t('app.subtitle')}</p>
+        
+        {/* Language Selector - Small Dropdown */}
+        <div className="flex justify-center">
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+            <Languages className="w-3.5 h-3.5 text-gray-600" />
+            <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+              <SelectTrigger className="w-[100px] h-6 text-xs border-0 focus:ring-0 p-0" data-testid="select-language-scan">
+                <SelectValue placeholder="Language" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
+                <SelectItem value="de">Deutsch</SelectItem>
+                <SelectItem value="it">Italiano</SelectItem>
+                <SelectItem value="pt">Português</SelectItem>
+                <SelectItem value="nl">Nederlands</SelectItem>
+                <SelectItem value="pl">Polski</SelectItem>
+                <SelectItem value="ru">Русский</SelectItem>
+                <SelectItem value="ja">日本語</SelectItem>
+                <SelectItem value="zh">中文</SelectItem>
+                <SelectItem value="ko">한국어</SelectItem>
+                <SelectItem value="ar">العربية</SelectItem>
+                <SelectItem value="hi">हिन्दी</SelectItem>
+                <SelectItem value="tr">Türkçe</SelectItem>
+                <SelectItem value="sv">Svenska</SelectItem>
+                <SelectItem value="no">Norsk</SelectItem>
+                <SelectItem value="da">Dansk</SelectItem>
+                <SelectItem value="fi">Suomi</SelectItem>
+                <SelectItem value="el">Ελληνικά</SelectItem>
+                <SelectItem value="cs">Čeština</SelectItem>
+                <SelectItem value="hu">Magyar</SelectItem>
+                <SelectItem value="ro">Română</SelectItem>
+                <SelectItem value="th">ไทย</SelectItem>
+                <SelectItem value="vi">Tiếng Việt</SelectItem>
+                <SelectItem value="id">Bahasa Indonesia</SelectItem>
+                <SelectItem value="ms">Bahasa Melayu</SelectItem>
+                <SelectItem value="uk">Українська</SelectItem>
+                <SelectItem value="he">עברית</SelectItem>
+                <SelectItem value="bn">বাংলা</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Section Header */}
+      <div className="mb-6 text-center">
+        <h2 className="text-xl font-bold text-primary mb-2">Add Receipt</h2>
+        <p className="text-sm text-gray-600">Capture, upload or enter receipt details</p>
       </div>
 
       {/* Scan Options */}
       <div className="space-y-4 mb-8">
-        <Card className="border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowQrScanner(true)}
-              className="w-full h-auto py-6 bg-primary hover:bg-primary/90 text-left"
-              disabled={showQrScanner}
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-primary-foreground/20 rounded-xl flex items-center justify-center">
-                  <QrCode className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg">QR Code Scan</div>
-                  <div className="text-sm opacity-90">Scan merchant QR code for instant receipt</div>
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowCamera(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-2"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-gray-700" />
-                </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Take Photo</div>
-                  <div className="text-sm text-gray-600">Capture receipt with camera</div>
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
+        {/* Camera Capture Option */}
+        <Card className="hover:shadow-md transition-shadow border-2 border-primary" data-testid="card-camera-capture">
+          <CardContent className="p-0">
             <label className="block w-full cursor-pointer">
               <input
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 onChange={handleFileUpload}
                 className="hidden"
                 disabled={uploadMutation.isPending}
+                data-testid="input-camera-capture"
               />
-              <div className="flex items-center space-x-4 py-6">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-gray-700" />
+              <div className="flex items-center space-x-4 py-6 px-6 hover:bg-primary/5 rounded-lg transition-colors">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-primary" />
                 </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">
-                    {uploadMutation.isPending ? "Uploading..." : "Upload from Gallery"}
+                <div className="text-left">
+                  <div className="font-semibold text-lg text-gray-900" data-testid="text-camera-title">
+                    {uploadMutation.isPending ? "Processing..." : "Take Photo"}
                   </div>
-                  <div className="text-sm text-gray-600">Choose existing photo from device</div>
+                  <div className="text-sm text-gray-600">
+                    Capture receipt with camera
+                  </div>
                 </div>
               </div>
             </label>
           </CardContent>
         </Card>
 
-        {/* Barcode Scanner Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-blue-200">
-          <CardContent className="p-6">
-            <Button
-              onClick={() => setShowBarcodeScanner(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-0 hover:bg-blue-50"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <ScanLine className="w-6 h-6 text-blue-700" />
+        {/* Gallery Upload Option */}
+        <Card className="hover:shadow-md transition-shadow" data-testid="card-gallery-upload">
+          <CardContent className="p-0">
+            <label className="block w-full cursor-pointer">
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={uploadMutation.isPending}
+                data-testid="input-gallery-upload"
+              />
+              <div className="flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors">
+                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-gray-700" />
                 </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Scan Barcode</div>
-                  <div className="text-sm text-gray-600">Scan product barcode on receipt</div>
-                  {detectedBarcode && (
-                    <div className="text-xs text-blue-600 mt-1">
-                      Last detected: {detectedBarcode}
-                    </div>
-                  )}
+                <div className="text-left">
+                  <div className="font-semibold text-lg text-gray-900" data-testid="text-upload-title">
+                    {uploadMutation.isPending ? "Processing..." : "Upload from Gallery"}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Choose existing photo from device
+                  </div>
                 </div>
               </div>
-            </Button>
+            </label>
           </CardContent>
         </Card>
 
         {/* Manual Entry Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-green-200">
+        <Card className="hover:shadow-md transition-shadow border-2 border-green-200" data-testid="card-manual-entry">
           <CardContent className="p-6">
             <Button
               onClick={() => setShowManualForm(true)}
-              variant="outline"
-              className="w-full h-auto py-6 text-left border-0 hover:bg-green-50"
+              className="w-full h-auto py-6 bg-green-600 hover:bg-green-700 text-white"
+              data-testid="button-manual-entry"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Edit className="w-6 h-6 text-green-700" />
+              <div className="flex items-center justify-center space-x-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Edit className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <div className="font-semibold text-lg text-gray-900">Enter Details Manually</div>
-                  <div className="text-sm text-gray-600">Type receipt information by hand</div>
+                <div className="text-left">
+                  <div className="font-semibold text-lg text-white">Import Receipt</div>
+                  <div className="text-sm text-white/90">Enter receipt information manually</div>
                 </div>
               </div>
             </Button>
@@ -201,50 +248,24 @@ export default function Scan() {
               <FileText className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-primary mb-1">Privacy First</h3>
+              <h3 className="font-semibold text-primary mb-1">Smart Receipt Processing</h3>
               <p className="text-sm text-gray-700 mb-3">
-                All receipts are stored locally on your device. We use advanced OCR to extract receipt data while keeping your information private.
+                Your receipts, one digital wallet. Receipts organised your way.
               </p>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>✓ Support for all major UK retailers</div>
-                <div>✓ Automatic categorization and eco-impact tracking</div>
-                <div>✓ Works with any payment method</div>
+                <div>✓ Automatic data extraction from photos</div>
+                <div>✓ Secure image + data storage</div>
+                <div>✓ Simplified management</div>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* QR Scanner Modal */}
-      {showQrScanner && (
-        <RealQrScanner
-          onClose={() => setShowQrScanner(false)}
-          onScan={(data) => {
-            console.log("QR Code scanned:", data);
-            setShowQrScanner(false);
-            toast({
-              title: "QR Code detected",
-              description: "Processing receipt data...",
-            });
-          }}
-        />
-      )}
-
-      {/* Camera Scanner Modal */}
-      <ScannerModal open={showCamera} onOpenChange={setShowCamera} />
-
       {/* Manual Receipt Form */}
       <ManualReceiptForm 
         open={showManualForm} 
         onOpenChange={setShowManualForm}
-        initialData={detectedBarcode ? { notes: `Barcode detected: ${detectedBarcode}` } : undefined}
-      />
-
-      {/* Barcode Scanner */}
-      <BarcodeScanner
-        open={showBarcodeScanner}
-        onOpenChange={setShowBarcodeScanner}
-        onBarcodeDetected={handleBarcodeDetected}
       />
     </div>
   );

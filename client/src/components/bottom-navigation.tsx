@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from 'react-i18next';
 import { 
   Home, 
   QrCode, 
@@ -9,18 +10,20 @@ import {
   User,
   RefreshCw,
   Shield,
-  Receipt
+  Receipt,
+  BarChart3
 } from "lucide-react";
-
-const navItems = [
-  { path: "/", icon: Home, label: "Home" },
-  { path: "/scan", icon: QrCode, label: "Scan" },
-  { path: "/receipts", icon: Receipt, label: "My Receipts" },
-  { path: "/profile", icon: User, label: "More" },
-];
 
 export default function BottomNavigation() {
   const [location] = useLocation();
+  const { t } = useTranslation();
+  
+  const navItems = [
+    { path: "/", icon: QrCode, label: t('nav.scan') },
+    { path: "/analytics", icon: BarChart3, label: t('nav.analytics') },
+    { path: "/receipts", icon: Receipt, label: t('nav.receipts') },
+    { path: "/profile", icon: User, label: t('nav.account') },
+  ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">

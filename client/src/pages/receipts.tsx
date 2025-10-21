@@ -1,11 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import BulkSelectToolbar from "@/components/bulk-select-toolbar";
+import CategoryPickerModal from "@/components/category-picker-modal";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Receipt {
   id: string;
@@ -18,9 +25,92 @@ interface Receipt {
 }
 
 export default function ReceiptsPage() {
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const { toast } = useToast();
+  const { format: formatCurrency } = useCurrency();
+
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ['/api/receipts'],
   });
+
+  // Bulk move mutation
+  const bulkMoveMutation = useMutation({
+    mutationFn: async ({ receiptIds, categoryId }: { receiptIds: string[]; categoryId: string }) => {
+      const response = await fetch('/api/receipts/bulk-move', {
+        method: 'POST',
+        body: JSON.stringify({ receiptIds, categoryId }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to bulk move receipts');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+      setSelectionMode(false);
+      setSelectedReceipts(new Set());
+      toast({
+        title: "Receipts moved",
+        description: `Successfully moved ${selectedReceipts.size} receipt(s).`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Move failed",
+        description: "Failed to move receipts. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleToggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedReceipts(new Set());
+  };
+
+  const handleReceiptSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    const newSelection = new Set(selectedReceipts);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedReceipts(newSelection);
+
+    if (newSelection.size === 0) {
+      setSelectionMode(false);
+    }
+  };
+
+  const handleBulkMove = () => {
+    if (selectedReceipts.size === 0) return;
+    setCategoryPickerOpen(true);
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    if (selectedReceipts.size > 0) {
+      bulkMoveMutation.mutate({ receiptIds: Array.from(selectedReceipts), categoryId });
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedReceipts(new Set());
+  };
+
+  const handleSelectAll = () => {
+    if (selectedReceipts.size === receipts.length) {
+      setSelectedReceipts(new Set());
+    } else {
+      setSelectedReceipts(new Set(receipts.map(r => r.id)));
+    }
+  };
 
   // Group receipts by date
   const groupedReceipts = receipts.reduce((groups: Record<string, Receipt[]>, receipt: Receipt) => {
@@ -89,16 +179,37 @@ export default function ReceiptsPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-sm mx-auto p-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">My Receipts</h1>
+            <h1 className="text-xl font-semibold text-gray-900">
+              {selectionMode ? `${selectedReceipts.size} selected` : 'My Receipts'}
+            </h1>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm">
-                <Search className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Filter className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Calendar className="h-4 w-4" />
+              {selectionMode && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={handleSelectAll}
+                  data-testid="button-select-all"
+                >
+                  {selectedReceipts.size === receipts.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              )}
+              {!selectionMode && (
+                <>
+                  <Button variant="ghost" size="sm">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              <Button 
+                variant={selectionMode ? "default" : "ghost"} 
+                size="sm"
+                onClick={handleToggleSelectionMode}
+                data-testid="button-toggle-selection"
+              >
+                <CheckSquare className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -128,51 +239,72 @@ export default function ReceiptsPage() {
                 </h2>
                 <div className="space-y-2">
                   {groupReceipts.map((receipt: Receipt) => (
-                    <Link key={receipt.id} href={`/receipt/${receipt.id}`}>
-                      <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
-                                {getMerchantIcon(receipt.merchantName)}
+                    <Card 
+                      key={receipt.id} 
+                      className={`hover:shadow-md transition-shadow cursor-pointer ${
+                        selectedReceipts.has(receipt.id) ? 'ring-2 ring-primary' : ''
+                      }`}
+                      onClick={(e) => {
+                        if (selectionMode) {
+                          handleReceiptSelect(receipt.id, e);
+                        }
+                      }}
+                      data-testid={`card-receipt-${receipt.id}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            {selectionMode && (
+                              <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
+                                <Checkbox 
+                                  checked={selectedReceipts.has(receipt.id)}
+                                  data-testid={`checkbox-receipt-${receipt.id}`}
+                                />
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-2">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
-                                    {receipt.merchantName}
-                                  </p>
-                                  {receipt.category && (
-                                    <Badge 
-                                      variant="secondary" 
-                                      className={`text-xs ${getCategoryColor(receipt.category)}`}
-                                    >
-                                      {receipt.category}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  {format(new Date(receipt.date), 'h:mm a')}
-                                  {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
-                                </p>
-                              </div>
+                            )}
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
+                              {getMerchantIcon(receipt.merchantName)}
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="text-right">
-                                <p className="text-sm font-semibold text-gray-900">
-                                  £{receipt.total}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {receipt.merchantName}
                                 </p>
-                                {receipt.paymentMethod && (
-                                  <p className="text-xs text-gray-500">
-                                    {receipt.paymentMethod}
-                                  </p>
+                                {receipt.category && (
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={`text-xs ${getCategoryColor(receipt.category)}`}
+                                  >
+                                    {receipt.category}
+                                  </Badge>
                                 )}
                               </div>
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                              <p className="text-xs text-gray-500">
+                                {format(new Date(receipt.date), 'h:mm a')}
+                                {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                              </p>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                          <div className="flex items-center space-x-2">
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(receipt.total)}
+                              </p>
+                              {receipt.paymentMethod && (
+                                <p className="text-xs text-gray-500">
+                                  {receipt.paymentMethod}
+                                </p>
+                              )}
+                            </div>
+                            {!selectionMode && (
+                              <Link href={`/receipt/${receipt.id}`}>
+                                <ChevronRight className="h-4 w-4 text-gray-400" />
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </div>
@@ -180,6 +312,21 @@ export default function ReceiptsPage() {
           </div>
         )}
       </div>
+
+      {/* Category Picker Modal */}
+      <CategoryPickerModal
+        open={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        onSelect={handleCategorySelect}
+        title={`Move ${selectedReceipts.size} receipt(s) to category`}
+      />
+
+      {/* Bulk Selection Toolbar */}
+      <BulkSelectToolbar
+        selectedCount={selectedReceipts.size}
+        onMove={handleBulkMove}
+        onCancel={handleCancelSelection}
+      />
     </div>
   );
 }

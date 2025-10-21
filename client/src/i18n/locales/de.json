@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "Ihre Digitale Brieftasche"
+  },
+  "nav": {
+    "scan": "Scannen",
+    "receipts": "Meine Belege",
+    "analytics": "Analytik",
+    "account": "Konto"
+  },
+  "scan": {
+    "title": "Beleg Scannen",
+    "cameraCapture": "Kamera-Aufnahme",
+    "galleryUpload": "Aus Galerie Hochladen",
+    "manualEntry": "Manuelle Eingabe",
+    "uploadSuccess": "Beleg erfolgreich erfasst",
+    "uploadSuccessDesc": "Ihr Beleg wurde verarbeitet und zu Ihrer Sammlung hinzugefügt.",
+    "uploadError": "Erfassung fehlgeschlagen",
+    "uploadErrorDesc": "Ihr Beleg konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut."
+  },
+  "receipts": {
+    "title": "Meine Belege",
+    "noReceipts": "Noch keine Belege",
+    "noReceiptsDesc": "Beginnen Sie mit dem Scannen Ihres ersten Belegs",
+    "total": "Gesamt"
+  },
+  "receiptDetail": {
+    "receiptImage": "Belegbild",
+    "items": "Artikel",
+    "tax": "Steuer",
+    "total": "Gesamt",
+    "paymentMethod": "Zahlungsmethode",
+    "category": "Kategorie",
+    "splitReceipt": "Beleg Aufteilen"
+  },
+  "analytics": {
+    "title": "Analytik",
+    "spending": "Ausgaben",
+    "thisMonth": "Diesen Monat",
+    "categories": "Kategorien",
+    "trends": "Trends"
+  },
+  "profile": {
+    "title": "Konto",
+    "myData": "Meine Daten",
+    "receiptsOrders": "Meine Belege und Bestellungen",
+    "appPreferences": "App-Einstellungen",
+    "notifications": "Benachrichtigungen",
+    "currency": "Währung",
+    "language": "Spracheinstellungen",
+    "autoCategorize": "Auto-Kategorisieren",
+    "data": "Daten",
+    "exportReceipts": "Belege Exportieren",
+    "signOut": "Abmelden"
+  },
+  "manual": {
+    "title": "Manuelle Belegeingabe",
+    "merchantName": "Händlername",
+    "location": "Standort",
+    "date": "Datum",
+    "total": "Gesamtbetrag",
+    "category": "Kategorie",
+    "paymentMethod": "Zahlungsmethode",
+    "addItem": "Artikel Hinzufügen",
+    "itemName": "Artikelname",
+    "price": "Preis",
+    "quantity": "Menge",
+    "save": "Beleg Speichern",
+    "cancel": "Abbrechen"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "close": "Schließen",
+    "back": "Zurück",
+    "on": "EIN",
+    "off": "AUS",
+    "loading": "Laden..."
+  }
+}

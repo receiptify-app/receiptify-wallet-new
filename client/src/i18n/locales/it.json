@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "Il Tuo Portafoglio Digitale"
+  },
+  "nav": {
+    "scan": "Scansiona",
+    "receipts": "Le Mie Ricevute",
+    "analytics": "Analisi",
+    "account": "Account"
+  },
+  "scan": {
+    "title": "Scansiona Ricevuta",
+    "cameraCapture": "Cattura con Fotocamera",
+    "galleryUpload": "Carica dalla Galleria",
+    "manualEntry": "Inserimento Manuale",
+    "uploadSuccess": "Ricevuta acquisita con successo",
+    "uploadSuccessDesc": "La tua ricevuta è stata elaborata e aggiunta alla tua collezione.",
+    "uploadError": "Acquisizione fallita",
+    "uploadErrorDesc": "Impossibile elaborare la tua ricevuta. Riprova."
+  },
+  "receipts": {
+    "title": "Le Mie Ricevute",
+    "noReceipts": "Nessuna ricevuta ancora",
+    "noReceiptsDesc": "Inizia scansionando la tua prima ricevuta",
+    "total": "Totale"
+  },
+  "receiptDetail": {
+    "receiptImage": "Immagine della Ricevuta",
+    "items": "Articoli",
+    "tax": "Tassa",
+    "total": "Totale",
+    "paymentMethod": "Metodo di Pagamento",
+    "category": "Categoria",
+    "splitReceipt": "Dividi Ricevuta"
+  },
+  "analytics": {
+    "title": "Analisi",
+    "spending": "Spese",
+    "thisMonth": "Questo mese",
+    "categories": "Categorie",
+    "trends": "Tendenze"
+  },
+  "profile": {
+    "title": "Account",
+    "myData": "I Miei Dati",
+    "receiptsOrders": "Le Mie Ricevute e Ordini",
+    "appPreferences": "Preferenze dell'App",
+    "notifications": "Notifiche",
+    "currency": "Valuta",
+    "language": "Preferenze Lingua",
+    "autoCategorize": "Auto-Categorizza",
+    "data": "Dati",
+    "exportReceipts": "Esporta Ricevute",
+    "signOut": "Esci"
+  },
+  "manual": {
+    "title": "Inserimento Manuale Ricevuta",
+    "merchantName": "Nome del Commerciante",
+    "location": "Posizione",
+    "date": "Data",
+    "total": "Importo Totale",
+    "category": "Categoria",
+    "paymentMethod": "Metodo di Pagamento",
+    "addItem": "Aggiungi Articolo",
+    "itemName": "Nome Articolo",
+    "price": "Prezzo",
+    "quantity": "Quantità",
+    "save": "Salva Ricevuta",
+    "cancel": "Annulla"
+  },
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "close": "Chiudi",
+    "back": "Indietro",
+    "on": "ACCESO",
+    "off": "SPENTO",
+    "loading": "Caricamento..."
+  }
+}

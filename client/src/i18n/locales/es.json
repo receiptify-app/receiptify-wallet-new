@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Receiptify",
+    "subtitle": "Tu Billetera Digital"
+  },
+  "nav": {
+    "scan": "Escanear",
+    "receipts": "Mis Recibos",
+    "analytics": "Análisis",
+    "account": "Cuenta"
+  },
+  "scan": {
+    "title": "Escanear Recibo",
+    "cameraCapture": "Captura con Cámara",
+    "galleryUpload": "Subir desde Galería",
+    "manualEntry": "Entrada Manual",
+    "uploadSuccess": "Recibo capturado exitosamente",
+    "uploadSuccessDesc": "Tu recibo ha sido procesado y añadido a tu colección.",
+    "uploadError": "Captura fallida",
+    "uploadErrorDesc": "No se pudo procesar tu recibo. Inténtalo de nuevo."
+  },
+  "receipts": {
+    "title": "Mis Recibos",
+    "noReceipts": "Aún no hay recibos",
+    "noReceiptsDesc": "Comienza escaneando tu primer recibo",
+    "total": "Total"
+  },
+  "receiptDetail": {
+    "receiptImage": "Imagen del Recibo",
+    "items": "Artículos",
+    "tax": "Impuesto",
+    "total": "Total",
+    "paymentMethod": "Método de Pago",
+    "category": "Categoría",
+    "splitReceipt": "Dividir Recibo"
+  },
+  "analytics": {
+    "title": "Análisis",
+    "spending": "Gastos",
+    "thisMonth": "Este mes",
+    "categories": "Categorías",
+    "trends": "Tendencias"
+  },
+  "profile": {
+    "title": "Cuenta",
+    "myData": "Mis Datos",
+    "receiptsOrders": "Mis Recibos y Pedidos",
+    "appPreferences": "Preferencias de la App",
+    "notifications": "Notificaciones",
+    "currency": "Moneda",
+    "language": "Preferencias de Idioma",
+    "autoCategorize": "Auto-Categorizar",
+    "data": "Datos",
+    "exportReceipts": "Exportar Recibos",
+    "signOut": "Cerrar Sesión"
+  },
+  "manual": {
+    "title": "Entrada Manual de Recibo",
+    "merchantName": "Nombre del Comerciante",
+    "location": "Ubicación",
+    "date": "Fecha",
+    "total": "Monto Total",
+    "category": "Categoría",
+    "paymentMethod": "Método de Pago",
+    "addItem": "Añadir Artículo",
+    "itemName": "Nombre del Artículo",
+    "price": "Precio",
+    "quantity": "Cantidad",
+    "save": "Guardar Recibo",
+    "cancel": "Cancelar"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "on": "ENCENDIDO",
+    "off": "APAGADO",
+    "loading": "Cargando..."
+  }
+}

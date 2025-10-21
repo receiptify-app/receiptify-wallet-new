@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerEmailRoutes } from "./email-routes";
@@ -27,6 +28,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 export async function registerRoutes(app: Express): Promise<Server> {
   const defaultUserId = "default-user"; // For demo purposes
   
+  // Serve static files from public directory (for uploaded receipt images)
+  app.use('/uploads', express.static('public/uploads'));
+  
   // Mock authentication middleware for testing
   app.use((req, res, next) => {
     req.user = { id: defaultUserId };
@@ -44,6 +48,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register admin routes
   app.use("/api/admin", adminRouter);
+
+  // Seed route for development
+  app.post("/api/seed", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ error: "Seeding is only allowed in development" });
+      }
+
+      // Create Waitrose receipt
+      const waitroseReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "Waitrose",
+        location: "Harrow Weald, London",
+        total: "12.02",
+        date: new Date("2025-10-12T16:34:00"),
+        category: "Food",
+        paymentMethod: "VISA Debit",
+        receiptNumber: "WAIT-2025-001",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Baguette", price: "2.00", quantity: "1", category: "Food" });
+      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Mozzarella", price: "1.70", quantity: "2", category: "Food" });
+      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Smoked Salmon", price: "4.87", quantity: "1", category: "Food" });
+      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Organic Tomatoes", price: "1.75", quantity: "1", category: "Food" });
+
+      // Create Tesco receipt
+      const tescoReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "Tesco",
+        location: "London, UK",
+        total: "5.18",
+        date: new Date("2025-10-10T10:30:00"),
+        category: "Food",
+        paymentMethod: "Card",
+        receiptNumber: "TESCO-2025-004",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Milk", price: "1.50", quantity: "1", category: "Food" });
+      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Bread", price: "1.20", quantity: "1", category: "Food" });
+      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Eggs", price: "2.48", quantity: "1", category: "Food" });
+
+      // Create Argos receipt (September)
+      const argosReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "Argos",
+        location: "London, UK",
+        total: "59.99",
+        date: new Date("2025-09-25T14:20:00"),
+        category: "Tech",
+        paymentMethod: "Mastercard",
+        receiptNumber: "ARGOS-2025-002",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Wireless Mouse", price: "29.99", quantity: "1", category: "Tech" });
+      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Phone Stand", price: "15.00", quantity: "1", category: "Tech" });
+      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Cable", price: "15.00", quantity: "1", category: "Tech" });
+
+      // Create Currys receipt (October - Tech £1.99)
+      const currysReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "Currys",
+        location: "London, UK",
+        total: "1.99",
+        date: new Date("2025-10-05T14:00:00"),
+        category: "Tech",
+        paymentMethod: "Card",
+        receiptNumber: "CURRYS-2025-006",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: currysReceipt.id, name: "USB Cable", price: "1.99", quantity: "1", category: "Tech" });
+
+      // Create Shell receipt (October)
+      const shellReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "Shell",
+        location: "M25 Service Station",
+        total: "23.80",
+        date: new Date("2025-10-22T09:15:00"),
+        category: "Transport",
+        paymentMethod: "Contactless",
+        receiptNumber: "SHELL-2025-003",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: shellReceipt.id, name: "Unleaded Petrol", price: "23.80", quantity: "1", category: "Transport" });
+
+      // Create BP receipt (October)
+      const bpReceipt = await storage.createReceipt({
+        userId: defaultUserId,
+        merchantName: "BP",
+        location: "London, UK",
+        total: "79.20",
+        date: new Date("2025-10-15T08:00:00"),
+        category: "Transport",
+        paymentMethod: "Card",
+        receiptNumber: "BP-2025-005",
+        currency: "GBP",
+        ecoPoints: 1,
+      });
+
+      await storage.createReceiptItem({ receiptId: bpReceipt.id, name: "Diesel", price: "79.20", quantity: "1", category: "Transport" });
+
+      res.json({ 
+        message: "Database seeded successfully",
+        summary: {
+          Food: "£17.20",
+          Tech: "£1.99",
+          Transport: "£103.00",
+          Total: "£122.19"
+        }
+      });
+    } catch (error) {
+      console.error("Seeding error:", error);
+      res.status(500).json({ error: "Failed to seed database" });
+    }
+  });
+
+  // Analytics routes
+  app.get("/api/analytics/spending", async (req, res) => {
+    try {
+      const { period = 'month' } = req.query;
+      
+      // Get current month's date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      const receipts = await storage.getReceipts(defaultUserId, {
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+      });
+      
+      // Aggregate by category
+      const categoryTotals: { [key: string]: number } = {};
+      let totalSpending = 0;
+      
+      for (const receipt of receipts) {
+        const category = receipt.category || 'Other';
+        const amount = parseFloat(receipt.total);
+        
+        categoryTotals[category] = (categoryTotals[category] || 0) + amount;
+        totalSpending += amount;
+      }
+      
+      // Format response
+      const spendingData = Object.entries(categoryTotals).map(([category, amount]) => ({
+        category,
+        amount: parseFloat(amount.toFixed(2)),
+        percentage: totalSpending > 0 ? (amount / totalSpending) * 100 : 0,
+      }));
+      
+      res.json({
+        period: 'This month',
+        total: parseFloat(totalSpending.toFixed(2)),
+        categories: spendingData,
+        receipts: receipts.map(r => ({
+          id: r.id,
+          merchant: r.merchantName,
+          amount: parseFloat(r.total).toFixed(2),
+          date: r.date,
+          category: r.category,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching spending analytics:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
 
   // Receipt routes
   app.get("/api/receipts", async (req, res) => {
@@ -126,20 +307,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      // Extract location data from request body if provided by frontend
-      const { latitude, longitude } = req.body;
-
       // Process the receipt image with OCR
       console.log(`Processing uploaded receipt image: ${req.file.originalname}`);
       console.log(`Image size: ${req.file.size} bytes`);
       
-      // Save the uploaded file temporarily for OCR processing
-      const tempPath = `/tmp/${Date.now()}_${req.file.originalname}`;
-      fs.writeFileSync(tempPath, req.file.buffer);
+      // Save the image permanently
+      const timestamp = Date.now();
+      const filename = `${timestamp}_${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const permanentPath = `public/uploads/${filename}`;
+      const imageUrl = `/uploads/${filename}`;
+      
+      // Create uploads directory if it doesn't exist
+      if (!fs.existsSync('public/uploads')) {
+        fs.mkdirSync('public/uploads', { recursive: true });
+      }
+      
+      // Save the uploaded file permanently
+      fs.writeFileSync(permanentPath, req.file.buffer);
+      console.log(`Receipt image saved to: ${permanentPath}`);
       
       try {
         // Extract real data from the receipt image
-        const extractedData = await OCRProcessor.processReceiptImage(tempPath);
+        const extractedData = await OCRProcessor.processReceiptImage(permanentPath);
         console.log('Extracted receipt data:', extractedData);
         
         const receiptData = {
@@ -153,8 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Shopping",
           paymentMethod: extractedData.paymentMethod || "Unknown",
           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          imageUrl: imageUrl,
           ecoPoints: 1
         };
 
@@ -175,14 +363,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Clean up temp file
-        fs.unlinkSync(tempPath);
-        
         res.status(201).json(receipt);
       } catch (error) {
         console.error('OCR processing error:', error);
         
-        // Fallback: create basic receipt
+        // Fallback: create basic receipt with OCR error indication but keep the image
+        console.log('OCR extraction failed, creating placeholder receipt with image');
         const receiptData = {
           userId: defaultUserId,
           merchantName: "Receipt (OCR Failed)",
@@ -192,15 +378,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Other",
           paymentMethod: "Unknown",
           receiptNumber: `ERR${Date.now()}`,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          imageUrl: imageUrl,
           ecoPoints: 1
         };
         
         const receipt = await storage.createReceipt(receiptData);
-        
-        // Clean up temp file if it exists
-        try { fs.unlinkSync(tempPath); } catch {}
         
         res.status(201).json(receipt);
       }
@@ -442,6 +624,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing QR code:", error);
       res.status(400).json({ error: "Failed to process QR code" });
+    }
+  });
+
+  // Update receipt category
+  app.post("/api/receipts/:id/move", async (req, res) => {
+    try {
+      const { categoryId } = req.body;
+      if (!categoryId) {
+        return res.status(400).json({ error: "Category ID is required" });
+      }
+
+      const receipt = await storage.updateReceipt(req.params.id, { category: categoryId });
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+      
+      res.json(receipt);
+    } catch (error) {
+      console.error("Error moving receipt:", error);
+      res.status(500).json({ error: "Failed to move receipt" });
+    }
+  });
+
+  // Bulk move receipts to category
+  app.post("/api/receipts/bulk-move", async (req, res) => {
+    try {
+      const { receiptIds, categoryId } = req.body;
+      
+      if (!Array.isArray(receiptIds) || receiptIds.length === 0) {
+        return res.status(400).json({ error: "Receipt IDs array is required" });
+      }
+      if (!categoryId) {
+        return res.status(400).json({ error: "Category ID is required" });
+      }
+
+      const updatedReceipts = [];
+      for (const receiptId of receiptIds) {
+        const receipt = await storage.updateReceipt(receiptId, { category: categoryId });
+        if (receipt) {
+          updatedReceipts.push(receipt);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        updated: updatedReceipts.length,
+        receipts: updatedReceipts 
+      });
+    } catch (error) {
+      console.error("Error bulk moving receipts:", error);
+      res.status(500).json({ error: "Failed to bulk move receipts" });
     }
   });
 

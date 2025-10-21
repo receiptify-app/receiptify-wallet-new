@@ -1,0 +1,69 @@
+Goal
+Add a production-ready Analytics tab into the Receiptify app that:
+	1.	Uses real receipt data (no mock data) from the existing backend or local DB.
+	2.	Displays a donut/pie of category spend and a chronological Recent Activity list showing receipts (with images).
+	3.	Lets users move / assign imported receipts into any section or category they want — single or bulk — using a mobile-friendly UI (modal category picker, and optional drag/drop on web).
+	4.	Persist changes locally and remotely (AsyncStorage + API), and update analytics immediately.
+
+Assume: Expo React Native (TypeScript preferred) for mobile, Node + Express for a lightweight backend API. Use @expo/vector-icons, react-native-gesture-handler and react-native-reanimated (optional). If the project is web (React), adapt drag/drop to HTML5.
+
+Deliverables
+	•	Frontend: new/updated components and screens
+	•	screens/AnalyticsScreen.tsx — main analytics view
+	•	components/ReceiptCard.tsx — receipt row with thumbnail, merchant, date, amount, quick actions (move, share)
+	•	components/CategoryPickerModal.tsx — reusable picker (uses existing category JSON)
+	•	components/BulkSelectToolbar.tsx — for bulk move
+	•	utils/analytics.ts — compute category totals, top merchants, time range filters
+	•	Hook useReceipts() that loads receipts, listens for changes, exposes actions: moveReceipt(receiptId, categoryId), bulkMove(receiptIds[], categoryId)
+	•	Backend/API (server/ or /api):
+	•	GET /api/receipts?range=month|week|custom returns receipts with image URL, merchant, items, categoryId, createdAt, id.
+	•	POST /api/receipt/:id/move { categoryId } -> updates category
+	•	POST /api/receipts/bulk-move { receiptIds:[], categoryId } -> bulk update
+	•	GET /api/analytics?range=month returns precomputed category totals (optional but helpful)
+	•	Persistence
+	•	Frontend saves locally in AsyncStorage under keys: receipts and receipt:{id}
+	•	When user is online (toggle remoteSync), the app should call API endpoints and reconcile responses
+	•	UX behaviours
+	•	Analytics header: date range selector (This month / This week / Custom) + total spend for range on right (big number)
+	•	Donut chart shows category breakdown; tapping one category filters Recent Activity to that category
+	•	Recent Activity list shows receipts with thumbnail (image imported with receipt), merchant, date, amount and small category chip
+	•	Move action: each ReceiptCard has a “Move / Categorize” button which opens CategoryPickerModal; selecting a category updates locally and POSTs to /api/receipt/:id/move (if remoteSync enabled). Show toast success/failure.
+	•	Bulk mode: long-press one receipt to enable multi-select, show BulkSelectToolbar with a Move button which opens the CategoryPickerModal and moves all selected receipts.
+	•	On web only: support drag-and-drop from list into a pinned category area or drag over the donut segments to assign.
+	•	Visuals must match Receiptify style: pastel greens, rounded cards, subtle shadows. Keep accessibility (labels, hit targets).
+	•	Real image handling: ensure receipt images are displayed from stored URL. If only base64 is present, render safely.
+	•	When a receipt is moved, update analytics realtime (no reload): recompute totals and refresh chart.
+	•	Data requirements & formats
+	•	Receipt object schema:
+
+
+Category JSON: load src/data/categories.json (same shape as previous prompt). If not present, generate default categories.
+	•	Offline-first & sync
+	•	Use optimistic UI updates: update local state, queue API calls when offline, retry background sync.
+	•	Provide syncStatus indicator on Analytics screen if there are pending updates.
+	•	Tests
+	•	Jest tests for utils/analytics.ts to verify totals after moving receipts.
+	•	Tests for moveReceipt and bulkMove that simulate local update + mock API call.
+	•	Small react-native-testing-library test to ensure CategoryPickerModal calls onSave.
+	•	Docs
+	•	README update with:
+	•	How to run expo app and server locally
+	•	How to seed receipts data for testing
+	•	Notes on enabling remoteSync
+	•	Example curl commands
+
+Receipt images are shown in the Recent Activity list (thumbnail + full image on tap).
+	3.	Move single receipt: category change persists locally and POSTs to server. Analytics update immediately.
+	4.	Bulk move: user can select multiple receipts, choose a category, and all are updated locally and remotely.
+	5.	Filter & chart interactivity: tapping a donut segment filters the Recent Activity list to that category and highlights the selection.
+	6.	Offline / Sync: moves are queued if offline and applied when connection returns; UI shows pending status.
+	7.	Accessibility: all buttons and controls have proper labels and large hit targets.
+	8.	Tests pass locally.
+
+Edge / Implementation notes for the agent (do not ask me):
+	•	If no backend present, scaffold a small Node/Express in /server with an in-memory store (or JSON file) and endpoints above. Add a simple file store for images (or accept base64 in body).
+	•	Use react-native-chart-kit or victory-native for the donut chart. For web, use recharts.
+	•	Use TypeScript types for receipts & categories.
+	•	Keep code modular and commit frequently with clear messages.
+	•	Use existing style tokens and component library in repo. If none exist, create src/styles/tokens.ts with colors & spacing.
+	•	Assume remoteSync toggle in settings exists; if not, add it.
