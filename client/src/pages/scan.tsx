@@ -220,17 +220,17 @@ export default function Scan() {
 
         {/* Manual Entry Option */}
         <Card className="hover:shadow-md transition-shadow border-2 border-green-200" data-testid="card-manual-entry">
-          <CardContent className="p-6">
+          <CardContent className="p-0">
             <Button
               onClick={() => setShowManualForm(true)}
-              className="w-full h-auto py-6 bg-green-600 hover:bg-green-700 text-white"
+              className="w-full h-full bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center justify-start p-6"
               data-testid="button-manual-entry"
             >
-              <div className="flex items-center justify-center space-x-4">
+              <div className="flex items-center justify-center space-x-4 w-full">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                   <Edit className="w-6 h-6 text-white" />
                 </div>
-                <div className="text-left">
+                <div className="ml-4 text-left">
                   <div className="font-semibold text-lg text-white">Import Receipt</div>
                   <div className="text-sm text-white/90">Enter receipt information manually</div>
                 </div>

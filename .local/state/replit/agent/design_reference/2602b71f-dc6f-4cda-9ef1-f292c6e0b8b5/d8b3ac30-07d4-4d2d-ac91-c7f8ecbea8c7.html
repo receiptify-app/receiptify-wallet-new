@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receiptify - One Scan. Zero Paper.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#2D5A3D',
+                        'secondary': '#A8D5A8',
+                        'light-green': '#E8F5E8',
+                        'accent': '#4CAF50',
+                        'eco-green': '#66BB6A'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light-green font-inter">
+    <!-- @COMPONENT: MobileApp -->
+    <div class="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden">
+        
+        <!-- @COMPONENT: StatusBar -->
+        <div class="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
+            <span>9:41</span>
+            <div class="flex items-center space-x-1">
+                <i class="fas fa-signal text-xs"></i>
+                <i class="fas fa-wifi text-xs"></i>
+                <i class="fas fa-battery-three-quarters text-xs"></i>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: StatusBar -->
+
+        <!-- @COMPONENT: AppHeader -->
+        <div class="bg-gradient-to-r from-light-green to-secondary px-6 py-4">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                    <i class="fas fa-receipt text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-primary">Receiptify</h1>
+                    <p class="text-sm text-primary/70">One Scan. Zero Paper.</p>
+                </div>
+            </div>
+            
+            <!-- @COMPONENT: EcoStats -->
+            <div class="bg-white/80 backdrop-blur-sm rounded-xl p-4 mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-primary">This Month's Impact</span>
+                    <i class="fas fa-leaf text-accent"></i>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-accent" data-bind="ecoStats.papersSaved">47</div>
+                        <div class="text-xs text-gray-600">Papers Saved</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-accent" data-bind="ecoStats.co2Reduced">2.3kg</div>
+                        <div class="text-xs text-gray-600">CO₂ Reduced</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-accent" data-bind="ecoStats.treesEquivalent">0.1</div>
+                        <div class="text-xs text-gray-600">Trees Saved</div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: EcoStats -->
+        </div>
+        <!-- @END_COMPONENT: AppHeader -->
+
+        <!-- @COMPONENT: MainContent -->
+        <div class="px-6 py-4 pb-24">
+            
+            <!-- @COMPONENT: SearchAndFilters -->
+            <div class="mb-6">
+                <div class="relative mb-4">
+                    <input type="text" placeholder="Search receipts..." class="w-full bg-gray-100 rounded-lg px-4 py-3 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-accent" data-mock="true">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                
+                <div class="flex space-x-2 overflow-x-auto pb-2">
+                    <div class="bg-primary text-white px-3 py-1 rounded-full text-xs whitespace-nowrap">All</div>
+                    <div class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs whitespace-nowrap">Groceries</div>
+                    <div class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs whitespace-nowrap">Fuel</div>
+                    <div class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs whitespace-nowrap">Retail</div>
+                    <div class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs whitespace-nowrap">Dining</div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: SearchAndFilters -->
+
+            <!-- @COMPONENT: ReceiptsList -->
+            <div class="space-y-4">
+                <!-- @MAP: receipts.map(receipt => ( -->
+                
+                <!-- Receipt Card 1 - Tesco -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">T</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900" data-bind="receipt.merchantName">Tesco Express</h3>
+                                    <p class="text-sm text-gray-500" data-bind="receipt.location">Camden, London</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-gray-900" data-bind="receipt.total">£24.18</div>
+                                <div class="text-xs text-gray-500" data-bind="receipt.date">26 Apr 2024</div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-dashed border-gray-200 pt-3 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">Plain Bagels 4pk</span>
+                                <span class="font-medium" data-bind="item.price">£1.50</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">Whole Milk 4 Pints</span>
+                                <span class="font-medium" data-bind="item.price">£1.65</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">Cheddar Cheese</span>
+                                <span class="font-medium" data-bind="item.price">£3.25</span>
+                            </div>
+                            <div class="text-xs text-gray-400">+ 2 more items</div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between mt-4">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-6 bg-accent rounded-full flex items-center justify-center">
+                                    <span class="text-white text-xs">N</span>
+                                </div>
+                                <span class="text-xs text-gray-600">Saved 1 paper receipt</span>
+                            </div>
+                            <button class="bg-primary text-white px-3 py-1 rounded-lg text-xs" data-event="click:splitReceipt">Split</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt Card 2 - Waitrose -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-green-700 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">W</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900" data-bind="receipt.merchantName">Waitrose</h3>
+                                    <p class="text-sm text-gray-500" data-bind="receipt.location">Harrow Weald</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-gray-900" data-bind="receipt.total">£12.02</div>
+                                <div class="text-xs text-gray-500" data-bind="receipt.date">25 Apr 2024</div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-dashed border-gray-200 pt-3 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">SDGH BGTTE</span>
+                                <span class="font-medium" data-bind="item.price">£2.00</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">ITAL MOZZARELLA</span>
+                                <span class="font-medium" data-bind="item.price">£1.70</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">CWDSO SMK SALMON</span>
+                                <span class="font-medium" data-bind="item.price">£4.87</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between mt-4">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-utensils text-accent text-sm"></i>
+                                <span class="text-xs text-gray-600">Food & Groceries</span>
+                            </div>
+                            <button class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs" data-event="click:viewReceipt">View</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt Card 3 - Shell -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-gas-pump text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900" data-bind="receipt.merchantName">Shell</h3>
+                                    <p class="text-sm text-gray-500" data-bind="receipt.location">M25 Services</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-gray-900" data-bind="receipt.total">£45.67</div>
+                                <div class="text-xs text-gray-500" data-bind="receipt.date">24 Apr 2024</div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-dashed border-gray-200 pt-3 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">Unleaded Petrol</span>
+                                <span class="font-medium" data-bind="item.price">£43.50</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600" data-bind="item.name">Coffee</span>
+                                <span class="font-medium" data-bind="item.price">£2.17</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between mt-4">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-xs font-bold">G</span>
+                                </div>
+                                <span class="text-xs text-gray-600">Shell GO+ points earned</span>
+                            </div>
+                            <button class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs" data-event="click:viewReceipt">View</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- @END_MAP )) -->
+            </div>
+            <!-- @END_COMPONENT: ReceiptsList -->
+
+            <!-- @COMPONENT: QuickActions -->
+            <div class="mt-8 grid grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <i class="fas fa-chart-line text-accent text-lg"></i>
+                        <span class="font-medium text-gray-900">Spending Trends</span>
+                    </div>
+                    <p class="text-xs text-gray-600">£312.45 this month</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <i class="fas fa-calendar-alt text-accent text-lg"></i>
+                        <span class="font-medium text-gray-900">Subscriptions</span>
+                    </div>
+                    <p class="text-xs text-gray-600">3 active subscriptions</p>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: QuickActions -->
+
+        </div>
+        <!-- @END_COMPONENT: MainContent -->
+
+        <!-- @COMPONENT: FloatingActionButton -->
+        <div class="fixed bottom-20 right-6">
+            <button class="w-14 h-14 bg-primary rounded-full shadow-lg flex items-center justify-center" data-event="click:openScanner">
+                <i class="fas fa-qrcode text-white text-xl"></i>
+            </button>
+        </div>
+        <!-- @END_COMPONENT: FloatingActionButton -->
+
+        <!-- @COMPONENT: BottomNavigation -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+            <div class="max-w-sm mx-auto">
+                <div class="flex justify-around py-2">
+                    <button class="flex flex-col items-center py-2 px-4" data-event="click:navigateToHome">
+                        <i class="fas fa-home text-primary text-lg mb-1"></i>
+                        <span class="text-xs text-primary font-medium">Home</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 px-4" data-event="click:navigateToScan">
+                        <i class="fas fa-qrcode text-gray-400 text-lg mb-1"></i>
+                        <span class="text-xs text-gray-400">Scan</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 px-4" data-event="click:navigateToLoyalty">
+                        <i class="fas fa-credit-card text-gray-400 text-lg mb-1"></i>
+                        <span class="text-xs text-gray-400">Cards</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 px-4" data-event="click:navigateToEco">
+                        <i class="fas fa-leaf text-gray-400 text-lg mb-1"></i>
+                        <span class="text-xs text-gray-400">Eco</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 px-4" data-event="click:navigateToProfile">
+                        <i class="fas fa-user text-gray-400 text-lg mb-1"></i>
+                        <span class="text-xs text-gray-400">Profile</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: BottomNavigation -->
+
+        <!-- @COMPONENT: ScannerModal (Hidden by default) -->
+        <div class="fixed inset-0 bg-black/90 hidden" id="scannerModal" data-mock="true">
+            <div class="flex flex-col h-full">
+                <div class="flex justify-between items-center p-6 text-white">
+                    <h2 class="text-xl font-semibold">Scan Receipt</h2>
+                    <button class="text-white" data-event="click:closeScanner">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Camera viewfinder mockup -->
+                <div class="flex-1 relative flex items-center justify-center">
+                    <div class="w-64 h-64 border-2 border-white border-dashed rounded-2xl flex items-center justify-center">
+                        <div class="text-center text-white">
+                            <i class="fas fa-qrcode text-6xl mb-4 opacity-50"></i>
+                            <p class="text-sm">Position QR code within frame</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <button class="w-full bg-white text-black py-3 rounded-xl font-medium" data-event="click:capturePhoto">
+                        <i class="fas fa-camera mr-2"></i>
+                        Take Photo Instead
+                    </button>
+                    <button class="w-full border border-white text-white py-3 rounded-xl font-medium" data-event="click:uploadPhoto">
+                        <i class="fas fa-upload mr-2"></i>
+                        Upload from Gallery
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: ScannerModal -->
+
+    </div>
+    <!-- @END_COMPONENT: MobileApp -->
+
+    <!-- @COMPONENT: DesktopShowcase (Optional larger screens) -->
+    <div class="hidden lg:block fixed top-0 left-0 w-full h-full bg-gradient-to-br from-light-green to-secondary">
+        <div class="container mx-auto px-8 py-12 h-full flex items-center">
+            <div class="grid grid-cols-2 gap-16 w-full">
+                
+                <!-- Left side - Marketing content -->
+                <div class="flex flex-col justify-center">
+                    <div class="flex items-center space-x-4 mb-8">
+                        <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                            <i class="fas fa-receipt text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-4xl font-bold text-primary">Receiptify</h1>
+                            <p class="text-xl text-primary/70">One Scan. Zero Paper.</p>
+                        </div>
+                    </div>
+                    
+                    <h2 class="text-3xl font-bold text-primary mb-6">The paperless receipt revolution.</h2>
+                    
+                    <div class="space-y-6 mb-8">
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-qrcode text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary mb-1">One-Tap Receipt Capture</h3>
+                                <p class="text-gray-700">QR codes, NFC scanning, or camera - get your receipts instantly without paper waste.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-leaf text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary mb-1">Environmental Impact</h3>
+                                <p class="text-gray-700">Track your positive environmental impact with real-time CO₂ reduction metrics.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-credit-card text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary mb-1">Loyalty Integration</h3>
+                                <p class="text-gray-700">Link Tesco Clubcard, myWaitrose, Nectar, and Shell GO+ for seamless rewards.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-6 bg-white/80 backdrop-blur-sm rounded-2xl p-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-accent">1,247</div>
+                            <div class="text-sm text-gray-600">Papers Saved</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-accent">62.3kg</div>
+                            <div class="text-sm text-gray-600">CO₂ Reduced</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-accent">2.8</div>
+                            <div class="text-sm text-gray-600">Trees Saved</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right side - Phone mockup (already created above) -->
+                <div class="flex items-center justify-center">
+                    <div class="transform scale-90 origin-center">
+                        <!-- Phone frame -->
+                        <div class="relative">
+                            <div class="w-80 h-[600px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
+                                <div class="w-full h-full bg-white rounded-[2.5rem] overflow-hidden">
+                                    <!-- Mini version of mobile app would go here -->
+                                    <div class="h-full bg-gradient-to-b from-light-green to-white flex items-center justify-center">
+                                        <div class="text-center">
+                                            <div class="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <i class="fas fa-receipt text-white text-3xl"></i>
+                                            </div>
+                                            <h3 class="text-2xl font-bold text-primary mb-2">Receiptify</h3>
+                                            <p class="text-primary/70">Download for iOS & Android</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: DesktopShowcase -->
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        
+        (function() {
+            // Mock interactive elements for demonstration
+            const scanButton = document.querySelector('[data-event="click:openScanner"]');
+            const modal = document.getElementById('scannerModal');
+            const closeButton = document.querySelector('[data-event="click:closeScanner"]');
+            
+            if (scanButton && modal) {
+                scanButton.addEventListener('click', () => {
+                    modal.classList.remove('hidden');
+                });
+            }
+            
+            if (closeButton && modal) {
+                closeButton.addEventListener('click', () => {
+                    modal.classList.add('hidden');
+                });
+            }
+            
+            // Navigation button highlighting
+            const navButtons = document.querySelectorAll('[data-event^="click:navigateTo"]');
+            navButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    // Remove active state from all buttons
+                    navButtons.forEach(btn => {
+                        const icon = btn.querySelector('i');
+                        const text = btn.querySelector('span');
+                        if (icon) icon.className = icon.className.replace('text-primary', 'text-gray-400');
+                        if (text) text.className = text.className.replace('text-primary', 'text-gray-400');
+                    });
+                    
+                    // Add active state to clicked button
+                    const icon = button.querySelector('i');
+                    const text = button.querySelector('span');
+                    if (icon) icon.className = icon.className.replace('text-gray-400', 'text-primary');
+                    if (text) text.className = text.className.replace('text-gray-400', 'text-primary');
+                });
+            });
+            
+            // Eco stats animation on load
+            setTimeout(() => {
+                const ecoNumbers = document.querySelectorAll('[data-bind^="ecoStats"]');
+                ecoNumbers.forEach(el => {
+                    el.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        el.style.transform = 'scale(1)';
+                        el.style.transition = 'transform 0.2s ease';
+                    }, 200);
+                });
+            }, 1000);
+        })();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receiptify - Digital Receipt Wallet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10B981',
+                        'primary-dark': '#059669',
+                        accent: '#F59E0B',
+                        'gray-dark': '#1F2937',
+                        'gray-light': '#F9FAFB'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-light font-sans">
+    <!-- @COMPONENT: MobileApp [main container for the entire application] -->
+    <div class="max-w-sm mx-auto bg-white min-h-screen shadow-xl">
+        
+        <!-- @COMPONENT: AppHeader [top navigation with notifications and profile] -->
+        <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <i class="fas fa-receipt text-white text-sm"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-dark">Receiptify</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="relative">
+                    <i class="fas fa-bell text-gray-500 text-lg"></i>
+                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full text-xs"></span>
+                </div>
+                <div class="w-8 h-8 rounded-full bg-primary-dark overflow-hidden">
+                    <!-- Profile image placeholder -->
+                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32" 
+                         alt="Profile" class="w-full h-full object-cover" data-mock="true">
+                </div>
+            </div>
+        </header>
+        <!-- @END_COMPONENT: AppHeader -->
+
+        <!-- @COMPONENT: EcoImpactBanner [displays current eco savings and achievements] -->
+        <div class="bg-gradient-to-r from-primary to-primary-dark text-white p-4 m-4 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-lg font-semibold">This Month's Impact</h2>
+                <i class="fas fa-leaf text-xl"></i>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold" data-bind="ecoMetrics.paperSaved">47</div>
+                    <div class="text-sm opacity-90">Papers Saved</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold" data-bind="ecoMetrics.co2Saved">2.3kg</div>
+                    <div class="text-sm opacity-90">CO₂ Saved</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold" data-bind="ecoMetrics.treesSaved">0.12</div>
+                    <div class="text-sm opacity-90">Trees Saved</div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: EcoImpactBanner -->
+
+        <!-- @COMPONENT: QuickActions [main action buttons for receipt capture] -->
+        <div class="px-4 mb-6">
+            <div class="grid grid-cols-2 gap-3">
+                <button class="bg-primary text-white p-4 rounded-xl flex flex-col items-center space-y-2 shadow-md active:scale-95 transition-transform" 
+                        data-event="click:openQRScanner" data-implementation="Opens camera QR scanner modal">
+                    <i class="fas fa-qrcode text-2xl"></i>
+                    <span class="text-sm font-medium">Scan QR Code</span>
+                </button>
+                <button class="bg-gray-100 text-gray-dark p-4 rounded-xl flex flex-col items-center space-y-2 shadow-md active:scale-95 transition-transform"
+                        data-event="click:openBankSync" data-implementation="Opens bank synchronization interface">
+                    <i class="fas fa-university text-2xl"></i>
+                    <span class="text-sm font-medium">Sync Bank</span>
+                </button>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: QuickActions -->
+
+        <!-- @COMPONENT: SearchAndFilter [search bar with filter options] -->
+        <div class="px-4 mb-4">
+            <div class="relative">
+                <input type="search" placeholder="Search receipts..." 
+                       class="w-full bg-gray-100 rounded-lg pl-10 pr-4 py-3 text-gray-dark focus:outline-none focus:ring-2 focus:ring-primary"
+                       data-bind="searchQuery" data-implementation="Real-time search with debouncing">
+                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+            </div>
+            <div class="flex space-x-2 mt-3 overflow-x-auto">
+                <button class="bg-primary text-white px-4 py-2 rounded-full text-sm whitespace-nowrap" data-mock="true">All</button>
+                <button class="bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-sm whitespace-nowrap" data-mock="true">Today</button>
+                <button class="bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-sm whitespace-nowrap" data-mock="true">Groceries</button>
+                <button class="bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-sm whitespace-nowrap" data-mock="true">Fuel</button>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: SearchAndFilter -->
+
+        <!-- @COMPONENT: ReceiptFeed [scrollable list of receipt cards] -->
+        <div class="px-4 pb-20">
+            <h3 class="text-lg font-semibold text-gray-dark mb-3">Recent Receipts</h3>
+            
+            <!-- @MAP: receipts.map(receipt => ( -->
+            <!-- Individual receipt card - Tesco -->
+            <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-mock="true">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-3">
+                        <!-- Tesco logo placeholder -->
+                        <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">T</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-dark" data-bind="receipt.merchantName">Tesco Express</h4>
+                            <p class="text-sm text-gray-500" data-bind="receipt.location">High Street, London</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-dark" data-bind="receipt.total">£23.47</p>
+                        <p class="text-xs text-gray-500" data-bind="receipt.timestamp">2 hours ago</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-primary" data-bind="receipt.itemCount">8 items</span>
+                        <span class="text-accent" data-bind="receipt.loyaltyPoints">+47 points</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <i class="fas fa-share text-gray-400"></i>
+                        <i class="fas fa-comment text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual receipt card - Shell -->
+            <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-mock="true">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-3">
+                        <!-- Shell logo placeholder -->
+                        <div class="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">S</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-dark" data-bind="receipt.merchantName">Shell Station</h4>
+                            <p class="text-sm text-gray-500" data-bind="receipt.location">A40, Oxford</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-dark" data-bind="receipt.total">£45.20</p>
+                        <p class="text-xs text-gray-500" data-bind="receipt.timestamp">Yesterday</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-primary" data-bind="receipt.itemCount">Fuel</span>
+                        <span class="text-accent" data-bind="receipt.loyaltyPoints">+22 GO+ points</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <i class="fas fa-share text-gray-400"></i>
+                        <i class="fas fa-comment text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual receipt card - Sainsbury's -->
+            <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-mock="true">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-3">
+                        <!-- Sainsbury's logo placeholder -->
+                        <div class="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">S</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-dark" data-bind="receipt.merchantName">Sainsbury's</h4>
+                            <p class="text-sm text-gray-500" data-bind="receipt.location">Camden, London</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-dark" data-bind="receipt.total">£67.89</p>
+                        <p class="text-xs text-gray-500" data-bind="receipt.timestamp">3 days ago</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-primary" data-bind="receipt.itemCount">15 items</span>
+                        <span class="text-accent" data-bind="receipt.loyaltyPoints">+67 Nectar points</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <i class="fas fa-share text-gray-400"></i>
+                        <i class="fas fa-comment text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual receipt card - Waitrose -->
+            <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-mock="true">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-3">
+                        <!-- Waitrose logo placeholder -->
+                        <div class="w-12 h-12 bg-green-700 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">W</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-dark" data-bind="receipt.merchantName">Waitrose</h4>
+                            <p class="text-sm text-gray-500" data-bind="receipt.location">King's Road, London</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-dark" data-bind="receipt.total">£34.56</p>
+                        <p class="text-xs text-gray-500" data-bind="receipt.timestamp">1 week ago</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-primary" data-bind="receipt.itemCount">6 items</span>
+                        <span class="text-accent" data-bind="receipt.loyaltyPoints">+17 myWaitrose points</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <i class="fas fa-share text-gray-400"></i>
+                        <i class="fas fa-comment text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_MAP )) -->
+            
+        </div>
+        <!-- @END_COMPONENT: ReceiptFeed -->
+
+        <!-- @COMPONENT: BottomNavigation [fixed bottom navigation with main app sections] -->
+        <nav class="fixed bottom-0 left-1/2 transform -translate-x-1/2 max-w-sm w-full bg-white border-t border-gray-200 px-4 py-2">
+            <div class="flex justify-around items-center">
+                <button class="flex flex-col items-center py-2 text-primary" data-event="click:navigateToHome">
+                    <i class="fas fa-home text-lg"></i>
+                    <span class="text-xs mt-1">Home</span>
+                </button>
+                <button class="flex flex-col items-center py-2 text-gray-500" data-event="click:navigateToScan">
+                    <i class="fas fa-qrcode text-lg"></i>
+                    <span class="text-xs mt-1">Scan</span>
+                </button>
+                <button class="flex flex-col items-center py-2 text-gray-500" data-event="click:navigateToStats">
+                    <i class="fas fa-chart-bar text-lg"></i>
+                    <span class="text-xs mt-1">Stats</span>
+                </button>
+                <button class="flex flex-col items-center py-2 text-gray-500" data-event="click:navigateToWallet">
+                    <i class="fas fa-wallet text-lg"></i>
+                    <span class="text-xs mt-1">Wallet</span>
+                </button>
+                <button class="flex flex-col items-center py-2 text-gray-500" data-event="click:navigateToProfile">
+                    <i class="fas fa-user text-lg"></i>
+                    <span class="text-xs mt-1">Profile</span>
+                </button>
+            </div>
+        </nav>
+        <!-- @END_COMPONENT: BottomNavigation -->
+
+        <!-- @COMPONENT: FloatingActionButton [main QR scanner access button] -->
+        <button class="fixed bottom-20 right-4 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center z-50 active:scale-95 transition-transform"
+                data-event="click:openQRScanner" data-implementation="Opens QR scanner modal overlay">
+            <i class="fas fa-camera text-xl"></i>
+        </button>
+        <!-- @END_COMPONENT: FloatingActionButton -->
+
+    </div>
+    <!-- @END_COMPONENT: MobileApp -->
+
+    <!-- @COMPONENT: QRScannerModal [full-screen camera overlay for QR scanning] -->
+    <div id="qrScannerModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden">
+        <div class="relative w-full h-full">
+            <!-- Camera viewfinder placeholder -->
+            <div class="absolute inset-0 flex items-center justify-center">
+                <!-- Simulated camera view with scanning frame -->
+                <div class="w-80 h-80 border-2 border-primary rounded-lg relative">
+                    <div class="absolute inset-0 bg-black bg-opacity-30 rounded-lg"></div>
+                    <!-- Corner markers for QR frame -->
+                    <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary"></div>
+                    <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary"></div>
+                    <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary"></div>
+                    <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary"></div>
+                    
+                    <!-- Scanning line animation -->
+                    <div class="absolute top-0 left-0 w-full h-1 bg-primary opacity-70 animate-pulse"></div>
+                </div>
+            </div>
+            
+            <!-- Instructions overlay -->
+            <div class="absolute top-20 left-0 right-0 text-center px-6">
+                <h2 class="text-white text-xl font-semibold mb-2">Scan QR Code</h2>
+                <p class="text-gray-300 text-sm">Position the QR code within the frame</p>
+            </div>
+            
+            <!-- Close button -->
+            <button class="absolute top-8 right-6 w-10 h-10 bg-gray-800 bg-opacity-80 rounded-full flex items-center justify-center"
+                    data-event="click:closeQRScanner">
+                <i class="fas fa-times text-white"></i>
+            </button>
+            
+            <!-- Bottom actions -->
+            <div class="absolute bottom-20 left-0 right-0 flex justify-center space-x-6">
+                <button class="w-12 h-12 bg-gray-800 bg-opacity-80 rounded-full flex items-center justify-center"
+                        data-event="click:toggleFlash">
+                    <i class="fas fa-bolt text-white"></i>
+                </button>
+                <button class="w-12 h-12 bg-gray-800 bg-opacity-80 rounded-full flex items-center justify-center"
+                        data-event="click:openPhotoCapture">
+                    <i class="fas fa-camera text-white"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: QRScannerModal -->
+
+    <!-- @COMPONENT: NotificationToast [success notification for receipt sync] -->
+    <div id="notificationToast" class="fixed top-20 left-4 right-4 max-w-sm mx-auto bg-primary text-white p-4 rounded-lg shadow-lg transform -translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i class="fas fa-check-circle text-xl"></i>
+            <div>
+                <h4 class="font-semibold">Receipt Synced!</h4>
+                <p class="text-sm opacity-90" data-bind="notification.message">Tesco receipt automatically added</p>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: NotificationToast -->
+
+    <script>
+        // TODO: Implement camera access, QR code detection, and receipt processing
+        // TODO: Implement real-time bank synchronization and transaction matching
+        // TODO: Implement push notification system
+        // TODO: Implement offline caching and sync capabilities
+        
+        (function() {
+            // Mock QR Scanner functionality
+            function openQRScanner() {
+                const modal = document.getElementById('qrScannerModal');
+                modal.classList.remove('hidden');
+                // TODO: Initialize camera stream and QR detection
+            }
+            
+            function closeQRScanner() {
+                const modal = document.getElementById('qrScannerModal');
+                modal.classList.add('hidden');
+                // TODO: Stop camera stream
+            }
+            
+            function showNotification(message) {
+                const toast = document.getElementById('notificationToast');
+                toast.classList.remove('-translate-y-20', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+                
+                setTimeout(() => {
+                    toast.classList.add('-translate-y-20', 'opacity-0');
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                }, 3000);
+            }
+            
+            // Event listeners for interactive elements
+            document.addEventListener('click', function(e) {
+                const target = e.target.closest('[data-event]');
+                if (!target) return;
+                
+                const eventType = target.getAttribute('data-event');
+                
+                switch(eventType) {
+                    case 'click:openQRScanner':
+                        openQRScanner();
+                        break;
+                    case 'click:closeQRScanner':
+                        closeQRScanner();
+                        break;
+                    case 'click:openBankSync':
+                        showNotification('Bank sync feature coming soon!');
+                        break;
+                    // TODO: Implement other navigation and interaction handlers
+                }
+            });
+            
+            // Mock real-time receipt notifications
+            setTimeout(() => {
+                showNotification('New receipt from Tesco Express');
+            }, 5000);
+            
+        })();
+    </script>
+</body>
+</html>
