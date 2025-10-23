@@ -13,7 +13,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Digital Receipts</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
               <p className="text-sm text-gray-600">Your receipt wallet - store, track, return stress-free</p>
             </div>
           </div>
@@ -186,7 +186,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-6 h-6 text-green-400" />
-            <span className="text-xl font-bold">Digital Receipts</span>
+            <span className="text-xl font-bold">Receiptify</span>
           </div>
           <p className="text-gray-400">OneTap Receipts. Zero Paper. © 2025</p>
         </div>
