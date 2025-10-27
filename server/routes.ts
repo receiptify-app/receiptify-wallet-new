@@ -20,8 +20,22 @@ import {
   insertWarrantyClaimSchema,
 } from "@shared/schema";
 import multer from "multer";
-import * as fs from 'fs';
-import { OCRProcessor } from './ocr-processor';
+import * as fs from "fs";
+import path from "path";
+import os from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
+const execFileP = promisify(execFile);
+import sharp from "sharp";
+import { OCRProcessor } from "./ocr-processor";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string; [key: string]: any };
+    }
+  }
+}
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -48,131 +62,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register admin routes
   app.use("/api/admin", adminRouter);
-
-  // Seed route for development
-  app.post("/api/seed", async (req, res) => {
-    try {
-      if (process.env.NODE_ENV !== 'development') {
-        return res.status(403).json({ error: "Seeding is only allowed in development" });
-      }
-
-      // Create Waitrose receipt
-      const waitroseReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Waitrose",
-        location: "Harrow Weald, London",
-        total: "12.02",
-        date: new Date("2025-10-12T16:34:00"),
-        category: "Food",
-        paymentMethod: "VISA Debit",
-        receiptNumber: "WAIT-2025-001",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Baguette", price: "2.00", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Mozzarella", price: "1.70", quantity: "2", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Smoked Salmon", price: "4.87", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Organic Tomatoes", price: "1.75", quantity: "1", category: "Food" });
-
-      // Create Tesco receipt
-      const tescoReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Tesco",
-        location: "London, UK",
-        total: "5.18",
-        date: new Date("2025-10-10T10:30:00"),
-        category: "Food",
-        paymentMethod: "Card",
-        receiptNumber: "TESCO-2025-004",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Milk", price: "1.50", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Bread", price: "1.20", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Eggs", price: "2.48", quantity: "1", category: "Food" });
-
-      // Create Argos receipt (September)
-      const argosReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Argos",
-        location: "London, UK",
-        total: "59.99",
-        date: new Date("2025-09-25T14:20:00"),
-        category: "Tech",
-        paymentMethod: "Mastercard",
-        receiptNumber: "ARGOS-2025-002",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Wireless Mouse", price: "29.99", quantity: "1", category: "Tech" });
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Phone Stand", price: "15.00", quantity: "1", category: "Tech" });
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Cable", price: "15.00", quantity: "1", category: "Tech" });
-
-      // Create Currys receipt (October - Tech £1.99)
-      const currysReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Currys",
-        location: "London, UK",
-        total: "1.99",
-        date: new Date("2025-10-05T14:00:00"),
-        category: "Tech",
-        paymentMethod: "Card",
-        receiptNumber: "CURRYS-2025-006",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: currysReceipt.id, name: "USB Cable", price: "1.99", quantity: "1", category: "Tech" });
-
-      // Create Shell receipt (October)
-      const shellReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Shell",
-        location: "M25 Service Station",
-        total: "23.80",
-        date: new Date("2025-10-22T09:15:00"),
-        category: "Transport",
-        paymentMethod: "Contactless",
-        receiptNumber: "SHELL-2025-003",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: shellReceipt.id, name: "Unleaded Petrol", price: "23.80", quantity: "1", category: "Transport" });
-
-      // Create BP receipt (October)
-      const bpReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "BP",
-        location: "London, UK",
-        total: "79.20",
-        date: new Date("2025-10-15T08:00:00"),
-        category: "Transport",
-        paymentMethod: "Card",
-        receiptNumber: "BP-2025-005",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: bpReceipt.id, name: "Diesel", price: "79.20", quantity: "1", category: "Transport" });
-
-      res.json({ 
-        message: "Database seeded successfully",
-        summary: {
-          Food: "£17.20",
-          Tech: "£1.99",
-          Transport: "£103.00",
-          Total: "£122.19"
-        }
-      });
-    } catch (error) {
-      console.error("Seeding error:", error);
-      res.status(500).json({ error: "Failed to seed database" });
-    }
-  });
 
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
@@ -322,9 +211,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fs.mkdirSync('public/uploads', { recursive: true });
       }
       
-      // Save the uploaded file permanently
-      fs.writeFileSync(permanentPath, req.file.buffer);
-      console.log(`Receipt image saved to: ${permanentPath}`);
+      // Save the uploaded file permanently, converting HEIC/HEIF to PNG if needed
+      const origLower = (req.file.originalname || '').toLowerCase();
+      const isHeic = /\.(heic|heif)$/i.test(origLower) || req.file.mimetype === 'image/heif' || req.file.mimetype === 'image/heic';
+      
+      if (isHeic) {
+        console.log('HEIC/HEIF upload detected — attempting conversion before saving');
+        try {
+          // Try sharp first
+          const converted = await sharp(req.file.buffer, { failOnError: false }).png().toBuffer();
+          fs.writeFileSync(permanentPath, converted);
+          console.log(`Converted HEIC -> PNG (sharp) and saved to: ${permanentPath}`);
+        } catch (sharpErr) {
+          console.warn('Sharp HEIC conversion failed, trying external converters:', (sharpErr as any)?.message || String(sharpErr));
+          // try external converters
+          const tmpIn = path.join(os.tmpdir(), `ocr_in_${Date.now()}.heic`);
+          const tmpOut = path.join(os.tmpdir(), `ocr_out_${Date.now()}.png`);
+          await fs.promises.writeFile(tmpIn, req.file.buffer);
+          const candidates = [
+            { cmd: 'magick', args: [tmpIn, tmpOut] },
+            { cmd: 'convert', args: [tmpIn, tmpOut] },
+            { cmd: 'heif-convert', args: [tmpIn, tmpOut] },
+          ];
+          let convertedOk = false;
+          let lastErr: any = null;
+          for (const c of candidates) {
+            try {
+              console.log(`Trying external converter: ${c.cmd}`);
+              const { stdout, stderr } = await execFileP(c.cmd, c.args);
+              console.log(`${c.cmd} stdout:`, (stdout || '').toString().slice(0, 200));
+              console.log(`${c.cmd} stderr:`, (stderr || '').toString().slice(0, 200));
+              const stat = await fs.promises.stat(tmpOut).catch(() => null);
+              if (stat && stat.size > 0) {
+                const convertedBuf = await fs.promises.readFile(tmpOut);
+                fs.writeFileSync(permanentPath, convertedBuf);
+                console.log('External conversion successful with', c.cmd, '->', permanentPath);
+                convertedOk = true;
+                await fs.promises.unlink(tmpIn).catch(()=>{});
+                await fs.promises.unlink(tmpOut).catch(()=>{});
+                break;
+              } else {
+                lastErr = new Error(`${c.cmd} produced no output`);
+              }
+            } catch (extErr) {
+              console.warn(`${c.cmd} failed:`, (extErr as any)?.message ?? extErr);
+              lastErr = extErr;
+            }
+          }
+          if (!convertedOk) {
+            // cleanup tmp files and fallback to saving original buffer
+            await fs.promises.unlink(tmpIn).catch(()=>{});
+            await fs.promises.unlink(tmpOut).catch(()=>{});
+            console.warn('All external converters failed, saving original buffer as fallback:', lastErr?.message || lastErr);
+            fs.writeFileSync(permanentPath, req.file.buffer);
+          }
+        }
+      } else {
+        fs.writeFileSync(permanentPath, req.file.buffer);
+        console.log(`Receipt image saved to: ${permanentPath}`);
+      }
       
       try {
         // Extract real data from the receipt image
@@ -1001,7 +946,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
-      const existingUser = await storage.getUserByEmail(validatedData.email);
+      const email = validatedData.email;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Valid email is required" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
       
       if (existingUser) {
         return res.status(409).json({ error: "User already exists" });
@@ -1032,7 +982,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      // Update last login time — cast to any because storage.updateUser's partial type doesn't include lastLoginAt
+      await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
       res.json({ user: { id: user.id, email: user.email, username: user.username } });
     } catch (error) {
       console.error("Error logging in user:", error);
