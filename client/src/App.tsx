@@ -21,6 +21,7 @@ import TestAuth from "@/pages/test-auth";
 import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
 import BottomNavigation from "@/components/bottom-navigation";
+import ExportReceiptsPage from "@/pages/exports";
 
 // TODO: Backend cleanup needed - remove these API endpoints:
 // - /api/loyalty-cards (loyalty cards management)
@@ -68,6 +69,7 @@ function AuthenticatedRouter() {
         <Route path="/payment" component={Payment} />
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
+        <Route path="/exports" component={ExportReceiptsPage} />
         <Route path="/test-auth" component={TestAuth} />
         <Route component={NotFound} />
       </Switch>

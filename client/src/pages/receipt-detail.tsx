@@ -21,6 +21,25 @@ export default function ReceiptDetailPage() {
     queryKey: ["/api/receipts", receiptId],
   });
 
+  const downloadReceipt = async () => {
+    if (!receipt?.imageUrl) return;
+    try {
+      const res = await fetch(receipt.imageUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = (receipt.merchantName || "receipt").replace(/[^\w-_]/g, "_");
+      a.href = url;
+      a.download = `${safeName}_${receipt.id || ""}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Download failed:", e);
+    }
+  };
+
   if (isLoading || !receipt) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -99,16 +118,18 @@ export default function ReceiptDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Payment Method */}
-        {receipt.paymentMethod && (
+        {/* Download Receipt */}
+        {receipt.imageUrl && (
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-900 font-medium">{receipt.paymentMethod}</span>
+                <div>
+                  <div className="text-sm text-gray-600">Download</div>
+                  <div className="text-gray-900 font-medium">Receipt Image</div>
                 </div>
-                <Button variant="ghost" size="sm">
-                  <Download className="h-4 w-4" />
+                <Button onClick={downloadReceipt} size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
                 </Button>
               </div>
             </CardContent>
@@ -124,19 +145,6 @@ export default function ReceiptDetailPage() {
               </div>
               <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Split Receipt Button */}
-        <Card className="bg-white shadow-sm border-0">
-          <CardContent className="p-4">
-            <Button 
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-lg font-semibold rounded-2xl"
-              size="lg"
-              onClick={() => navigate('/split-receipt')}
-            >
-              Split Receipt
-            </Button>
           </CardContent>
         </Card>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,6 +55,71 @@ export default function Profile() {
     queryKey: ["/api/user"],
     retry: false,
   });
+  const [receiptsList, setReceiptsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/receipts");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted) setReceiptsList(data || []);
+      } catch (e) {
+        console.error("Failed to load receipts for export:", e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadReceipt = async (r: any) => {
+    if (!r?.imageUrl) return;
+    try {
+      const res = await fetch(r.imageUrl);
+      if (!res.ok) throw new Error("Failed to fetch image");
+      const blob = await res.blob();
+      const safeName = (r.merchantName || "receipt").replace(/[^\w-_]/g, "_");
+      downloadBlob(blob, `${safeName}_${r.id || ""}.png`);
+    } catch (e) {
+      console.error("Download receipt failed:", e);
+    }
+  };
+
+  const downloadAllAsZip = async () => {
+    if (!receiptsList.length) return;
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      for (const r of receiptsList) {
+        if (!r.imageUrl) continue;
+        try {
+          const res = await fetch(r.imageUrl);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const ext = blob.type?.split("/")[1] || "png";
+          const safeName = (r.merchantName || "receipt").replace(/[^\w-_]/g, "_");
+          zip.file(`${safeName}_${r.id || ""}.${ext}`, blob);
+        } catch (e) {
+          console.warn("Skipping receipt in ZIP due to fetch error:", r.id, e);
+        }
+      }
+      const content = await zip.generateAsync({ type: "blob" });
+      downloadBlob(content, `receipts_${new Date().toISOString().slice(0,10)}.zip`);
+    } catch (e) {
+      console.error("Failed to create ZIP:", e);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -228,16 +293,19 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Export Section */}
+        {/* Export (link to dedicated Export page) */}
         <div>
           <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.data')}</h3>
           <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/exports')}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Download className="w-6 h-6 text-gray-700" />
-                    <span className="text-lg font-medium text-gray-900">{t('profile.exportReceipts')}</span>
+                    <div>
+                      <div className="text-lg font-medium text-gray-900">{t('profile.exportReceipts')}</div>
+                      <div className="text-sm text-gray-500">Manage and download all receipts</div>
+                    </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>

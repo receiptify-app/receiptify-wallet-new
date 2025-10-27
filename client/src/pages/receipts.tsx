@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare } from "lucide-react";
+import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +64,31 @@ export default function ReceiptsPage() {
     }
   });
 
+  // Delete receipt mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/receipts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete receipt");
+      return true;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+      setSelectedReceipts(prev => {
+        const copy = new Set(prev);
+        copy.delete(id);
+        return copy;
+      });
+      toast({ title: "Receipt deleted", description: "Receipt removed successfully" });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Delete failed",
+        description: err?.message || "Failed to delete receipt",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleToggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
     setSelectedReceipts(new Set());
@@ -110,6 +135,15 @@ export default function ReceiptsPage() {
     } else {
       setSelectedReceipts(new Set(receipts.map(r => r.id)));
     }
+  };
+
+  const handleDeleteReceipt = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (!confirm("Delete this receipt? This cannot be undone.")) return;
+    deleteMutation.mutate(id);
   };
 
   // Group receipts by date
@@ -222,7 +256,7 @@ export default function ReceiptsPage() {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Receipt className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No receipts yet</h3>
-            <p className="text-gray-500 mb-6">Start scanning QR codes to add your first receipt</p>
+            <p className="text-gray-500 mb-6">Add your first receipt</p>
             <Link href="/scan">
               <Button>
                 <ShoppingBag className="h-4 w-4 mr-2" />
@@ -298,8 +332,21 @@ export default function ReceiptsPage() {
                             </div>
                             {!selectionMode && (
                               <Link href={`/receipt/${receipt.id}`}>
-                                <ChevronRight className="h-4 w-4 text-gray-400" />
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                </div>
                               </Link>
+                            )}
+                            {/* Delete action */}
+                            {!selectionMode && (
+                              <button
+                                onClick={(e) => handleDeleteReceipt(receipt.id, e)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                aria-label="Delete receipt"
+                                title="Delete receipt"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </button>
                             )}
                           </div>
                         </div>

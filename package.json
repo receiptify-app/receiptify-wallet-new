@@ -79,6 +79,7 @@
     "input-otp": "^1.4.2",
     "ioredis": "^5.7.0",
     "isomorphic-fetch": "^3.0.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.453.0",
     "mailparser": "^3.7.4",
     "memoizee": "^0.4.17",
