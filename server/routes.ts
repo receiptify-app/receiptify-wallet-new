@@ -273,23 +273,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // Extract real data from the receipt image
-        const extractedData = await OCRProcessor.processReceiptImage(permanentPath);
+        let extractedData;
+        try {
+          extractedData = await OCRProcessor.processReceiptImage(permanentPath);
+        } catch (err: any) {
+          // If OCR explicitly determined this is not a receipt, clean up and return 400
+          if (err && (err.code === 'NOT_A_RECEIPT' || /Not a receipt/i.test(String(err.message || '')))) {
+            await fs.promises.unlink(permanentPath).catch(()=>{});
+            console.warn('Upload rejected - image does not appear to contain a receipt');
+            return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
+          }
+          throw err;
+        }
+
+        // Defensive check: processReceiptImage may return a default "empty" object.
+        if ((!extractedData.items || extractedData.items.length === 0) &&
+            extractedData.total === '0.00' &&
+            /unknown/i.test(String(extractedData.merchantName || ''))) {
+          await fs.promises.unlink(permanentPath).catch(()=>{});
+          console.warn('Upload rejected - OCR produced default/empty receipt data');
+          return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
+        }
+
         console.log('Extracted receipt data:', extractedData);
-        
-        const receiptData = {
-          userId: defaultUserId,
-          merchantName: extractedData.merchantName,
-          location: extractedData.location,
-          total: extractedData.total,
-          subtotal: extractedData.subtotal,
-          tax: extractedData.tax,
-          date: extractedData.date || new Date(),
-          category: "Shopping",
-          paymentMethod: extractedData.paymentMethod || "Unknown",
-          receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-          imageUrl: imageUrl,
-          ecoPoints: 1
-        };
+         
+         const receiptData = {
+           userId: defaultUserId,
+           merchantName: extractedData.merchantName,
+           location: extractedData.location,
+           total: extractedData.total,
+           subtotal: extractedData.subtotal,
+           tax: extractedData.tax,
+           date: extractedData.date || new Date(),
+           category: extractedData.category || "Shopping",
+           paymentMethod: extractedData.paymentMethod || "Unknown",
+           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
+           imageUrl: imageUrl,
+           ecoPoints: 1
+         };
 
         const receipt = await storage.createReceipt(receiptData);
         

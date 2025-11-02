@@ -81,7 +81,7 @@ export default function ExportReceiptsPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <AppHeader 
-        showBackButton={false}
+        showBackButton={true}
         onBackClick={() => navigate('/profile')}
         title="Exports"
       />

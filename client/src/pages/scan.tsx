@@ -31,34 +31,19 @@ export default function Scan() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      console.log('Starting upload for file:', file.name, file.size, 'bytes');
       const formData = new FormData();
       formData.append('receipt', file);
-      
-      // Skip location for faster upload
-      console.log('Uploading without location to speed up process...');
-      
-      try {
-        const response = await fetch('/api/receipts/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Upload failed:', response.status, errorText);
-          throw new Error('Upload failed');
-        }
-        
-        const result = await response.json();
-        console.log('Upload successful:', result);
-        return result;
-      } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
+      const response = await fetch('/api/receipts/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const body = await response.json().catch(()=>({}));
+      if (!response.ok) {
+        const err: any = new Error(body?.error || 'Upload failed');
+        err.status = response.status;
+        throw err;
       }
+      return body;
     },
     onSuccess: (data) => {
       console.log('Receipt created successfully:', data.id);
@@ -74,8 +59,13 @@ export default function Scan() {
       
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
     },
-    onError: (error) => {
-      console.error('Upload mutation error:', error);
+    onError: (error: any) => {
+      // Show a clear popup when server rejects non-receipt images
+      if (error?.status === 400 || /receipt/i.test(String(error?.message || ''))) {
+        alert('Upload rejected: the image does not appear to contain a receipt.');
+      } else {
+        alert('Upload failed: ' + (error?.message || 'Unknown error'));
+      }
       
       // Reset file inputs even on error
       if (cameraInputRef.current) cameraInputRef.current.value = '';

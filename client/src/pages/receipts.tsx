@@ -286,8 +286,8 @@ export default function ReceiptsPage() {
                       data-testid={`card-receipt-${receipt.id}`}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
                             {selectionMode && (
                               <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
                                 <Checkbox 
@@ -300,27 +300,35 @@ export default function ReceiptsPage() {
                               {getMerchantIcon(receipt.merchantName)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {receipt.merchantName}
-                                </p>
-                                {receipt.category && (
-                                  <Badge 
-                                    variant="secondary" 
-                                    className={`text-xs ${getCategoryColor(receipt.category)}`}
+                              <div className="relative w-full overflow-hidden">
+                                {/* merchant name will truncate and leave room for badge on the right */}
+                                <div className="relative">
+                                  <p
+                                    className="text-sm font-medium text-gray-900 truncate pr-20"
+                                    title={receipt.merchantName}
                                   >
-                                    {receipt.category}
-                                  </Badge>
-                                )}
+                                    {receipt.merchantName}
+                                  </p>
+                                  {receipt.category && (
+                                    <div className="absolute top-0 right-0 pointer-events-none">
+                                      <Badge
+                                        variant="secondary"
+                                        className={`text-xs ${getCategoryColor(receipt.category)}`}
+                                      >
+                                        {receipt.category}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 truncate mt-1">
+                                  {format(new Date(receipt.date), 'h:mm a')}
+                                  {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-500">
-                                {format(new Date(receipt.date), 'h:mm a')}
-                                {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
-                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-right">
+                          <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                            <div className="text-right min-w-[10px] flex-shrink-0">
                               <p className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(receipt.total)}
                               </p>
@@ -331,17 +339,15 @@ export default function ReceiptsPage() {
                               )}
                             </div>
                             {!selectionMode && (
-                              <Link href={`/receipt/${receipt.id}`}>
-                                <div className="flex items-center gap-2">
-                                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                                </div>
-                              </Link>
-                            )}
+                              <div className="flex items-center gap-1">
+                                 <ChevronRight className="h-4 w-4 text-gray-400" />
+                               </div>
+                             )}
                             {/* Delete action */}
                             {!selectionMode && (
                               <button
                                 onClick={(e) => handleDeleteReceipt(receipt.id, e)}
-                                className="text-red-500 hover:text-red-700 p-1"
+                                className="text-red-500 hover:text-red-700 p-1 ml-2"
                                 aria-label="Delete receipt"
                                 title="Delete receipt"
                               >

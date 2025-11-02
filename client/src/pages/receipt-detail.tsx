@@ -61,7 +61,7 @@ export default function ReceiptDetailPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <AppHeader 
         showBackButton={true}
-        onBackClick={() => navigate('/')}
+        onBackClick={() => window.history.back()}
       />
 
       <div className="px-6 py-4 space-y-6">

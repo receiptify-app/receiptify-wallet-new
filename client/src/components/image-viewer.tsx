@@ -19,16 +19,29 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
   const [isCropping, setIsCropping] = useState(false);
   const [cropStart, setCropStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [currentSrc, setCurrentSrc] = useState<string>(imageUrl);
 
+  // Zoom configuration: smaller step and lower max to reduce perceived zoom
+  const ZOOM_STEP = 0.05;    // 5% per click (additive)
+  const MAX_ZOOM = 1.15;     // 115%
+  const MIN_ZOOM = 0.8;      // 80%
+
+  // Use simple numeric math (avoid unnecessary toFixed/parseFloat) so signs aren't inverted
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
+    setZoom(prev => {
+      const next = prev + ZOOM_STEP;
+      return next > MAX_ZOOM ? MAX_ZOOM : Number(next.toFixed(3));
+    });
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.5));
-    if (zoom <= 0.75) {
-      setPanPosition({ x: 0, y: 0 });
-    }
+    setZoom(prev => {
+      const next = prev - ZOOM_STEP;
+      const newZoom = next < MIN_ZOOM ? MIN_ZOOM : Number(next.toFixed(3));
+      if (newZoom === MIN_ZOOM) setPanPosition({ x: 0, y: 0 });
+      return newZoom;
+    });
   };
 
   const handleRotate = () => {
@@ -142,10 +155,112 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
     setIsCropping(false);
   };
 
-  const applyCrop = () => {
-    console.log('Crop area:', cropArea);
-    setIsCropMode(false);
-    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+  const applyCrop = async () => {
+    if (!containerRef.current) return;
+    if (!cropArea || cropArea.width <= 0 || cropArea.height <= 0) return;
+
+    // Ensure we have an Image object with natural size
+    const loadImage = (src: string) =>
+      new Promise<HTMLImageElement>((resolve, reject) => {
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.onload = () => resolve(im);
+        im.onerror = reject;
+        im.src = src;
+      });
+
+    try {
+      const imgEl = imgRef.current;
+      const img = imgEl && imgEl.naturalWidth ? imgEl : await loadImage(currentSrc);
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const imgRect = (imgRef.current && imgRef.current.getBoundingClientRect()) || {
+        left: containerRect.left,
+        top: containerRect.top,
+        width: containerRect.width,
+        height: containerRect.height,
+      };
+
+      // crop area is relative to container; compute crop region relative to displayed image
+      const cropOnImgX = cropArea.x - (imgRect.left - containerRect.left);
+      const cropOnImgY = cropArea.y - (imgRect.top - containerRect.top);
+
+      // clamp to image display bounds
+      const dispX = Math.max(0, cropOnImgX);
+      const dispY = Math.max(0, cropOnImgY);
+      const dispW = Math.max(0, Math.min(cropArea.width, imgRect.width - dispX));
+      const dispH = Math.max(0, Math.min(cropArea.height, imgRect.height - dispY));
+      if (dispW <= 0 || dispH <= 0) {
+        setIsCropMode(false);
+        setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+        return;
+      }
+
+      // Determine rotated canvas dimensions and draw the original image there (no scaling)
+      const naturalW = img.naturalWidth;
+      const naturalH = img.naturalHeight;
+
+      let rotCanvas = document.createElement('canvas');
+      let rotCtx = rotCanvas.getContext('2d')!;
+
+      const r = ((rotation % 360) + 360) % 360;
+      if (r === 90 || r === 270) {
+        rotCanvas.width = naturalH;
+        rotCanvas.height = naturalW;
+      } else {
+        rotCanvas.width = naturalW;
+        rotCanvas.height = naturalH;
+      }
+
+      // Draw rotated image onto rotCanvas
+      rotCtx.save();
+      // move to center for rotation
+      rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+      rotCtx.rotate((r * Math.PI) / 180);
+      // draw with center alignment
+      rotCtx.drawImage(img, -naturalW / 2, -naturalH / 2);
+      rotCtx.restore();
+
+      // The displayed image rectangle corresponds to rotCanvas scaled by displayScale
+      const displayScale = imgRect.width / rotCanvas.width;
+
+      // Convert displayed crop coords to pixels on rotCanvas
+      const canvasCropX = Math.max(0, Math.round(dispX / displayScale));
+      const canvasCropY = Math.max(0, Math.round(dispY / displayScale));
+      const canvasCropW = Math.max(1, Math.round(dispW / displayScale));
+      const canvasCropH = Math.max(1, Math.round(dispH / displayScale));
+
+      // Create final canvas for the cropped area
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = canvasCropW;
+      outCanvas.height = canvasCropH;
+      const outCtx = outCanvas.getContext('2d')!;
+
+      outCtx.drawImage(
+        rotCanvas,
+        canvasCropX,
+        canvasCropY,
+        canvasCropW,
+        canvasCropH,
+        0,
+        0,
+        canvasCropW,
+        canvasCropH
+      );
+
+      const dataUrl = outCanvas.toDataURL('image/png');
+
+      // Update viewer to show cropped image
+      setCurrentSrc(dataUrl);
+      setIsCropMode(false);
+      setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+      setPanPosition({ x: 0, y: 0 });
+      setZoom(1);
+    } catch (err) {
+      console.warn('Crop failed', err);
+      setIsCropMode(false);
+      setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+    }
   };
 
   return (
@@ -159,7 +274,7 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleZoomOut}
-                disabled={zoom <= 0.5}
+                disabled={zoom <= MIN_ZOOM}
                 className="h-8 w-8 p-0"
                 data-testid="button-zoom-out"
               >
@@ -172,7 +287,7 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleZoomIn}
-                disabled={zoom >= 3}
+                disabled={zoom >= MAX_ZOOM}
                 className="h-8 w-8 p-0"
                 data-testid="button-zoom-in"
               >
@@ -232,9 +347,10 @@ export default function ImageViewer({ imageUrl, alt }: ImageViewerProps) {
                 cursor: isCropMode ? 'crosshair' : (zoom > 1 && isDragging) ? 'grabbing' : zoom > 1 ? 'grab' : 'default'
               }}
             >
-              <img 
-                src={imageUrl} 
-                alt={alt} 
+              <img
+                ref={imgRef}
+                src={currentSrc}
+                alt={alt}
                 className="transition-transform duration-100 ease-out pointer-events-none"
                 style={{
                   transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoom}) rotate(${rotation}deg)`,

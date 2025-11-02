@@ -60,6 +60,7 @@ function AuthenticatedRouter() {
     <>
       <Switch>
         <Route path="/" component={Scan} />
+        <Route path="/scan" component={Scan} />
         <Route path="/analytics" component={Home} />
         <Route path="/receipts" component={Receipts} />
         <Route path="/map" component={Map} />

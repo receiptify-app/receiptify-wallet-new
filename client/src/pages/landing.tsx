@@ -67,7 +67,7 @@ export default function Landing() {
             Everything you need to go paperless
           </h3>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="space-y-4 mb-8">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="text-center">
                 <QrCode className="w-12 h-12 text-green-600 mx-auto mb-4" />
