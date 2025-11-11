@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { uploadReceiptFile } from '../lib/firebase-upload';
+import { getAuth } from 'firebase/auth';
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
@@ -31,51 +33,31 @@ export default function Scan() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('receipt', file);
-      const response = await fetch('/api/receipts/upload', {
+      console.log('Starting uploadReceiptFile for', file.name);
+      const { path } = await uploadReceiptFile(file);
+      console.log('Upload returned storage path:', path);
+
+      // optional: attach ID token for server auth
+      const token = await getAuth().currentUser?.getIdToken?.().catch(()=>undefined);
+      console.log('Using idToken present?:', !!token);
+
+      const resp = await fetch('/api/receipts/process', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ path }),
       });
-      const body = await response.json().catch(()=>({}));
-      if (!response.ok) {
-        const err: any = new Error(body?.error || 'Upload failed');
-        err.status = response.status;
-        throw err;
-      }
+      console.log('/api/receipts/process status:', resp.status);
+      const body = await resp.json().catch(()=>null);
+      console.log('/api/receipts/process response body:', body);
+      if (!resp.ok) throw new Error('Processing failed: ' + JSON.stringify(body));
       return body;
     },
-    onSuccess: (data) => {
-      console.log('Receipt created successfully:', data.id);
-      
-      // Reset file inputs
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
-      
-      toast({
-        title: t('scan.uploadSuccess'),
-        description: t('scan.uploadSuccessDesc'),
-      });
-      
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
-    },
-    onError: (error: any) => {
-      // Show a clear popup when server rejects non-receipt images
-      if (error?.status === 400 || /receipt/i.test(String(error?.message || ''))) {
-        alert('Upload rejected: the image does not appear to contain a receipt.');
-      } else {
-        alert('Upload failed: ' + (error?.message || 'Unknown error'));
-      }
-      
-      // Reset file inputs even on error
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
-      
-      toast({
-        title: t('scan.uploadError'),
-        description: t('scan.uploadErrorDesc'),
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
     }
   });
 

@@ -1167,8 +1167,8 @@ export class OCRProcessor {
             // skip obvious non-item lines
             if (isPromoLine(prevRaw) || urlLike.test(prevRaw) || phoneLike.test(prevRaw) || barcodeLike.test(prevRaw) || starsLike.test(prevRaw) || addressLike.test(prevRaw)) { j--; continue; }
             // avoid mapping merchant/location lines
-            if (merchantName && prev.toLowerCase().includes(String(merchantName).toLowerCase())) { j--; continue; }
-            if (location && prev.toLowerCase().includes(String(location).toLowerCase())) { j--; continue; }
+            if (merchantName && prevRaw.toLowerCase().includes(String(merchantName).toLowerCase())) { j--; continue; }
+            if (location && prevRaw.toLowerCase().includes(String(location).toLowerCase())) { j--; continue; }
             break;
           }
           if (j < 0) continue;

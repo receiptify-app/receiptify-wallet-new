@@ -22,6 +22,9 @@ import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
 import BottomNavigation from "@/components/bottom-navigation";
 import ExportReceiptsPage from "@/pages/exports";
+import { useEffect } from 'react';
+import { signInAnonymously } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 // TODO: Backend cleanup needed - remove these API endpoints:
 // - /api/loyalty-cards (loyalty cards management)
@@ -65,7 +68,7 @@ function AuthenticatedRouter() {
         <Route path="/receipts" component={Receipts} />
         <Route path="/map" component={Map} />
         <Route path="/profile" component={Profile} />
-        <Route path="/receipt/:id" component={ReceiptDetail} />
+        <Route path="/receipts/:id" component={ReceiptDetail} />
         <Route path="/split-receipt" component={SplitReceipt} />
         <Route path="/payment" component={Payment} />
         <Route path="/settings/email" component={EmailSettings} />
@@ -80,6 +83,15 @@ function AuthenticatedRouter() {
 }
 
 function App() {
+  useEffect(() => {
+    if (!auth) return;
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch((err) => {
+        console.warn('Anonymous sign-in failed', err);
+      });
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -87,7 +99,6 @@ function App() {
           <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
             {/* Status Bar */}
             <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
-              <span>9:41</span>
               <div className="flex items-center space-x-1 text-xs">
                 <i className="fas fa-signal"></i>
                 <i className="fas fa-wifi"></i>

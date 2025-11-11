@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -25,6 +25,7 @@ interface Receipt {
 }
 
 export default function ReceiptsPage() {
+  const [, setLocation] = useLocation();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -281,7 +282,10 @@ export default function ReceiptsPage() {
                       onClick={(e) => {
                         if (selectionMode) {
                           handleReceiptSelect(receipt.id, e);
+                          return;
                         }
+                        // navigate to receipt detail
+                        setLocation(`/receipts/${receipt.id}`);
                       }}
                       data-testid={`card-receipt-${receipt.id}`}
                     >
