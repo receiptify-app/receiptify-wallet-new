@@ -73,6 +73,7 @@
     "firebase": "^12.5.0",
     "firebase-admin": "^13.5.0",
     "framer-motion": "^11.13.1",
+    "git-filter-repo": "^0.0.30",
     "google-auth-library": "^10.2.1",
     "googleapis": "^156.0.0",
     "i18next": "^25.6.0",
