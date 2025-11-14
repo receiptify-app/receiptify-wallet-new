@@ -1190,7 +1190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               outBuf = await sharp(buffer, { failOnError: false }).png().toBuffer();
               ext = 'png';
             } catch (convErr) {
-              console.warn('HEIC -> PNG conversion failed, saving original buffer:', convErr?.message ?? convErr);
+              console.warn('HEIC -> PNG conversion failed, saving original buffer:', (convErr as any)?.message ?? String(convErr));
               // fall back to original buffer and original ext (may not display in some browsers)
             }
           }

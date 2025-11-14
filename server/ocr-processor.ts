@@ -50,6 +50,47 @@ export class OCRProcessor {
   private static worker: any = null;
   private static visionClient: any = null;
 
+  // Simple merchant -> category heuristic
+  private static inferCategoryFromMerchant(merchant?: string): string | undefined {
+    if (!merchant) return undefined;
+    const m = merchant.toLowerCase();
+
+    // mapping table: regex -> category (order matters: more specific first)
+    const rules: Array<{ re: RegExp; category: string }> = [
+      // Supermarkets / groceries
+      { re: /\b(sainsbury|tesco|waitrose|morrisons|asda|aldi|lidl|spar|co-?op|marks&spencer|m&s|iceland|morisson|sainsburys)\b/i, category: 'Groceries' },
+      // Convenience / petrol forecourt shops
+      { re: /\b(shell|bp|esso|texaco|total|petrol|petrol station|morrisons petrol|sainsbury petrol)\b/i, category: 'Transport' },
+      // Coffee / cafe / quick bites
+      { re: /\b(starbucks|costa|greggs|pret|caffè nero|caffe nero|doppio|doppio coffee|tim hortons|caribou|bluebottle|coffee)\b/i, category: 'Dining' },
+      // Fast food / restaurants
+      { re: /\b(kfc|mcdonald|burger king|burger|domino|pizza hut|papa john|subway|restaurant|bar|grill|bistro|taqueria|taco bell)\b/i, category: 'Dining' },
+      // Pharmacies / health
+      { re: /\b(boots|walgreens|cvs|pharmacy|chemist|health|healthcare)\b/i, category: 'Healthcare' },
+      // Electronics / tech retailers
+      { re: /\b(apple|currys|argos|best buy|maplin|richer sounds|dixons|ao.com|b&q|argos)\b/i, category: 'Electronics' },
+      // Clothing / fashion
+      { re: /\b(zara|h&m|uniqlo|next|primark|topshop|asos|hm|gap|nike|adidas|river island|fashion)\b/i, category: 'Shopping' },
+      // Marketplaces / online services / subscriptions
+      { re: /\b(amazon|ebay|spotify|netflix|disney\+|apple music|google play|paypal|stripe|shopify)\b/i, category: 'Shopping' },
+      // Travel / transport services
+      { re: /\b(uber|lyft|trainline|national express|ryanair|easyjet|british airways|hotel|booking|airbnb|travel)\b/i, category: 'Travel' },
+      // Utilities / bills / telecoms / insurance
+      { re: /\b(sse|british gas|edf energy|npower|o2|vodafone|three|ee|sky|talktalk|virgin|utility|bill|insurance)\b/i, category: 'Utilities' },
+      // Entertainment / leisure
+      { re: /\b(cinema|odeon|vue|bbci|ticketmaster|eventbrite|theatre|concert|netflix|hulu|cinema)\b/i, category: 'Entertainment' },
+      // Fuel specific (if not matched earlier)
+      { re: /\b(fuel|unleaded|diesel|petrol)\b/i, category: 'Transport' },
+      // Default shopping/fallback for unknown retail-sounding names
+      { re: /\b(store|shop|supermarket|market|mart|express|convenience|retail|department)\b/i, category: 'Shopping' },
+    ];
+
+    for (const { re, category } of rules) {
+      if (re.test(m)) return category;
+    }
+    return undefined;
+  }
+
   private static getDefaultReceiptData(): ExtractedReceiptData {
     // Minimal safe default used when OCR fails or input is invalid
     return {
@@ -246,31 +287,36 @@ export class OCRProcessor {
     }
   }
 
-  private static validateReceiptText(text: string) {
+  // tightened receipt validation (optional ocrConfidence helps reject bad scans)
+  private static validateReceiptText(text: string, ocrConfidence?: number) {
     const priceRegex = /[$£€]?\s*-?\d+\.\d{2}/g;
+    const currencyPriceRegex = /[$£€]\s*-?\d+\.\d{2}/g;
     const prices = (text.match(priceRegex) || []).length;
+    const currencyPrices = (text.match(currencyPriceRegex) || []).length;
     const hasCurrency = /[$£€]/.test(text);
-    const hasTotalLabel = /\b(total|balance\s*due|amount\s+due|grand\s+total|subtotal|receipt|vat|change|amount payable)\b/i.test(text);
+    const hasTotalLabel = /\b(balance\s*due|amount\s+due|grand\s+total|amount payable|total(?:[:\s]|$))/i.test(text);
     const hasDate = /(\d{1,2}:\d{2}(?::\d{2})?)|(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b)|(\b\d{4}-\d{2}-\d{2}\b)/.test(text);
-    const merchantHints = /\b(store|supermarket|sainsbury|tesco|waitrose|co-op|morrisons|restaurant|cafe|bar|hotel|booking|amazon)\b/i.test(text);
-    
+    const merchantHints = /\b(store|supermarket|sainsbury|tesco|waitrose|co-?op|morrisons|restaurant|cafe|bar|hotel|booking|amazon)\b/i.test(text);
+
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    // Keep an immutable snapshot of original OCR lines for secondary passes
-    const origLines = [...lines];
-    // length of the raw OCR text (used by weak heuristic)
     const textLen = typeof text === 'string' ? text.length : 0;
 
-    // Heuristics:
-    // - strong: explicit total label + at least one price
-    // - medium: multiple prices + merchant/store hint
-    // - weak: currency present + at least one price + enough text/lines
-    const strong = hasTotalLabel && prices >= 1;
-    const medium = prices >= 2 && merchantHints;
-    const weak = hasCurrency && prices >= 1 && textLen > 120 && lines.length >= 4;
+    // Stricter heuristics:
+    // - strong: explicit total label AND at least one currency-priced token
+    // - medium: merchant hint AND at least two currency-priced tokens
+    // - weak: multiple price tokens + currency present + enough length/lines
+    const strong = hasTotalLabel && currencyPrices >= 1;
+    const medium = merchantHints && currencyPrices >= 2;
+    const weak = hasCurrency && prices >= 2 && textLen > 200 && lines.length >= 6;
+
+    // If OCR confidence is provided and very low, reject regardless
+    if (typeof ocrConfidence === 'number' && ocrConfidence < 25) {
+      return { isReceipt: false, score: 0, details: { prices, currencyPrices, hasCurrency, hasTotalLabel, hasDate, merchantHints, lines: lines.length, textLen, ocrConfidence } };
+    }
 
     const isReceipt = strong || medium || weak;
     const score = (strong ? 3 : 0) + (medium ? 2 : 0) + (weak ? 1 : 0);
-    return { isReceipt, score, details: { prices, hasCurrency, hasTotalLabel, hasDate, merchantHints, lines: lines.length, textLen } };
+    return { isReceipt, score, details: { prices, currencyPrices, hasCurrency, hasTotalLabel, hasDate, merchantHints, lines: lines.length, textLen, ocrConfidence } };
   }
 
   static async processReceiptImage(imagePath: string): Promise<ExtractedReceiptData> {
@@ -340,7 +386,7 @@ export class OCRProcessor {
         console.log('=== End OCR Text ===');
 
       // quick validation: reject images that don't appear to be receipts
-      const validation = this.validateReceiptText(text || '');
+      const validation = this.validateReceiptText(text || '', confidence);
       console.log('Receipt validation:', validation);
       if (!validation.isReceipt) {
         // throw a specific error so callers (routes) can return a 4xx and remove uploaded file
@@ -625,10 +671,11 @@ export class OCRProcessor {
       // --- Date/time extraction ---
       const extractDateFromLines = (lines: string[]): Date | null => {
         const timeRe = /(\d{1,2}:\d{2}(?::\d{2})?)/;
-        const dmySlashRe = /(\b\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b)/;             // 24/10/2025 or 24-10-2025
+        const dmySlashRe = /(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b)/;             // 24/10/2025 or 24-10-2025
         const dmyTextRe = /(\b\d{1,2}\s*[A-Za-z]{3,9}\s*\d{4}\b)/i;                 // 24 Oct 2025
-        const gluedRe = /\b(\d{1,2})([A-Za-z]{3,9})(\d{4})\b/;                      // 24OCT2025 or 240CT2025
+        const gluedRe = /\b(\d{1,2})([A-Za-z]{3,9})(\d{4})\b/;
         const isoRe = /\b\d{4}-\d{2}-\d{2}\b/;
+        const gluedLooseRe = /\b(\d{1,2})([A-Za-z0O0]{2,9})(\d{4})\b/; // tolerate OCR 0/O or digits slipped into month
 
         const parseDMY = (day: number, mon: number, year: number, timeParts?: string) => {
           const now = new Date();
@@ -663,6 +710,11 @@ export class OCRProcessor {
         for (const raw of candidates) {
           let line = raw.replace(/\s{2,}/g, ' ').trim();
           if (!line) continue;
+          // Normalize common OCR confusions before matching:
+          // - replace digit '0' used where letter 'O' appears in month texts (e.g. "31OCT" vs "310CT")
+          // - replace capital letter 'I' mistaken for '1' in dates like "1OCT" etc.
+          const norm = line.replace(/\b0([A-Za-z]{2,})\b/g, 'O$1').replace(/([0-9])O([A-Za-z]{1,})/g, '$1O$2').replace(/I(?=\d)/g, '1');
+          line = norm;
           // quick attempt: detect ISO
           const isoMatch = line.match(isoRe);
           if (isoMatch) {
@@ -671,10 +723,14 @@ export class OCRProcessor {
           }
 
           // fused glued forms (e.g. "240CT2025" or "24OCT2025") -> normalize to "24 OCT 2025"
-          const gluedMatch = line.match(gluedRe);
+          let gluedMatch = line.match(gluedRe);
+          if (!gluedMatch) {
+            // try looser match that tolerates '0' or 'O' noise inside month token
+            gluedMatch = line.match(gluedLooseRe);
+          }
           if (gluedMatch) {
             const day = parseInt(gluedMatch[1], 10);
-            let monStr = gluedMatch[2].replace(/0/g, 'O'); // tolerate OCR 0/O confusion
+            let monStr = gluedMatch[2].replace(/0/g, 'O'); // turn OCR zeros into letter O
             monStr = monStr.toLowerCase();
             const year = parseInt(gluedMatch[3], 10);
             const monNum = monthMap[monStr.slice(0,3)] || NaN;
@@ -746,6 +802,14 @@ export class OCRProcessor {
         // assign to date variable used in returned object
         // note: date in ExtractedReceiptData is optional Date
         (date as any) = detectedDate;
+      }
+      // infer category from merchant name if available
+      if (!category) {
+        const inferred = OCRProcessor.inferCategoryFromMerchant(merchantName);
+        if (inferred) {
+          category = inferred;
+          console.log('Inferred category from merchant:', category);
+        }
       }
       // --- end date/time extraction ---
 
@@ -870,6 +934,10 @@ export class OCRProcessor {
 
       for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
+        // single shared finalPriceStr for this iteration (avoid redeclaration in inner blocks)
+        let finalPriceStr: string | null = null;
+        // Detected explicit quantity parsed from "2 x £1.65" patterns (scoped per-iteration)
+        let detectedQty: number | undefined = undefined;
         // Skip promotional / voucher / survey noise that sometimes gets OCR'd near items
         if (promoNoise.test(line) || /^(\*{3,}|-+|_+|#{2,})$/.test(line)) {
           console.log('Skipped promotional/noise line:', line);
@@ -918,43 +986,14 @@ export class OCRProcessor {
               i++;
             }
           }
-
           const computedTotal = +(weightVal * unitPrice).toFixed(2);
-          const finalPriceStr = explicitTotal || computedTotal.toFixed(2);
-
-          // Build clean name from nameFromPrev (fallback to "Weighed item" if missing)
-          let nameCandidate = (nameFromPrev || 'Weighed item').replace(/[^\w\s&'()-]/g, ' ').replace(/\s+/g, ' ').trim();
-          // Post-filters similar to other items
-          const digits = (nameCandidate.match(/\d/g) || []).length;
-          if (!nameCandidate || nameCandidate.length < 2 || digits / nameCandidate.length > 0.7) {
-            console.log('Skipped weighed item due to poor name candidate:', nameCandidate);
-          } else if (parseFloat(finalPriceStr) > 0) {
-            // determine quantity = weight (use kg as quantity to keep info) and append unit to name
-            const quantity = weightVal;
-            const unit = weightMatch[2].toLowerCase();
-            // append weight info to the name to preserve details
-            nameCandidate = `${nameCandidate} (${weightVal}${unit} @ ${unitPrice.toFixed(2)}/kg)`.trim();
-            items.push({ name: nameCandidate, price: parseFloat(finalPriceStr).toFixed(2), quantity });
-            console.log('Found weighed item:', nameCandidate, 'Price:', finalPriceStr, 'Quantity(kg):', quantity);
-          }
-          // continue to next line
-          continue;
-        }
-
-        // Quantity + unit price on same line
-        const qtyMatch = line.match(qtyUnitPattern);
-        let detectedQty: number | null = null;
-        let detectedUnitPrice: number | null = null;
-        if (qtyMatch) {
-          detectedQty = parseInt(qtyMatch[1], 10);
-          detectedUnitPrice = parseFloat(qtyMatch[2]);
+          finalPriceStr = explicitTotal || computedTotal.toFixed(2);
         }
 
         // Extract prices on this line (preserving a leading minus that may appear before currency)
         const pricesOnLine = extractPricesFromLine(line);
 
         // Normalize a single detected price into finalPriceStr (null if none or ambiguous multiple prices)
-        let finalPriceStr: string | null = null;
         if (pricesOnLine.length === 1) {
           let fp = String(pricesOnLine[0] || '').trim();
           fp = fp.replace(/\u2212/g, '-');
@@ -1041,13 +1080,21 @@ export class OCRProcessor {
           }
         }
 
-        if (detectedQty && detectedUnitPrice !== null) {
-          const computedTotal = +(detectedQty * detectedUnitPrice).toFixed(2);
-          if (finalPriceStr) {
-            const explicitTotal = parseFloat(finalPriceStr);
-            finalPriceStr = (!isNaN(explicitTotal)) ? explicitTotal.toFixed(2) : computedTotal.toFixed(2);
-          } else {
-            finalPriceStr = computedTotal.toFixed(2);
+        // handle explicit quantity x unit-price patterns like "2 x £1.65" found on the current line
+        {
+          const qtyMatch = line.match(qtyUnitPattern);
+          if (qtyMatch) {
+            detectedQty = parseInt(qtyMatch[1], 10);
+            const detectedUnitPrice = parseFloat(qtyMatch[2]);
+            if (!isNaN(detectedQty) && !isNaN(detectedUnitPrice)) {
+              const computedTotal = +(detectedQty * detectedUnitPrice).toFixed(2);
+              if (finalPriceStr) {
+                const explicitTotal = parseFloat(finalPriceStr);
+                finalPriceStr = (!isNaN(explicitTotal)) ? explicitTotal.toFixed(2) : computedTotal.toFixed(2);
+              } else {
+                finalPriceStr = computedTotal.toFixed(2);
+              }
+            }
           }
         }
 
@@ -1131,8 +1178,14 @@ export class OCRProcessor {
           continue;
         }
 
-        items.push({ name: nameCandidate, price: normalizedPrice, quantity });
-        console.log('Found item:', nameCandidate, 'Price:', normalizedPrice, 'Quantity:', quantity);
+        // sanitize and noise-filter the primary candidate (pass merchant+total)
+        const sanitizedPrimary = OCRProcessor.normalizeItemName(nameCandidate);
+        if (OCRProcessor.isNoiseItemName(sanitizedPrimary, parseFloat(total || '0'), merchantName)) {
+          console.log('Filtered noise item candidate (primary):', sanitizedPrimary, 'price:', normalizedPrice);
+          continue;
+        }
+        items.push({ name: sanitizedPrimary, price: normalizedPrice, quantity });
+        console.log('Found item:', sanitizedPrimary, 'Price:', normalizedPrice, 'Quantity:', quantity);
       }
 
       // --- Secondary pass: attach price-only lines to preceding name lines ---
@@ -1202,8 +1255,14 @@ export class OCRProcessor {
 
           // all checks passed -> attach
           const normalizedPrice = parsed.toFixed(2);
-          items.push({ name: nameLine, price: normalizedPrice, quantity: 1 });
-          console.log('Secondary-pass mapped ->', nameLine, normalizedPrice);
+          const sanitizedNameLine = OCRProcessor.normalizeItemName(nameLine);
+          if (OCRProcessor.isNoiseItemName(sanitizedNameLine, parseFloat(total || '0'), merchantName)) {
+            console.log('Secondary-pass skipped noise mapping for:', sanitizedNameLine, normalizedPrice);
+            // do not consume the name line so other mapping attempts can use it
+            continue;
+          }
+          items.push({ name: sanitizedNameLine, price: normalizedPrice, quantity: 1 });
+          console.log('Secondary-pass mapped ->', sanitizedNameLine, normalizedPrice);
           // mark consumed
           origLines[j] = '';
           origLines[idx] = '';
@@ -1213,5 +1272,114 @@ export class OCRProcessor {
       }
 
     return { merchantName, location, total, subtotal, tax, date, receiptNumber, paymentMethod, category, items };
+  }
+
+  private static normalizeItemName(n: string): string {
+    if (!n) return '';
+    let s = n.replace(/[^\w\s&'()\-\+\/\.£€]/g, ' ');
+    s = s.replace(/\b(x|X)\s*for\s*\b/gi, 'for ');
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    s = s.replace(/(\s?\d[\d\s\.]{1,}\d)\s*$/g, '').trim(); // trim trailing numeric artefacts
+    s = s.replace(/[_\-\*]{2,}/g, ' ').trim();
+    return s.replace(/\s{2,}/g, ' ').trim();
+  }
+
+  private static isNoiseItemName(n: string, totalNum?: number, merchant?: string): boolean {
+    if (!n) return true;
+    const name = n.trim();
+    if (name.length < 2) return true;
+
+    // Allow discount/savings descriptors (treat these as valid item lines to preserve price-reduction entries)
+    const discountLike = /\b(nectar\b|price\s*saving|price\s*reduction|your\s*savings|saving\b|discount\b|promo\s*saving)\b/i;
+    if (discountLike.test(name)) return false;
+
+    // explicit blacklist (slogans, POS messages, common non-item tokens)
+    const explicit = [
+      'change','total','subtotal','vat','your points','thank you','receipt',
+      'auth code','balance','promotions','multibuy','buy any','savings','smartshop','smart shop',
+      'over 18','over18','think 25','think25','cashier confirmed','cashier','gift card',
+      'good food for all','good food for all of us','please tell us how we did','thank you for your visit'
+    ];
+    for (const b of explicit) {
+      if (new RegExp(`\\b${b.replace(/[\s]/g,'\\s+')}\\b`, 'i').test(name)) return true;
+    }
+
+    const extraNoise: RegExp[] = [
+      /\bverification\b/i,
+      /\bverification\s+not\s+required\b/i,
+      /\bverification\s+required\b/i,
+      /\bverified\b/i,
+      /\bpayment\s+authori(s|z)ed\b/i,
+      /\bauthori(s|z)ed\b/i,
+      /\bpayment\s+approved\b/i,
+      /\btransaction\s+approved\b/i,
+      /\bapproved\b/i,
+      /\bnot\s+required\b/i,
+      /\bauth(?:orized|orised)?\b/i,
+      /\bthink\s*25\b/i,
+      /\bover\s*18\b/i,
+      /\bcashier\s+confirmed\b/i
+    ];
+    for (const re of extraNoise) if (re.test(name)) return true;
+
+    // merchant duplicate check (avoid merchant mapped as item)
+    if (merchant) {
+      const m = String(merchant).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const candidate = name.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      if (m && candidate && (candidate === m || candidate.includes(m) || m.includes(candidate))) return true;
+    }
+
+    // time/date lines
+    if (/\b\d{1,2}[:\/\-]\d{1,2}\b/.test(name) || /\b20\d{2}\b/.test(name) || /\b\d{2}:\d{2}:\d{2}\b/.test(name)) return true;
+
+    // too many digits relative to letters -> probably barcode/noise
+    const letters = (name.match(/[A-Za-z]/g) || []).length;
+    const digits = (name.match(/\d/g) || []).length;
+    if (letters < 2) return true;
+    if (digits / Math.max(1, name.length) > 0.45) return true;
+
+    // price fragment included
+    if (/\b\d+\.\d{2}\b/.test(name)) return true;
+
+    // absurd price inside name relative to total
+    if (typeof totalNum === 'number' && totalNum > 0) {
+      try {
+        const p = parseFloat((name.match(/-?\d+\.\d{2}/) || [])[0] || '0');
+        if (!isNaN(p) && Math.abs(p) > Math.max(999, totalNum * 20)) return true;
+      } catch {}
+    }
+
+    return false;
+  }
+
+  private static mergeAndCleanItems(items: Array<{ name: string; price: string; quantity?: number }>, total?: string, merchant?: string) {
+    const totalNum = total ? parseFloat(total) : NaN;
+    const cleaned = items
+      .map(it => ({ ...it, name: OCRProcessor.normalizeItemName(it.name) }))
+      .filter(it => !OCRProcessor.isNoiseItemName(it.name, isNaN(totalNum) ? undefined : totalNum, merchant));
+
+    const groups = new Map<string, { name: string; price: number; quantity: number }>();
+    for (const it of cleaned) {
+      const key = it.name.toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
+      const priceNum = parseFloat(String(it.price).replace(/[^0-9.\-]/g, '')) || 0;
+      const q = it.quantity || 1;
+      if (!groups.has(key)) groups.set(key, { name: it.name, price: priceNum, quantity: q });
+      else {
+        const g = groups.get(key)!;
+        if (priceNum > 0 && g.price === 0) g.price = priceNum;
+        if (priceNum > 0 && Math.abs(priceNum - g.price) > 0.01 && priceNum < g.price) g.price = priceNum;
+        g.quantity += q;
+      }
+    }
+
+    const out: Array<{ name: string; price: string; quantity?: number }> = [];
+    for (const { name, price, quantity } of Array.from(groups.values())) {
+      if (!isNaN(totalNum) && Math.abs(price) > Math.max(999, totalNum * 10)) {
+        console.log('Dropping unrealistic item price after merge:', name, price, 'total=', totalNum);
+        continue;
+      }
+      out.push({ name, price: (Math.abs(price) ? price.toFixed(2) : '0.00'), quantity });
+    }
+    return out;
   }
 }
