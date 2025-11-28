@@ -4,9 +4,13 @@ import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // Read Vite client envs (must be in client/.env and prefixed VITE_)
 const requiredEnvVars = {
-  apiKey: import.meta.env.VITE_FIREBASE_APIKEY as string | undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined, // NOTE: use _ between PROJECT and ID
-  appId: import.meta.env.VITE_FIREBASE_APPID as string | undefined,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
+};
+
+// Optional env vars - can be derived from projectId
+const optionalEnvVars = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
@@ -16,7 +20,6 @@ console.log('VITE env preview:', {
   apiKey: Boolean(requiredEnvVars.apiKey),
   projectId: requiredEnvVars.projectId,
   appId: Boolean(requiredEnvVars.appId),
-  storageBucket: Boolean(requiredEnvVars.storageBucket),
 });
 
 const missingVars = Object.entries(requiredEnvVars)
@@ -35,10 +38,10 @@ if (missingVars.length > 0) {
 } else {
   const firebaseConfig = {
     apiKey: requiredEnvVars.apiKey,
-    authDomain: `${requiredEnvVars.projectId}.firebaseapp.com`,
+    authDomain: optionalEnvVars.authDomain || `${requiredEnvVars.projectId}.firebaseapp.com`,
     projectId: requiredEnvVars.projectId,
-    storageBucket: `${requiredEnvVars.projectId}.firebasestorage.app`,
-    messagingSenderId: "123456789",
+    storageBucket: optionalEnvVars.storageBucket || `${requiredEnvVars.projectId}.firebasestorage.app`,
+    messagingSenderId: optionalEnvVars.messagingSenderId || "",
     appId: requiredEnvVars.appId,
   };
 
