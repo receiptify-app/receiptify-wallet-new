@@ -60,7 +60,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section - Commented out per user request
       <section className="px-6 py-16 bg-white">
         <div className="max-w-6xl mx-auto">
           <h3 className="text-3xl font-bold text-center text-gray-900 mb-12">
@@ -142,6 +142,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      */}
 
       {/* Stats Section */}
       <section className="px-6 py-16 bg-green-600 text-white">
