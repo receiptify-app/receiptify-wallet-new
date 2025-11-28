@@ -45,8 +45,13 @@ export default function ScannerModal({ open, onOpenChange }: ScannerModalProps) 
         method: 'POST',
         body: formData,
       });
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err: any = new Error(body?.error || 'Upload failed');
+        err.status = response.status;
+        throw err;
+      }
+      return body;
     },
     onSuccess: () => {
       toast({
@@ -57,12 +62,24 @@ export default function ScannerModal({ open, onOpenChange }: ScannerModalProps) 
       queryClient.invalidateQueries({ queryKey: ['/api/eco-metrics'] });
       onOpenChange(false);
     },
-    onError: () => {
-      toast({
-        title: "Capture failed",
-        description: "Failed to process your receipt. Please try again.",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      // Normalize message/status and show a clearer rejection message when appropriate
+      const msg = String(error?.message || error?.response?.data?.error || '');
+      const status = error?.status || error?.response?.status;
+
+      if (status === 400 || /does not appear to contain a receipt/i.test(msg) || /not a receipt/i.test(msg)) {
+        toast({
+          title: "Image rejected",
+          description: "Upload rejected — the image does not appear to contain a receipt.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Capture failed",
+          description: msg || "Failed to process your receipt. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   });
 

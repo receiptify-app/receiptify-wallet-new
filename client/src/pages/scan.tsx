@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { uploadReceiptFile } from '../lib/firebase-upload';
+import { getAuth } from 'firebase/auth';
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
@@ -31,61 +33,31 @@ export default function Scan() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      console.log('Starting upload for file:', file.name, file.size, 'bytes');
-      const formData = new FormData();
-      formData.append('receipt', file);
-      
-      // Skip location for faster upload
-      console.log('Uploading without location to speed up process...');
-      
-      try {
-        const response = await fetch('/api/receipts/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Upload failed:', response.status, errorText);
-          throw new Error('Upload failed');
-        }
-        
-        const result = await response.json();
-        console.log('Upload successful:', result);
-        return result;
-      } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      console.log('Receipt created successfully:', data.id);
-      
-      // Reset file inputs
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
-      
-      toast({
-        title: t('scan.uploadSuccess'),
-        description: t('scan.uploadSuccessDesc'),
+      console.log('Starting uploadReceiptFile for', file.name);
+      const { path } = await uploadReceiptFile(file);
+      console.log('Upload returned storage path:', path);
+
+      // optional: attach ID token for server auth
+      const token = await getAuth().currentUser?.getIdToken?.().catch(()=>undefined);
+      console.log('Using idToken present?:', !!token);
+
+      const resp = await fetch('/api/receipts/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ path }),
       });
-      
+      console.log('/api/receipts/process status:', resp.status);
+      const body = await resp.json().catch(()=>null);
+      console.log('/api/receipts/process response body:', body);
+      if (!resp.ok) throw new Error('Processing failed: ' + JSON.stringify(body));
+      return body;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
-    },
-    onError: (error) => {
-      console.error('Upload mutation error:', error);
-      
-      // Reset file inputs even on error
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
-      
-      toast({
-        title: t('scan.uploadError'),
-        description: t('scan.uploadErrorDesc'),
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
     }
   });
 
@@ -220,17 +192,17 @@ export default function Scan() {
 
         {/* Manual Entry Option */}
         <Card className="hover:shadow-md transition-shadow border-2 border-green-200" data-testid="card-manual-entry">
-          <CardContent className="p-6">
+          <CardContent className="p-0">
             <Button
               onClick={() => setShowManualForm(true)}
-              className="w-full h-auto py-6 bg-green-600 hover:bg-green-700 text-white"
+              className="w-full h-full bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center justify-start p-6"
               data-testid="button-manual-entry"
             >
-              <div className="flex items-center justify-center space-x-4">
+              <div className="flex items-center justify-center space-x-4 w-full">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                   <Edit className="w-6 h-6 text-white" />
                 </div>
-                <div className="text-left">
+                <div className="ml-4 text-left">
                   <div className="font-semibold text-lg text-white">Import Receipt</div>
                   <div className="text-sm text-white/90">Enter receipt information manually</div>
                 </div>

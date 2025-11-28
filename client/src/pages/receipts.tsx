@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare } from "lucide-react";
-import { Link } from "wouter";
+import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -25,6 +25,7 @@ interface Receipt {
 }
 
 export default function ReceiptsPage() {
+  const [, setLocation] = useLocation();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -59,6 +60,31 @@ export default function ReceiptsPage() {
       toast({
         title: "Move failed",
         description: "Failed to move receipts. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete receipt mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/receipts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete receipt");
+      return true;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
+      setSelectedReceipts(prev => {
+        const copy = new Set(prev);
+        copy.delete(id);
+        return copy;
+      });
+      toast({ title: "Receipt deleted", description: "Receipt removed successfully" });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Delete failed",
+        description: err?.message || "Failed to delete receipt",
         variant: "destructive",
       });
     }
@@ -110,6 +136,15 @@ export default function ReceiptsPage() {
     } else {
       setSelectedReceipts(new Set(receipts.map(r => r.id)));
     }
+  };
+
+  const handleDeleteReceipt = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (!confirm("Delete this receipt? This cannot be undone.")) return;
+    deleteMutation.mutate(id);
   };
 
   // Group receipts by date
@@ -222,7 +257,7 @@ export default function ReceiptsPage() {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Receipt className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No receipts yet</h3>
-            <p className="text-gray-500 mb-6">Start scanning QR codes to add your first receipt</p>
+            <p className="text-gray-500 mb-6">Add your first receipt</p>
             <Link href="/scan">
               <Button>
                 <ShoppingBag className="h-4 w-4 mr-2" />
@@ -247,13 +282,16 @@ export default function ReceiptsPage() {
                       onClick={(e) => {
                         if (selectionMode) {
                           handleReceiptSelect(receipt.id, e);
+                          return;
                         }
+                        // navigate to receipt detail
+                        setLocation(`/receipts/${receipt.id}`);
                       }}
                       data-testid={`card-receipt-${receipt.id}`}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
                             {selectionMode && (
                               <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
                                 <Checkbox 
@@ -266,27 +304,35 @@ export default function ReceiptsPage() {
                               {getMerchantIcon(receipt.merchantName)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {receipt.merchantName}
-                                </p>
-                                {receipt.category && (
-                                  <Badge 
-                                    variant="secondary" 
-                                    className={`text-xs ${getCategoryColor(receipt.category)}`}
+                              <div className="relative w-full overflow-hidden">
+                                {/* merchant name will truncate and leave room for badge on the right */}
+                                <div className="relative">
+                                  <p
+                                    className="text-sm font-medium text-gray-900 truncate pr-20"
+                                    title={receipt.merchantName}
                                   >
-                                    {receipt.category}
-                                  </Badge>
-                                )}
+                                    {receipt.merchantName}
+                                  </p>
+                                  {receipt.category && (
+                                    <div className="absolute top-0 right-0 pointer-events-none">
+                                      <Badge
+                                        variant="secondary"
+                                        className={`text-xs ${getCategoryColor(receipt.category)}`}
+                                      >
+                                        {receipt.category}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 truncate mt-1">
+                                  {format(new Date(receipt.date), 'h:mm a')}
+                                  {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-500">
-                                {format(new Date(receipt.date), 'h:mm a')}
-                                {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
-                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-right">
+                          <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                            <div className="text-right min-w-[10px] flex-shrink-0">
                               <p className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(receipt.total)}
                               </p>
@@ -297,9 +343,20 @@ export default function ReceiptsPage() {
                               )}
                             </div>
                             {!selectionMode && (
-                              <Link href={`/receipt/${receipt.id}`}>
-                                <ChevronRight className="h-4 w-4 text-gray-400" />
-                              </Link>
+                              <div className="flex items-center gap-1">
+                                 <ChevronRight className="h-4 w-4 text-gray-400" />
+                               </div>
+                             )}
+                            {/* Delete action */}
+                            {!selectionMode && (
+                              <button
+                                onClick={(e) => handleDeleteReceipt(receipt.id, e)}
+                                className="text-red-500 hover:text-red-700 p-1 ml-2"
+                                aria-label="Delete receipt"
+                                title="Delete receipt"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </button>
                             )}
                           </div>
                         </div>

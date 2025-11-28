@@ -1,22 +1,32 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 
-// Validate Firebase environment variables
+// Read Vite client envs (must be in client/.env and prefixed VITE_)
 const requiredEnvVars = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_APIKEY as string | undefined,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined, // NOTE: use _ between PROJECT and ID
+  appId: import.meta.env.VITE_FIREBASE_APPID as string | undefined,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
 };
 
-// Check for missing environment variables
+console.log('VITE env preview:', {
+  apiKey: Boolean(requiredEnvVars.apiKey),
+  projectId: requiredEnvVars.projectId,
+  appId: Boolean(requiredEnvVars.appId),
+  storageBucket: Boolean(requiredEnvVars.storageBucket),
+});
+
 const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
-  .map(([key]) => `VITE_FIREBASE_${key.toUpperCase()}`);
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 
 if (missingVars.length > 0) {
+
   console.warn("Missing Firebase environment variables:", missingVars);
   console.warn("Firebase authentication will not be available. Please configure Firebase to enable auth features.");
   console.warn("Set these environment variables:", missingVars.join(", "));

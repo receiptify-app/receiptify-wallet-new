@@ -42,6 +42,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Helper to fail fast when Firebase isn't configured
+  function ensureAuth() {
+    if (!auth) {
+      const err = new Error("Firebase not configured");
+      toast({
+        title: "Auth unavailable",
+        description: "Firebase is not configured. Authentication actions are disabled in this environment.",
+        variant: "destructive",
+      });
+      throw err;
+    }
+    return auth;
+  }
+
   async function signup(email: string, password: string, displayName: string) {
     if (!auth) {
       toast({
@@ -52,7 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const _auth = ensureAuth();
+      const result = await createUserWithEmailAndPassword(_auth, email, password);
       await updateProfile(result.user, { displayName });
       toast({
         title: "Account created!",
@@ -89,7 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const _auth = ensureAuth();
+      await signInWithEmailAndPassword(_auth, email, password);
       toast({
         title: "Welcome back!",
         description: "Successfully signed in to your account.",
@@ -127,7 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      await signOut(auth);
+      const _auth = ensureAuth();
+      await signOut(_auth);
       toast({
         title: "Signed out",
         description: "You have been successfully signed out.",
@@ -152,7 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      await sendPasswordResetEmail(auth, email);
+      const _auth = ensureAuth();
+      await sendPasswordResetEmail(_auth, email);
       toast({
         title: "Password reset sent",
         description: "Check your email for password reset instructions.",
@@ -177,14 +195,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      // Add custom parameters for better compatibility
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      await signInWithPopup(auth, provider);
+      const _auth = ensureAuth();
+       const provider = new GoogleAuthProvider();
+       provider.addScope('email');
+       provider.addScope('profile');
+       // Add custom parameters for better compatibility
+       provider.setCustomParameters({
+         prompt: 'select_account'
+       });
+      await signInWithPopup(_auth, provider);
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Google.",
@@ -218,9 +237,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      const provider = new FacebookAuthProvider();
-      provider.addScope('email');
-      await signInWithPopup(auth, provider);
+      const _auth = ensureAuth();
+       const provider = new FacebookAuthProvider();
+       provider.addScope('email');
+      await signInWithPopup(_auth, provider);
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Facebook.",
@@ -256,10 +276,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Firebase authentication not configured");
     }
     try {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-      await signInWithPopup(auth, provider);
+      const _auth = ensureAuth();
+       const provider = new OAuthProvider('apple.com');
+       provider.addScope('email');
+       provider.addScope('name');
+      await signInWithPopup(_auth, provider);
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Apple.",
@@ -286,6 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+
     if (!auth) {
       // If Firebase auth is not configured, just set loading to false
       setLoading(false);
@@ -297,7 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
   const value: AuthContextType = {
