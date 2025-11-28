@@ -50,8 +50,27 @@ export default function Scan() {
         console.log('Location not available:', error);
       }
       
+      // Get auth token for the request
+      const { auth } = await import('@/lib/firebase');
+      const headers: Record<string, string> = {};
+      
+      if (auth?.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+            console.log("Auth token attached to upload");
+          }
+        } catch (e) {
+          console.warn('Failed to get auth token:', e);
+        }
+      } else {
+        console.log("No authenticated user for upload");
+      }
+      
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
+        headers,
         body: formData,
       });
       

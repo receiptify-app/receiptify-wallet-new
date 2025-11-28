@@ -11,7 +11,7 @@ import AnalyticsReceiptCard from "@/components/analytics-receipt-card";
 import CategoryPickerModal from "@/components/category-picker-modal";
 import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CATEGORIES, getCategoryColor } from "@shared/categories";
 import { computeAnalytics, getAvailableMonthRanges, getMonthBoundsFromKey } from "@/utils/analytics";
 import type { Receipt } from "@shared/schema";
@@ -86,12 +86,7 @@ export default function Home() {
   // Move receipt mutation
   const moveMutation = useMutation({
     mutationFn: async ({ receiptId, categoryId }: { receiptId: string; categoryId: string }) => {
-      const response = await fetch(`/api/receipts/${receiptId}/move`, {
-        method: 'POST',
-        body: JSON.stringify({ categoryId }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) throw new Error('Failed to move receipt');
+      const response = await apiRequest('POST', `/api/receipts/${receiptId}/move`, { categoryId });
       return response.json();
     },
     onSuccess: () => {
@@ -113,12 +108,7 @@ export default function Home() {
   // Bulk move mutation
   const bulkMoveMutation = useMutation({
     mutationFn: async ({ receiptIds, categoryId }: { receiptIds: string[]; categoryId: string }) => {
-      const response = await fetch('/api/receipts/bulk-move', {
-        method: 'POST',
-        body: JSON.stringify({ receiptIds, categoryId }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) throw new Error('Failed to bulk move receipts');
+      const response = await apiRequest('POST', '/api/receipts/bulk-move', { receiptIds, categoryId });
       return response.json();
     },
     onSuccess: () => {

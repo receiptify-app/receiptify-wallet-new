@@ -22,9 +22,6 @@ import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
 import BottomNavigation from "@/components/bottom-navigation";
 import ExportReceiptsPage from "@/pages/exports";
-import { useEffect } from 'react';
-import { signInAnonymously } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
 // TODO: Backend cleanup needed - remove these API endpoints:
 // - /api/loyalty-cards (loyalty cards management)
@@ -83,15 +80,6 @@ function AuthenticatedRouter() {
 }
 
 function App() {
-  useEffect(() => {
-    if (!auth) return;
-    if (!auth.currentUser) {
-      signInAnonymously(auth).catch((err) => {
-        console.warn('Anonymous sign-in failed', err);
-      });
-    }
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

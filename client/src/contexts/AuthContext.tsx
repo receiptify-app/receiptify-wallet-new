@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { 
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  onIdTokenChanged,
   GoogleAuthProvider,
   FacebookAuthProvider,
   OAuthProvider,
@@ -14,6 +15,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, setAuthTokenGetter } from "@/lib/queryClient";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const previousUserIdRef = useRef<string | null>(null);
 
   // Helper to fail fast when Firebase isn't configured
   function ensureAuth() {
@@ -307,19 +310,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-
     if (!auth) {
-      // If Firebase auth is not configured, just set loading to false
+      setAuthTokenGetter(async () => null);
       setLoading(false);
       return;
     }
-    
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+
+    let isFirstAuthCallback = true;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      const newUserId = user?.uid || null;
+      const previousUserId = previousUserIdRef.current;
+      
+      if (isFirstAuthCallback) {
+        isFirstAuthCallback = false;
+        setAuthTokenGetter(async () => {
+          if (auth.currentUser) {
+            try {
+              return await auth.currentUser.getIdToken();
+            } catch (e) {
+              console.warn('Failed to get ID token:', e);
+              return null;
+            }
+          }
+          return null;
+        });
+      }
+      
+      if (newUserId !== previousUserId) {
+        console.log(`Auth state changed: ${previousUserId || 'anonymous'} -> ${newUserId || 'anonymous'}`);
+        queryClient.resetQueries();
+        previousUserIdRef.current = newUserId;
+      }
+      
       setCurrentUser(user);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeToken = onIdTokenChanged(auth, (user) => {
+      if (user) {
+        console.log('ID token refreshed for user:', user.uid);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeToken();
+    };
   }, []);
 
   const value: AuthContextType = {

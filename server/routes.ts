@@ -1314,8 +1314,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Fallback: persist using storage API so parsed receipts are visible in UI
           console.log('No DB save helper found; falling back to storage.createReceipt');
+          const userId = req.user?.id;
+          if (!userId) {
+            console.warn('No authenticated user for receipt save');
+            return res.status(401).json({ error: 'Authentication required' });
+          }
           const receiptData = {
-            userId: defaultUserId,
+            userId,
             merchantName: parsed.merchantName || 'Unknown Merchant',
             location: parsed.location || null,
             total: parsed.total || '0.00',
