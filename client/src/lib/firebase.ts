@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
 
 // Validate Firebase environment variables
 const requiredEnvVars = {
@@ -13,29 +13,36 @@ const missingVars = Object.entries(requiredEnvVars)
   .filter(([key, value]) => !value)
   .map(([key]) => `VITE_FIREBASE_${key.toUpperCase()}`);
 
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+
 if (missingVars.length > 0) {
-  console.error("Missing Firebase environment variables:", missingVars);
-  throw new Error(`Missing Firebase configuration: ${missingVars.join(", ")}`);
+  console.warn("Missing Firebase environment variables:", missingVars);
+  console.warn("Firebase authentication will not be available. Please configure Firebase to enable auth features.");
+  console.warn("Set these environment variables:", missingVars.join(", "));
+} else {
+  const firebaseConfig = {
+    apiKey: requiredEnvVars.apiKey,
+    authDomain: `${requiredEnvVars.projectId}.firebaseapp.com`,
+    projectId: requiredEnvVars.projectId,
+    storageBucket: `${requiredEnvVars.projectId}.firebasestorage.app`,
+    messagingSenderId: "123456789",
+    appId: requiredEnvVars.appId,
+  };
+
+  console.log("Firebase initialized with project:", requiredEnvVars.projectId);
+
+  // Initialize Firebase only if not already initialized
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApps()[0];
+  }
+
+  // Initialize Firebase Authentication and get a reference to the service
+  auth = getAuth(app);
 }
 
-const firebaseConfig = {
-  apiKey: requiredEnvVars.apiKey,
-  authDomain: `${requiredEnvVars.projectId}.firebaseapp.com`,
-  projectId: requiredEnvVars.projectId,
-  storageBucket: `${requiredEnvVars.projectId}.firebasestorage.app`,
-  messagingSenderId: "123456789",
-  appId: requiredEnvVars.appId,
-};
-
-console.log("Firebase initialized with project:", requiredEnvVars.projectId);
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
-
-// Remove emulator connection for Replit environment
-// Firebase will connect directly to production services
-
+// Export with null checks - consumers should verify auth is available
+export { auth };
 export default app;

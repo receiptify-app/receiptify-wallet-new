@@ -43,6 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   async function signup(email: string, password: string, displayName: string) {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
@@ -72,6 +80,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(email: string, password: string) {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({
@@ -102,6 +118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       await signOut(auth);
       toast({
@@ -119,6 +143,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPassword(email: string) {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       await sendPasswordResetEmail(auth, email);
       toast({
@@ -136,6 +168,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithGoogle() {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
@@ -169,6 +209,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithFacebook() {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       const provider = new FacebookAuthProvider();
       provider.addScope('email');
@@ -199,6 +247,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithApple() {
+    if (!auth) {
+      toast({
+        title: "Authentication unavailable",
+        description: "Firebase authentication is not configured. Please contact the administrator.",
+        variant: "destructive",
+      });
+      throw new Error("Firebase authentication not configured");
+    }
     try {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
@@ -230,6 +286,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    if (!auth) {
+      // If Firebase auth is not configured, just set loading to false
+      setLoading(false);
+      return;
+    }
+    
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
