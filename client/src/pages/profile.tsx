@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppHeader from "@/components/app-header";
 import { useCurrency } from "@/hooks/use-currency";
 import { CURRENCIES } from "@/lib/currency";
+import { apiRequest } from "@/lib/queryClient";
 
 // Sample user data matching the mockup
 const sampleUser = {
@@ -61,8 +62,7 @@ export default function Profile() {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/receipts");
-        if (!res.ok) return;
+        const res = await apiRequest("GET", "/api/receipts");
         const data = await res.json();
         if (mounted) setReceiptsList(data || []);
       } catch (e) {

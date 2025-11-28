@@ -9,7 +9,7 @@ import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSqua
 import { Link, useLocation } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import CategoryPickerModal from "@/components/category-picker-modal";
 import { useCurrency } from "@/hooks/use-currency";
@@ -39,12 +39,7 @@ export default function ReceiptsPage() {
   // Bulk move mutation
   const bulkMoveMutation = useMutation({
     mutationFn: async ({ receiptIds, categoryId }: { receiptIds: string[]; categoryId: string }) => {
-      const response = await fetch('/api/receipts/bulk-move', {
-        method: 'POST',
-        body: JSON.stringify({ receiptIds, categoryId }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) throw new Error('Failed to bulk move receipts');
+      const response = await apiRequest('POST', '/api/receipts/bulk-move', { receiptIds, categoryId });
       return response.json();
     },
     onSuccess: () => {
@@ -68,8 +63,7 @@ export default function ReceiptsPage() {
   // Delete receipt mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/receipts/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete receipt");
+      await apiRequest("DELETE", `/api/receipts/${id}`);
       return true;
     },
     onSuccess: (_, id) => {

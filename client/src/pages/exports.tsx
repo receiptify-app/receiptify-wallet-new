@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Download, ChevronLeft } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function ExportReceiptsPage() {
   const [, navigate] = useLocation();
@@ -15,8 +16,7 @@ export default function ExportReceiptsPage() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/receipts");
-        if (!res.ok) return;
+        const res = await apiRequest("GET", "/api/receipts");
         const data = await res.json();
         if (mounted) setReceiptsList(data || []);
       } catch (e) {
