@@ -1,5 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // Read Vite client envs (must be in client/.env and prefixed VITE_)
 const requiredEnvVars = {
@@ -24,6 +25,7 @@ const missingVars = Object.entries(requiredEnvVars)
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let storage: FirebaseStorage | null = null;
 
 if (missingVars.length > 0) {
 
@@ -51,8 +53,11 @@ if (missingVars.length > 0) {
 
   // Initialize Firebase Authentication and get a reference to the service
   auth = getAuth(app);
+  
+  // Initialize Firebase Storage
+  storage = getStorage(app);
 }
 
-// Export with null checks - consumers should verify auth is available
-export { auth };
+// Export with null checks - consumers should verify auth/storage is available
+export { auth, storage };
 export default app;
