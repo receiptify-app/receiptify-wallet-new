@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
@@ -13,8 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { uploadReceiptFile } from '../lib/firebase-upload';
-import { getAuth } from 'firebase/auth';
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
@@ -33,31 +31,66 @@ export default function Scan() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      console.log('Starting uploadReceiptFile for', file.name);
-      const { path } = await uploadReceiptFile(file);
-      console.log('Upload returned storage path:', path);
-
-      // optional: attach ID token for server auth
-      const token = await getAuth().currentUser?.getIdToken?.().catch(()=>undefined);
-      console.log('Using idToken present?:', !!token);
-
-      const resp = await fetch('/api/receipts/process', {
+      console.log('Starting upload for', file.name, file.size);
+      
+      const formData = new FormData();
+      formData.append('receipt', file);
+      
+      // Get current location if available
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: true
+          });
+        });
+        formData.append('latitude', position.coords.latitude.toString());
+        formData.append('longitude', position.coords.longitude.toString());
+      } catch (error) {
+        console.log('Location not available:', error);
+      }
+      
+      const response = await fetch('/api/receipts/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ path }),
+        body: formData,
       });
-      console.log('/api/receipts/process status:', resp.status);
-      const body = await resp.json().catch(()=>null);
-      console.log('/api/receipts/process response body:', body);
-      if (!resp.ok) throw new Error('Processing failed: ' + JSON.stringify(body));
+      
+      const body = await response.json().catch(() => ({}));
+      console.log('/api/receipts/upload status:', response.status, body);
+      
+      if (!response.ok) {
+        const err: any = new Error(body?.error || 'Upload failed');
+        err.status = response.status;
+        throw err;
+      }
       return body;
     },
     onSuccess: () => {
+      toast({
+        title: "Receipt captured successfully",
+        description: "Your receipt has been processed and added to your collection.",
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/eco-metrics'] });
+    },
+    onError: (error: any) => {
+      const msg = String(error?.message || error?.response?.data?.error || '');
+      const status = error?.status || error?.response?.status;
+      
+      if (status === 400 || /does not appear to contain a receipt/i.test(msg) || /not a receipt/i.test(msg)) {
+        toast({
+          title: "Image rejected",
+          description: "Upload rejected — the image does not appear to contain a receipt.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Capture failed",
+          description: msg || "Failed to process your receipt. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   });
 
