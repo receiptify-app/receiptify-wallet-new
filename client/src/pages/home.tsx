@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,9 +13,11 @@ import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CATEGORIES, getCategoryColor } from "@shared/categories";
-import { computeAnalytics, DateRange } from "@/utils/analytics";
+import { computeAnalytics, getAvailableMonthRanges, getMonthBoundsFromKey } from "@/utils/analytics";
 import type { Receipt } from "@shared/schema";
 import { useCurrency } from "@/hooks/use-currency";
+
+type DateRange = 'week' | 'month' | 'custom';
 
 export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState<DateRange>("month");
@@ -24,6 +26,15 @@ export default function Home() {
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
+  // default to current/latest month when monthOptions become available
+  useEffect(() => {
+    const options = getAvailableMonthRanges(receipts);
+    if (!selectedMonthKey && options.length > 0) {
+      setSelectedMonthKey(options[0].key);
+      setSelectedPeriod('custom');
+    }
+  }, [selectedMonthKey]);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrency();
@@ -43,18 +54,34 @@ export default function Home() {
     return map;
   }, []);
 
-  // Compute analytics data
-  const analytics = useMemo(() => {
-    return computeAnalytics(receipts, selectedPeriod, categoryColorMap);
-  }, [receipts, selectedPeriod, categoryColorMap]);
+  // Compute analytics data (use state so we can update from the month selector)
+  const [analytics, setAnalytics] = useState(() => computeAnalytics(receipts, selectedPeriod, categoryColorMap));
+
+  // keep analytics in sync when receipts / selectedPeriod / categoryColorMap change,
+  // or when selectedMonthKey switches
+  useEffect(() => {
+    if (selectedMonthKey === 'thisMonth') {
+      setAnalytics(computeAnalytics(receipts, selectedPeriod, categoryColorMap));
+      return;
+    }
+    const bounds = getMonthBoundsFromKey(selectedMonthKey ?? '');
+    if (bounds) {
+      setAnalytics(computeAnalytics(receipts, 'custom', categoryColorMap, bounds.start, bounds.end));
+    } else {
+      // fallback to selectedPeriod if key is invalid
+      setAnalytics(computeAnalytics(receipts, selectedPeriod, categoryColorMap));
+    }
+  }, [receipts, selectedPeriod, categoryColorMap, selectedMonthKey]);
 
   // Filter receipts by selected category
   const filteredReceipts = useMemo(() => {
-    if (!selectedCategory) return analytics.receipts;
-    return analytics.receipts.filter(r => 
+    // prefer analytics.receipts (period filtered) but fall back to raw receipts so Recent Activity shows uploads
+    const source = (analytics?.receipts && analytics.receipts.length > 0) ? analytics.receipts : receipts;
+    if (!selectedCategory) return source;
+    return source.filter(r =>
       r.category?.toLowerCase() === selectedCategory.toLowerCase()
     );
-  }, [analytics.receipts, selectedCategory]);
+  }, [analytics.receipts, selectedCategory, receipts]);
 
   // Move receipt mutation
   const moveMutation = useMutation({
@@ -162,6 +189,8 @@ export default function Home() {
     setSelectedReceipts(new Set());
   };
 
+  const monthOptions = useMemo(() => getAvailableMonthRanges(receipts), [receipts]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -185,13 +214,23 @@ export default function Home() {
       <div className="px-6 py-4 space-y-6">
         {/* Header with period selector and total */}
         <div className="flex items-center justify-between">
-          <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as DateRange)}>
-            <SelectTrigger className="w-[140px]" data-testid="select-date-range">
+          <Select
+            value={selectedMonthKey ?? ''}
+            onValueChange={(value) => {
+              // value is a YYYY-MM key from monthOptions
+              setSelectedPeriod('custom');
+              setSelectedMonthKey(value);
+            }}
+          >
+            <SelectTrigger className="w-[160px]" data-testid="select-date-range">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
+              {monthOptions.map(m => (
+                <SelectItem key={m.key} value={m.key}>
+                  {m.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -308,7 +347,7 @@ export default function Home() {
                   selectionMode={selectionMode}
                   onSelect={handleReceiptSelect}
                   onMove={handleMoveReceipt}
-                  onClick={(id) => navigate(`/receipt/${id}`)}
+                  onClick={(id) => navigate(`/receipts/${id}`)}
                 />
               ))}
             </div>

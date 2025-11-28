@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receiptify - OneTap Receipts. Zero Paper.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'receipt-green': '#2D5A3D',
+                        'receipt-light': '#A8D5A8',
+                        'receipt-bg': '#E8F5E8',
+                        'receipt-accent': '#4CAF50'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .receipt-border {
+            border: 2px dashed #A8D5A8;
+            border-radius: 12px;
+        }
+        .eco-gradient {
+            background: linear-gradient(135deg, #E8F5E8 0%, #A8D5A8 100%);
+        }
+        .chart-bar {
+            transition: height 0.5s ease-in-out;
+        }
+        .loyalty-card {
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(45, 90, 61, 0.15);
+        }
+        .mobile-container {
+            max-width: 375px;
+            margin: 0 auto;
+            min-height: 100vh;
+            position: relative;
+        }
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 375px;
+            width: 100%;
+            z-index: 50;
+        }
+        .receipt-item-icon {
+            width: 20px;
+            height: 20px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="bg-receipt-bg font-sans">
+    <!-- @COMPONENT: MobileApp [Main container for entire app] -->
+    <div class="mobile-container bg-receipt-bg">
+        
+        <!-- @COMPONENT: StatusBar [iOS status bar simulation] -->
+        <div class="bg-receipt-bg px-4 py-2 flex justify-between items-center text-sm font-medium text-gray-900">
+            <span>9:41</span>
+            <div class="flex items-center space-x-1">
+                <i class="fas fa-signal text-xs"></i>
+                <i class="fas fa-wifi text-xs"></i>
+                <i class="fas fa-battery-full text-xs"></i>
+            </div>
+        </div>
+
+        <!-- @COMPONENT: Header [App header with logo and navigation] -->
+        <div class="bg-receipt-bg px-4 py-4 border-b border-receipt-light/20">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-receipt-green rounded-full flex items-center justify-center">
+                    <i class="fas fa-receipt text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-receipt-green">Receiptify</h1>
+                    <p class="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- @COMPONENT: MainContent [Scrollable content area] -->
+        <div class="pb-20 overflow-y-auto" style="height: calc(100vh - 140px);">
+            
+            <!-- @COMPONENT: EcoImpactDashboard [Environmental impact overview] -->
+            <div class="p-4 space-y-4">
+                <div class="eco-gradient p-6 rounded-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-receipt-green">Your Eco Impact</h2>
+                        <i class="fas fa-leaf text-receipt-green text-xl"></i>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-receipt-green" data-bind="user.papersSaved">127</div>
+                            <div class="text-xs text-gray-600">Paper Receipts Saved</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-receipt-green" data-bind="user.co2Saved">2.3kg</div>
+                            <div class="text-xs text-gray-600">CO₂ Saved</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-receipt-green" data-bind="user.treesSaved">0.8</div>
+                            <div class="text-xs text-gray-600">Trees Saved</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- @COMPONENT: QRScanner [Quick receipt capture] -->
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-gray-900">Quick Capture</h3>
+                        <button class="w-8 h-8 bg-receipt-green rounded-full flex items-center justify-center" data-event="click:openQRScanner">
+                            <i class="fas fa-qrcode text-white text-sm"></i>
+                        </button>
+                    </div>
+                    <!-- A modern QR code scanner interface with green scan overlay -->
+                    <div class="receipt-border bg-gray-50 h-32 flex items-center justify-center relative">
+                        <div class="text-center">
+                            <i class="fas fa-camera text-receipt-green text-2xl mb-2"></i>
+                            <p class="text-sm text-gray-600">Tap to scan QR code</p>
+                        </div>
+                        <div class="absolute inset-4 border-2 border-receipt-green opacity-50 rounded-lg"></div>
+                    </div>
+                </div>
+
+                <!-- @COMPONENT: RecentReceipts [Latest transactions list] -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-900">Recent Receipts</h3>
+                            <button class="text-receipt-green text-sm font-medium" data-event="click:viewAllReceipts">View All</button>
+                        </div>
+                    </div>
+                    
+                    <!-- @MAP: recentReceipts.map(receipt => ( -->
+                    <div class="p-4 border-b border-gray-50 last:border-b-0" data-mock="true">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <span class="text-white font-bold text-sm">T</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium text-gray-900" data-bind="receipt.merchant">Tesco Express</p>
+                                        <p class="text-sm text-gray-500" data-bind="receipt.location">Camden, London</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900" data-bind="receipt.total">£24.18</p>
+                                        <p class="text-xs text-gray-500" data-bind="receipt.date">26 Apr 2024</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-b border-gray-50" data-mock="true">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                                <span class="text-white font-bold text-sm">W</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium text-gray-900">Waitrose</p>
+                                        <p class="text-sm text-gray-500">Harrow Weald</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900">£12.02</p>
+                                        <p class="text-xs text-gray-500">25 Apr 2024</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </div>
+                    </div>
+
+                    <div class="p-4" data-mock="true">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                <span class="text-white font-bold text-sm">A</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium text-gray-900">Argos</p>
+                                        <p class="text-sm text-gray-500">Oxford Street</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900">£89.99</p>
+                                        <p class="text-xs text-gray-500">23 Apr 2024</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+
+                <!-- @COMPONENT: SpendingOverview [Monthly spending analytics] -->
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-900">This Month's Spending</h3>
+                        <span class="text-2xl font-bold text-receipt-green" data-bind="user.monthlySpending">£387.45</span>
+                    </div>
+                    
+                    <!-- Simple bar chart representation -->
+                    <div class="flex items-end space-x-2 h-20 mb-3">
+                        <div class="flex-1 bg-receipt-light rounded-t chart-bar" style="height: 60%;" data-implementation="Week 1 spending visualization"></div>
+                        <div class="flex-1 bg-receipt-light rounded-t chart-bar" style="height: 80%;" data-implementation="Week 2 spending visualization"></div>
+                        <div class="flex-1 bg-receipt-green rounded-t chart-bar" style="height: 100%;" data-implementation="Week 3 spending visualization"></div>
+                        <div class="flex-1 bg-receipt-light rounded-t chart-bar" style="height: 45%;" data-implementation="Week 4 spending visualization"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-3 text-sm">
+                        <div class="text-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full mx-auto mb-1"></div>
+                            <div class="font-medium text-gray-900">£156.20</div>
+                            <div class="text-gray-500">Food</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mx-auto mb-1"></div>
+                            <div class="font-medium text-gray-900">£89.99</div>
+                            <div class="text-gray-500">Shopping</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-3 h-3 bg-orange-500 rounded-full mx-auto mb-1"></div>
+                            <div class="font-medium text-gray-900">£141.26</div>
+                            <div class="text-gray-500">Transport</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- @COMPONENT: LoyaltyCards [Linked loyalty programs] -->
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-900">Linked Loyalty Cards</h3>
+                        <button class="text-receipt-green text-sm font-medium" data-event="click:manageLoyaltyCards">Manage</button>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="loyalty-card bg-blue-600 text-white p-3 flex items-center justify-between" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <div class="text-lg font-bold">TESCO</div>
+                                <div class="text-sm opacity-90">Clubcard</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm opacity-90">Points</div>
+                                <div class="font-bold" data-bind="loyaltyCard.points">1,247</div>
+                            </div>
+                        </div>
+                        
+                        <div class="loyalty-card bg-green-600 text-white p-3 flex items-center justify-between" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <div class="text-lg font-bold">myWaitrose</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm opacity-90">Active</div>
+                                <div class="font-bold">Connected</div>
+                            </div>
+                        </div>
+                        
+                        <div class="loyalty-card bg-orange-500 text-white p-3 flex items-center justify-between" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <div class="text-lg font-bold">nectar</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm opacity-90">Points</div>
+                                <div class="font-bold" data-bind="loyaltyCard.points">892</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- @COMPONENT: ReceiptDetail [Detailed receipt view example] -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Latest Receipt Details</h3>
+                    </div>
+                    
+                    <!-- A panoramic view of London streets with classic red buses and black cabs -->
+                    <div class="h-32 bg-gray-200 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=300" alt="London street with red buses" class="w-full h-full object-cover" />
+                        <div class="absolute top-4 left-4 w-8 h-8 bg-receipt-green rounded-full flex items-center justify-center">
+                            <i class="fas fa-map-marker-alt text-white text-sm"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-900" data-bind="receipt.merchant">Tesco Express</h4>
+                                <p class="text-sm text-gray-500" data-bind="receipt.location">Camden, London</p>
+                                <p class="text-sm text-gray-500" data-bind="receipt.timestamp">26 Apr 2024 • 11:28</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-2xl font-bold text-gray-900" data-bind="receipt.total">£24.18</p>
+                            </div>
+                        </div>
+                        
+                        <div class="receipt-border p-3 mb-4">
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fas fa-bread-slice receipt-item-icon text-yellow-600"></i>
+                                        <span data-bind="item.name">Plain Bagels 4pk</span>
+                                    </div>
+                                    <span data-bind="item.price">£1.50</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fas fa-glass-whiskey receipt-item-icon text-blue-600"></i>
+                                        <span>Whole Milk 4 Pints</span>
+                                    </div>
+                                    <span>£1.65</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fas fa-cheese receipt-item-icon text-orange-600"></i>
+                                        <span>Cheddar Cheese</span>
+                                    </div>
+                                    <span>£3.25</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fas fa-apple-alt receipt-item-icon text-yellow-500"></i>
+                                        <span>Fairtrade Bananas</span>
+                                    </div>
+                                    <span>£1.58</span>
+                                </div>
+                                <div class="border-t border-dashed border-gray-300 pt-2 mt-2">
+                                    <div class="flex justify-between font-semibold">
+                                        <span>Total</span>
+                                        <span>£24.18</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-receipt-green text-white py-3 rounded-lg font-medium" data-event="click:splitReceipt">
+                                Split Receipt
+                            </button>
+                            <button class="px-4 py-3 bg-gray-100 rounded-lg" data-event="click:shareReceipt">
+                                <i class="fas fa-share text-gray-600"></i>
+                            </button>
+                            <button class="px-4 py-3 bg-gray-100 rounded-lg" data-event="click:addNote">
+                                <i class="fas fa-comment text-gray-600"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-receipt-bg rounded-lg flex items-center space-x-2">
+                            <div class="w-6 h-6 bg-receipt-green rounded-full flex items-center justify-center">
+                                <span class="text-white text-xs font-bold">N</span>
+                            </div>
+                            <span class="text-sm text-receipt-green font-medium">Saved 1 paper receipt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- @COMPONENT: Settings [App configuration options] -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Quick Settings</h3>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-100">
+                        <div class="p-4 flex items-center justify-between" data-event="click:toggleNotifications">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-bell text-gray-600"></i>
+                                <span>Push Notifications</span>
+                            </div>
+                            <div class="w-12 h-6 bg-receipt-green rounded-full relative">
+                                <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 right-0.5 shadow"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 flex items-center justify-between" data-event="click:manageCurrency">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-pound-sign text-gray-600"></i>
+                                <span>Currency</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-gray-500">GBP (£)</span>
+                                <i class="fas fa-chevron-right text-gray-300"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 flex items-center justify-between" data-event="click:exportData">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-download text-gray-600"></i>
+                                <span>Export Data</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </div>
+                        
+                        <div class="p-4 flex items-center justify-between" data-event="click:manageBackup">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-cloud text-gray-600"></i>
+                                <span>Backup & Sync</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- @COMPONENT: BottomTabBar [Main navigation] -->
+        <div class="tab-bar bg-white border-t border-gray-200 px-4 py-2">
+            <div class="flex items-center justify-around">
+                <button class="flex flex-col items-center space-y-1 py-2" data-event="click:navigateToEcoImpact">
+                    <i class="fas fa-leaf text-receipt-green text-lg"></i>
+                    <span class="text-xs font-medium text-receipt-green">Eco Impact</span>
+                </button>
+                
+                <button class="flex flex-col items-center space-y-1 py-2" data-event="click:navigateToSpending">
+                    <i class="fas fa-chart-line text-gray-400 text-lg"></i>
+                    <span class="text-xs text-gray-400">Spending</span>
+                </button>
+                
+                <button class="flex flex-col items-center space-y-1 py-2" data-event="click:navigateToReceipts">
+                    <i class="fas fa-receipt text-gray-400 text-lg"></i>
+                    <span class="text-xs text-gray-400">Receipts</span>
+                </button>
+                
+                <button class="flex flex-col items-center space-y-1 py-2" data-event="click:navigateToSettings">
+                    <i class="fas fa-cog text-gray-400 text-lg"></i>
+                    <span class="text-xs text-gray-400">Settings</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: MobileApp -->
+
+    <script>
+        (function() {
+            // TODO: Implement React Native navigation logic
+            // TODO: Implement QR code scanning functionality
+            // TODO: Implement receipt data fetching and processing
+            // TODO: Implement loyalty card API integrations
+            // TODO: Implement eco-impact calculations
+            // TODO: Implement bill splitting and payment processing
+            
+            // Simple demo interactions for the mockup
+            const buttons = document.querySelectorAll('[data-event]');
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const event = this.getAttribute('data-event');
+                    console.log('Button clicked:', event);
+                    
+                    // Simple visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 150);
+                });
+            });
+            
+            // Animate charts on load
+            setTimeout(() => {
+                const chartBars = document.querySelectorAll('.chart-bar');
+                chartBars.forEach((bar, index) => {
+                    setTimeout(() => {
+                        bar.style.opacity = '1';
+                        bar.style.transform = 'translateY(0)';
+                    }, index * 100);
+                });
+            }, 500);
+            
+        })();
+    </script>
+</body>
+</html>

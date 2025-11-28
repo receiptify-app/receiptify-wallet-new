@@ -1,0 +1,722 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receiptify - Digital Receipt Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#1976D2',
+                        'primary-dark': '#1565C0',
+                        'secondary': '#388E3C',
+                        'accent': '#FF5722',
+                        'background': '#FAFAFA',
+                        'surface': '#FFFFFF',
+                        'text-primary': '#212121',
+                        'text-secondary': '#757575',
+                    },
+                    boxShadow: {
+                        'material': '0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)',
+                        'material-hover': '0 4px 8px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.12)',
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .mobile-container {
+            max-width: 375px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .scanner-overlay {
+            background: linear-gradient(45deg, rgba(25,118,210,0.1) 0%, rgba(56,142,60,0.1) 100%);
+        }
+        
+        .qr-viewfinder {
+            border: 3px solid #FF5722;
+            border-radius: 20px;
+            position: relative;
+        }
+        
+        .qr-viewfinder::before,
+        .qr-viewfinder::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #FF5722;
+        }
+        
+        .qr-viewfinder::before {
+            top: -4px;
+            left: -4px;
+            border-right: none;
+            border-bottom: none;
+            border-top-left-radius: 20px;
+        }
+        
+        .qr-viewfinder::after {
+            bottom: -4px;
+            right: -4px;
+            border-left: none;
+            border-top: none;
+            border-bottom-right-radius: 20px;
+        }
+        
+        .floating-action-button {
+            transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+        
+        .floating-action-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .receipt-card {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .receipt-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-background">
+    <div class="mobile-container">
+        
+        <!-- @COMPONENT: OnboardingScreen -->
+        <div id="onboarding-screen" class="min-h-screen bg-gradient-to-b from-primary to-primary-dark text-white">
+            <!-- Onboarding Carousel -->
+            <div class="flex flex-col h-screen">
+                <div class="flex-1 flex items-center justify-center px-8">
+                    <div class="text-center">
+                        <div class="mb-8">
+                            <i class="fas fa-qrcode text-6xl mb-4 opacity-90"></i>
+                        </div>
+                        <h1 class="text-3xl font-bold mb-4">One Scan.<br>Zero Paper.</h1>
+                        <p class="text-lg opacity-90 mb-8 leading-relaxed">Experience the future of receipts! Scan QR codes to instantly access digital receipts with complete privacy.</p>
+                        
+                        <!-- Demo QR Code -->
+                        <div class="bg-white rounded-xl p-4 inline-block mb-8">
+                            <!-- QR code sample from user's uploaded image -->
+                            <img src="data:image/png;base64,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" alt="Sample QR Code" class="w-24 h-24" />
+                        </div>
+                        
+                        <p class="text-sm opacity-75">Scan this sample QR code to see how it works</p>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="p-6 space-y-4">
+                    <button onclick="showScannerScreen()" class="w-full bg-accent text-white py-4 rounded-xl font-semibold text-lg shadow-material">
+                        <i class="fas fa-qrcode mr-3"></i>Start Scanning
+                    </button>
+                    <button onclick="showReceiptsScreen()" class="w-full bg-white/20 text-white py-4 rounded-xl font-semibold text-lg backdrop-blur-sm">
+                        Continue Without Account
+                    </button>
+                </div>
+                
+                <!-- Privacy Notice -->
+                <div class="p-4 text-center">
+                    <p class="text-xs opacity-75">🔒 No personal data required • 100% device storage • Zero spam</p>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: OnboardingScreen -->
+
+        <!-- @COMPONENT: QRScannerScreen -->
+        <div id="scanner-screen" class="hidden min-h-screen bg-black relative">
+            <!-- Status Bar -->
+            <div class="bg-black text-white p-4 pt-12 z-20 relative">
+                <div class="flex items-center justify-between">
+                    <button onclick="hideScanner()" class="text-white">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                    <h2 class="font-semibold text-lg">Scan Receipt QR</h2>
+                    <button class="text-white">
+                        <i class="fas fa-bolt text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Scanner Area -->
+            <div class="scanner-overlay absolute inset-0 flex items-center justify-center">
+                <!-- Viewfinder -->
+                <div class="qr-viewfinder w-64 h-64 bg-transparent relative">
+                    <div class="absolute inset-4 flex items-center justify-center">
+                        <div class="text-white text-center">
+                            <i class="fas fa-qrcode text-4xl mb-2 opacity-50"></i>
+                            <p class="text-sm">Position QR code here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Instructions -->
+            <div class="absolute bottom-32 left-0 right-0 text-center px-6">
+                <p class="text-white text-lg mb-2">Point camera at QR code</p>
+                <p class="text-white/70 text-sm">Receipt will be saved automatically</p>
+            </div>
+            
+            <!-- Bottom Actions -->
+            <div class="absolute bottom-8 left-0 right-0 flex justify-center space-x-8">
+                <button onclick="showCameraUpload()" class="bg-white/20 p-4 rounded-full backdrop-blur-sm">
+                    <i class="fas fa-camera text-white text-xl"></i>
+                </button>
+                <button class="bg-white/20 p-4 rounded-full backdrop-blur-sm">
+                    <i class="fas fa-image text-white text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: QRScannerScreen -->
+
+        <!-- @COMPONENT: ReceiptsScreen -->
+        <div id="receipts-screen" class="hidden min-h-screen bg-background">
+            <!-- Header -->
+            <div class="bg-surface shadow-sm px-4 py-6 pt-12">
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-2xl font-bold text-text-primary">Receipts</h1>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="showMapView()" class="p-2 rounded-full bg-background">
+                            <i class="fas fa-map-marker-alt text-text-secondary"></i>
+                        </button>
+                        <button class="p-2 rounded-full bg-background">
+                            <i class="fas fa-filter text-text-secondary"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary"></i>
+                    <input type="text" placeholder="Search receipts, merchants, amounts..." 
+                           class="w-full pl-12 pr-4 py-3 bg-background rounded-xl text-text-primary placeholder-text-secondary border-none focus:ring-2 focus:ring-primary/20">
+                </div>
+            </div>
+            
+            <!-- Eco Impact Banner -->
+            <div class="mx-4 mt-4 bg-gradient-to-r from-secondary to-secondary/80 rounded-xl p-4 text-white">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold text-sm">Your Eco Impact</h3>
+                        <p class="text-xs opacity-90">This month you've saved</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold">47</div>
+                        <div class="text-xs opacity-90">receipts • 2.3kg CO₂</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Receipt List -->
+            <div class="px-4 py-4 space-y-3">
+                
+                <!-- @MAP: receipts.map(receipt => ( -->
+                <!-- Sample Receipt Card - Tesco -->
+                <div class="receipt-card bg-surface rounded-xl p-4 shadow-material" data-mock="true">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-shopping-cart text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-text-primary" data-bind="receipt.merchant">Tesco Express</h3>
+                                <p class="text-sm text-text-secondary" data-bind="receipt.location">High Street, London</p>
+                                <p class="text-xs text-text-secondary" data-bind="receipt.timestamp">Today, 2:34 PM</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-lg text-text-primary" data-bind="receipt.total">£23.47</p>
+                            <span class="inline-block w-2 h-2 bg-secondary rounded-full"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Receipt Items Preview -->
+                    <div class="border-t pt-3 space-y-1" data-mock="true">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Milk (2L)</span>
+                            <span class="text-text-primary">£2.50</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Bread</span>
+                            <span class="text-text-primary">£1.20</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-text-secondary">
+                            <span>+3 more items</span>
+                            <i class="fas fa-chevron-right text-xs"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t">
+                        <div class="flex space-x-4">
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-share-square mr-1"></i>Share
+                            </button>
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-users mr-1"></i>Split
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-secondary">+12 Clubcard points</span>
+                            <i class="fas fa-map-marker-alt text-text-secondary text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sample Receipt Card - Waitrose -->
+                <div class="receipt-card bg-surface rounded-xl p-4 shadow-material" data-mock="true">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-green-700 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-leaf text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-text-primary">Waitrose</h3>
+                                <p class="text-sm text-text-secondary">Canary Wharf, London</p>
+                                <p class="text-xs text-text-secondary">Yesterday, 6:15 PM</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-lg text-text-primary">£45.82</p>
+                            <span class="inline-block w-2 h-2 bg-secondary rounded-full"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-3 space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Essential Organic Quinoa</span>
+                            <span class="text-text-primary">£3.50</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Free Range Eggs</span>
+                            <span class="text-text-primary">£3.20</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-text-secondary">
+                            <span>+7 more items</span>
+                            <i class="fas fa-chevron-right text-xs"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t">
+                        <div class="flex space-x-4">
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-share-square mr-1"></i>Share
+                            </button>
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-users mr-1"></i>Split
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-text-secondary">Warranty: 30 days</span>
+                            <i class="fas fa-map-marker-alt text-text-secondary text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sample Receipt Card - Shell -->
+                <div class="receipt-card bg-surface rounded-xl p-4 shadow-material" data-mock="true">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-gas-pump text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-text-primary">Shell</h3>
+                                <p class="text-sm text-text-secondary">A40 Service Station</p>
+                                <p class="text-xs text-text-secondary">3 days ago, 8:22 AM</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-lg text-text-primary">£52.30</p>
+                            <span class="inline-block w-2 h-2 bg-secondary rounded-full"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-3 space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Unleaded Petrol</span>
+                            <span class="text-text-primary">£50.00</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-text-secondary">Coffee</span>
+                            <span class="text-text-primary">£2.30</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t">
+                        <div class="flex space-x-4">
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-share-square mr-1"></i>Share
+                            </button>
+                            <button class="text-primary text-sm font-medium">
+                                <i class="fas fa-redo mr-1"></i>Return
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-secondary">+25 GO+ points</span>
+                            <i class="fas fa-map-marker-alt text-text-secondary text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+                
+            </div>
+            
+            <!-- Floating Action Button -->
+            <button onclick="showScannerScreen()" class="floating-action-button fixed bottom-20 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-material-hover flex items-center justify-center">
+                <i class="fas fa-qrcode text-xl"></i>
+            </button>
+            
+            <!-- Bottom Navigation -->
+            <div class="fixed bottom-0 left-0 right-0 bg-surface border-t border-gray-200 px-4 py-2">
+                <div class="flex justify-around items-center max-w-sm mx-auto">
+                    <button class="flex flex-col items-center py-2 text-primary">
+                        <i class="fas fa-receipt text-lg mb-1"></i>
+                        <span class="text-xs font-medium">Receipts</span>
+                    </button>
+                    <button onclick="showMapView()" class="flex flex-col items-center py-2 text-text-secondary">
+                        <i class="fas fa-map text-lg mb-1"></i>
+                        <span class="text-xs">Map</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 text-text-secondary">
+                        <i class="fas fa-chart-line text-lg mb-1"></i>
+                        <span class="text-xs">Insights</span>
+                    </button>
+                    <button class="flex flex-col items-center py-2 text-text-secondary">
+                        <i class="fas fa-user text-lg mb-1"></i>
+                        <span class="text-xs">Profile</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: ReceiptsScreen -->
+
+        <!-- @COMPONENT: MapScreen -->
+        <div id="map-screen" class="hidden min-h-screen bg-background">
+            <!-- Header -->
+            <div class="bg-surface shadow-sm px-4 py-6 pt-12 relative z-10">
+                <div class="flex items-center justify-between">
+                    <button onclick="hideMapView()">
+                        <i class="fas fa-arrow-left text-text-primary text-xl"></i>
+                    </button>
+                    <h1 class="text-xl font-semibold text-text-primary">Purchase Locations</h1>
+                    <button class="p-2 rounded-full bg-background">
+                        <i class="fas fa-layer-group text-text-secondary"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Map Area -->
+            <div class="relative h-96 bg-gray-200">
+                <!-- Mock Map Background -->
+                <!-- A London street map view showing various shop locations -->
+                <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=400" 
+                     alt="London street map" class="w-full h-full object-cover" />
+                
+                <!-- Map Pins -->
+                <div class="absolute top-24 left-16 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg">
+                    <i class="fas fa-gas-pump"></i>
+                </div>
+                <div class="absolute top-32 right-20 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="absolute bottom-20 left-1/3 bg-green-700 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg">
+                    <i class="fas fa-leaf"></i>
+                </div>
+                
+                <!-- Location Controls -->
+                <button class="absolute bottom-4 right-4 bg-surface p-3 rounded-full shadow-material">
+                    <i class="fas fa-crosshairs text-primary"></i>
+                </button>
+            </div>
+            
+            <!-- Location Summary -->
+            <div class="p-4">
+                <div class="bg-surface rounded-xl p-4 shadow-material">
+                    <h3 class="font-semibold text-text-primary mb-3">Recent Locations</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-blue-600 rounded-full"></div>
+                            <div class="flex-1">
+                                <p class="font-medium text-text-primary">Tesco Express</p>
+                                <p class="text-sm text-text-secondary">High Street, London • £23.47</p>
+                            </div>
+                            <span class="text-xs text-text-secondary">Today</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-700 rounded-full"></div>
+                            <div class="flex-1">
+                                <p class="font-medium text-text-primary">Waitrose</p>
+                                <p class="text-sm text-text-secondary">Canary Wharf, London • £45.82</p>
+                            </div>
+                            <span class="text-xs text-text-secondary">Yesterday</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-red-600 rounded-full"></div>
+                            <div class="flex-1">
+                                <p class="font-medium text-text-primary">Shell</p>
+                                <p class="text-sm text-text-secondary">A40 Service Station • £52.30</p>
+                            </div>
+                            <span class="text-xs text-text-secondary">3 days ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Map Legend -->
+            <div class="px-4 pb-4">
+                <div class="bg-surface rounded-xl p-4 shadow-material">
+                    <h4 class="font-medium text-text-primary mb-2">Legend</h4>
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-blue-600 rounded-full"></div>
+                            <span class="text-text-secondary">Grocery</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-red-600 rounded-full"></div>
+                            <span class="text-text-secondary">Fuel</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-green-700 rounded-full"></div>
+                            <span class="text-text-secondary">Organic</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-purple-600 rounded-full"></div>
+                            <span class="text-text-secondary">Electronics</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: MapScreen -->
+
+        <!-- @COMPONENT: ReceiptDetailModal -->
+        <div id="receipt-detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end">
+            <div class="bg-surface rounded-t-3xl w-full max-h-[80vh] overflow-y-auto">
+                <!-- Modal Header -->
+                <div class="sticky top-0 bg-surface px-4 py-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-shopping-cart text-white"></i>
+                            </div>
+                            <div>
+                                <h2 class="font-bold text-xl text-text-primary">Tesco Express</h2>
+                                <p class="text-sm text-text-secondary">High Street, London</p>
+                            </div>
+                        </div>
+                        <button onclick="hideReceiptDetail()" class="p-2 rounded-full bg-background">
+                            <i class="fas fa-times text-text-secondary"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Receipt Content -->
+                <div class="p-4 space-y-4">
+                    <!-- Receipt Info -->
+                    <div class="bg-background rounded-xl p-4">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p class="text-text-secondary">Date & Time</p>
+                                <p class="font-medium text-text-primary">Today, 2:34 PM</p>
+                            </div>
+                            <div>
+                                <p class="text-text-secondary">Total Amount</p>
+                                <p class="font-bold text-xl text-text-primary">£23.47</p>
+                            </div>
+                            <div>
+                                <p class="text-text-secondary">Payment Method</p>
+                                <p class="font-medium text-text-primary">Contactless Card</p>
+                            </div>
+                            <div>
+                                <p class="text-text-secondary">Receipt ID</p>
+                                <p class="font-medium text-text-primary">#RC001247</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Line Items -->
+                    <div class="bg-background rounded-xl p-4">
+                        <h3 class="font-semibold text-text-primary mb-4">Items Purchased</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex-1">
+                                    <p class="font-medium text-text-primary">Tesco Milk 2L Semi-Skimmed</p>
+                                    <p class="text-sm text-text-secondary">Qty: 1 • £2.50 each</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-text-primary">£2.50</p>
+                                    <button class="text-xs text-primary">Add note</button>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex-1">
+                                    <p class="font-medium text-text-primary">Hovis Wholemeal Bread 800g</p>
+                                    <p class="text-sm text-text-secondary">Qty: 1 • £1.20 each</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-text-primary">£1.20</p>
+                                    <button class="text-xs text-primary">Add note</button>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex-1">
+                                    <p class="font-medium text-text-primary">Bananas Loose</p>
+                                    <p class="text-sm text-text-secondary">Qty: 6 • £0.18 each</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-text-primary">£1.08</p>
+                                    <button class="text-xs text-primary">Add note</button>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex-1">
+                                    <p class="font-medium text-text-primary">Tesco British Chicken Breast 1kg</p>
+                                    <p class="text-sm text-text-secondary">Qty: 1 • £6.50 each</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-text-primary">£6.50</p>
+                                    <button class="text-xs text-primary">Add note</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Totals -->
+                        <div class="mt-4 pt-4 border-t space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-text-secondary">Subtotal</span>
+                                <span class="text-text-primary">£21.28</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-text-secondary">Clubcard Discount</span>
+                                <span class="text-secondary">-£0.81</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-text-secondary">VAT (20%)</span>
+                                <span class="text-text-primary">£1.00</span>
+                            </div>
+                            <div class="flex justify-between text-lg font-bold border-t pt-2">
+                                <span class="text-text-primary">Total</span>
+                                <span class="text-text-primary">£23.47</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loyalty & Benefits -->
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="font-semibold text-text-primary">Tesco Clubcard</h4>
+                                <p class="text-sm text-text-secondary">Points earned this purchase</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-blue-600">+12</div>
+                                <p class="text-xs text-text-secondary">points</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="bg-primary text-white py-4 rounded-xl font-semibold flex items-center justify-center space-x-2">
+                            <i class="fas fa-users"></i>
+                            <span>Split Receipt</span>
+                        </button>
+                        <button class="bg-background text-text-primary py-4 rounded-xl font-semibold border flex items-center justify-center space-x-2">
+                            <i class="fas fa-share-square"></i>
+                            <span>Share/Export</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Eco Impact -->
+                    <div class="bg-gradient-to-r from-secondary/10 to-secondary/20 rounded-xl p-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
+                                <i class="fas fa-leaf text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-text-primary">Eco Impact</h4>
+                                <p class="text-sm text-text-secondary">This digital receipt saved 0.05kg CO₂</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: ReceiptDetailModal -->
+
+    </div>
+
+    <script>
+        // Simple screen management - In production, this would be handled by React Navigation
+        // TODO: Implement proper navigation state management in React Native
+        
+        (function() {
+            function showScreen(screenId) {
+                // Hide all screens
+                const screens = ['onboarding-screen', 'scanner-screen', 'receipts-screen', 'map-screen'];
+                screens.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.classList.add('hidden');
+                });
+                
+                // Show target screen
+                const targetScreen = document.getElementById(screenId);
+                if (targetScreen) targetScreen.classList.remove('hidden');
+            }
+            
+            // Make functions global for onclick handlers
+            window.showScannerScreen = () => showScreen('scanner-screen');
+            window.showReceiptsScreen = () => showScreen('receipts-screen');
+            window.showMapView = () => showScreen('map-screen');
+            window.hideScanner = () => showScreen('receipts-screen');
+            window.hideMapView = () => showScreen('receipts-screen');
+            
+            // Modal management
+            window.showReceiptDetail = () => {
+                document.getElementById('receipt-detail-modal').classList.remove('hidden');
+            };
+            
+            window.hideReceiptDetail = () => {
+                document.getElementById('receipt-detail-modal').classList.add('hidden');
+            };
+            
+            // Camera upload simulation
+            window.showCameraUpload = () => {
+                // TODO: Implement camera/photo picker using React Native Image Picker
+                alert('Camera functionality would be implemented using React Native Camera or Image Picker');
+            };
+            
+            // Add click handlers for receipt cards
+            document.addEventListener('DOMContentLoaded', function() {
+                const receiptCards = document.querySelectorAll('.receipt-card');
+                receiptCards.forEach(card => {
+                    card.addEventListener('click', window.showReceiptDetail);
+                });
+            });
+            
+            // Start with onboarding screen visible
+            showScreen('onboarding-screen');
+        })();
+    </script>
+</body>
+</html>

@@ -94,7 +94,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
             </span>
           </div>
           <div className="flex space-x-2">
-            <Link href={`/receipt/${receipt.id}`}>
+            <Link href={`/receipts/${receipt.id}`}>
               <Button size="sm" variant="outline" className="text-xs px-3">
                 <Eye className="w-3 h-3 mr-1" />
                 View

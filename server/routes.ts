@@ -20,8 +20,98 @@ import {
   insertWarrantyClaimSchema,
 } from "@shared/schema";
 import multer from "multer";
-import * as fs from 'fs';
-import { OCRProcessor } from './ocr-processor';
+import * as fs from "fs";
+import path from "path";
+import os from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
+const execFileP = promisify(execFile);
+import sharp from 'sharp';
+
+// helper: save buffer into public/uploads, convert HEIC/HEIF -> PNG for browser compatibility
+async function saveBufferToUploads(buffer: Buffer, suggestedName?: string): Promise<string> {
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  const base = suggestedName
+    ? String(suggestedName).replace(/[^a-zA-Z0-9-_]/g, '_').replace(/\.[^.]+$/, '')
+    : `proc_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+
+  // detect HEIC/HEIF by magic bytes (ftyp ... heic/heif) as a heuristic
+  const header = buffer.slice(4, 12).toString('utf8').toLowerCase();
+  const isHeic = header.includes('heic') || header.includes('heif');
+
+  let finalBuf = buffer;
+  let finalExt = isHeic ? 'png' : 'png'; // default to png for web
+
+  if (isHeic) {
+    // try sharp first
+    try {
+      finalBuf = await sharp(buffer, { failOnError: false }).png().toBuffer();
+      finalExt = 'png';
+      console.log('saveBufferToUploads: converted HEIC -> PNG with sharp');
+    } catch (sharpErr) {
+      console.warn('saveBufferToUploads: sharp conversion failed, trying external converters:', (sharpErr as any)?.message || sharpErr);
+
+      // fallback to external converters using temp files
+      const tmpIn = path.join(os.tmpdir(), `in_${Date.now()}.heic`);
+      const tmpOut = path.join(os.tmpdir(), `out_${Date.now()}.png`);
+      await fs.promises.writeFile(tmpIn, buffer);
+
+      try {
+        let converted = false;
+
+        const tryCmd = async (cmd: string, args: string[]) => {
+          try {
+            await execFileP(cmd, args);
+            const stat = await fs.promises.stat(tmpOut).catch(() => null);
+            if (stat && stat.size > 0) {
+              converted = true;
+              console.log(`saveBufferToUploads: ${cmd} conversion succeeded`);
+            } else {
+              console.warn(`saveBufferToUploads: ${cmd} produced no output`);
+            }
+          } catch (e) {
+            console.warn(`saveBufferToUploads: ${cmd} failed:`, (e as any)?.message || e);
+          }
+        };
+
+        // Try common converters in order
+        await tryCmd('magick', [tmpIn, tmpOut]);        // ImageMagick (modern)
+        if (!converted) await tryCmd('convert', [tmpIn, tmpOut]); // ImageMagick older name
+        if (!converted) await tryCmd('heif-convert', [tmpIn, tmpOut]); // libheif
+        if (!converted) await tryCmd('sips', ['-s', 'format', 'png', tmpIn, '--out', tmpOut]); // macOS fallback
+
+        if (converted) {
+          finalBuf = await fs.promises.readFile(tmpOut);
+          finalExt = 'png';
+        } else {
+          console.warn('saveBufferToUploads: all external converters failed; saving original HEIC as fallback');
+          finalBuf = buffer;
+          finalExt = 'heic';
+        }
+      } finally {
+        try { await fs.promises.unlink(tmpIn); } catch {}
+        try { await fs.promises.unlink(tmpOut); } catch {}
+      }
+    }
+  }
+
+  // write final buffer to uploads
+  const filename = `${base}.${finalExt}`;
+  const outPath = path.join(uploadsDir, filename);
+  await fs.promises.writeFile(outPath, finalBuf);
+  console.log('saveBufferToUploads: wrote file ->', outPath, 'ext=', finalExt);
+  return `/uploads/${filename}`;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string; [key: string]: any };
+    }
+  }
+}
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -48,131 +138,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register admin routes
   app.use("/api/admin", adminRouter);
-
-  // Seed route for development
-  app.post("/api/seed", async (req, res) => {
-    try {
-      if (process.env.NODE_ENV !== 'development') {
-        return res.status(403).json({ error: "Seeding is only allowed in development" });
-      }
-
-      // Create Waitrose receipt
-      const waitroseReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Waitrose",
-        location: "Harrow Weald, London",
-        total: "12.02",
-        date: new Date("2025-10-12T16:34:00"),
-        category: "Food",
-        paymentMethod: "VISA Debit",
-        receiptNumber: "WAIT-2025-001",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Baguette", price: "2.00", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Mozzarella", price: "1.70", quantity: "2", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Smoked Salmon", price: "4.87", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: waitroseReceipt.id, name: "Organic Tomatoes", price: "1.75", quantity: "1", category: "Food" });
-
-      // Create Tesco receipt
-      const tescoReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Tesco",
-        location: "London, UK",
-        total: "5.18",
-        date: new Date("2025-10-10T10:30:00"),
-        category: "Food",
-        paymentMethod: "Card",
-        receiptNumber: "TESCO-2025-004",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Milk", price: "1.50", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Bread", price: "1.20", quantity: "1", category: "Food" });
-      await storage.createReceiptItem({ receiptId: tescoReceipt.id, name: "Eggs", price: "2.48", quantity: "1", category: "Food" });
-
-      // Create Argos receipt (September)
-      const argosReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Argos",
-        location: "London, UK",
-        total: "59.99",
-        date: new Date("2025-09-25T14:20:00"),
-        category: "Tech",
-        paymentMethod: "Mastercard",
-        receiptNumber: "ARGOS-2025-002",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Wireless Mouse", price: "29.99", quantity: "1", category: "Tech" });
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Phone Stand", price: "15.00", quantity: "1", category: "Tech" });
-      await storage.createReceiptItem({ receiptId: argosReceipt.id, name: "Cable", price: "15.00", quantity: "1", category: "Tech" });
-
-      // Create Currys receipt (October - Tech £1.99)
-      const currysReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Currys",
-        location: "London, UK",
-        total: "1.99",
-        date: new Date("2025-10-05T14:00:00"),
-        category: "Tech",
-        paymentMethod: "Card",
-        receiptNumber: "CURRYS-2025-006",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: currysReceipt.id, name: "USB Cable", price: "1.99", quantity: "1", category: "Tech" });
-
-      // Create Shell receipt (October)
-      const shellReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "Shell",
-        location: "M25 Service Station",
-        total: "23.80",
-        date: new Date("2025-10-22T09:15:00"),
-        category: "Transport",
-        paymentMethod: "Contactless",
-        receiptNumber: "SHELL-2025-003",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: shellReceipt.id, name: "Unleaded Petrol", price: "23.80", quantity: "1", category: "Transport" });
-
-      // Create BP receipt (October)
-      const bpReceipt = await storage.createReceipt({
-        userId: defaultUserId,
-        merchantName: "BP",
-        location: "London, UK",
-        total: "79.20",
-        date: new Date("2025-10-15T08:00:00"),
-        category: "Transport",
-        paymentMethod: "Card",
-        receiptNumber: "BP-2025-005",
-        currency: "GBP",
-        ecoPoints: 1,
-      });
-
-      await storage.createReceiptItem({ receiptId: bpReceipt.id, name: "Diesel", price: "79.20", quantity: "1", category: "Transport" });
-
-      res.json({ 
-        message: "Database seeded successfully",
-        summary: {
-          Food: "£17.20",
-          Tech: "£1.99",
-          Transport: "£103.00",
-          Total: "£122.19"
-        }
-      });
-    } catch (error) {
-      console.error("Seeding error:", error);
-      res.status(500).json({ error: "Failed to seed database" });
-    }
-  });
 
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
@@ -227,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Receipt routes
-  app.get("/api/receipts", async (req, res) => {
+  app.get("/api/receipts/process", async (req, res) => {
     try {
       const { category, merchant, startDate, endDate, minAmount, maxAmount } = req.query;
       
@@ -311,40 +276,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Processing uploaded receipt image: ${req.file.originalname}`);
       console.log(`Image size: ${req.file.size} bytes`);
       
-      // Save the image permanently
+      // Save the image permanently (choose extension based on conversion)
       const timestamp = Date.now();
-      const filename = `${timestamp}_${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const permanentPath = `public/uploads/${filename}`;
-      const imageUrl = `/uploads/${filename}`;
+      const origBase = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^/.]+$/, '');
+      // Will adjust ext to 'png' when we convert HEIC/HEIF
+      let ext = path.extname(req.file.originalname).replace(/^\./, '') || 'jpg';
+      let filename = `${timestamp}_${origBase}.${ext}`;
+      let permanentPath = `public/uploads/${filename}`;
+      let imageUrl = `/uploads/${filename}`;
+ 
+       // Create uploads directory if it doesn't exist
+       if (!fs.existsSync('public/uploads')) {
+         fs.mkdirSync('public/uploads', { recursive: true });
+       }
+       
+       // Save the uploaded file permanently, converting HEIC/HEIF to PNG if needed
+       const origLower = (req.file.originalname || '').toLowerCase();
+       const isHeic = /\.(heic|heif)$/i.test(origLower) || req.file.mimetype === 'image/heif' || req.file.mimetype === 'image/heic';
+       
+       if (isHeic) {
+         console.log('HEIC/HEIF upload detected — attempting conversion before saving');
+         try {
+          // Try sharp first and update filename/paths to .png when conversion succeeds
+          const converted = await sharp(req.file.buffer, { failOnError: false }).png().toBuffer();
+          ext = 'png';
+          filename = `${timestamp}_${origBase}.${ext}`;
+          permanentPath = `public/uploads/${filename}`;
+          imageUrl = `/uploads/${filename}`;
+          fs.writeFileSync(permanentPath, converted);
+          console.log(`Converted HEIC -> PNG (sharp) and saved to: ${permanentPath}`);
+         } catch (sharpErr) {
+           console.warn('Sharp HEIC conversion failed, trying external converters:', (sharpErr as any)?.message || String(sharpErr));
+           // try external converters
+           const tmpIn = path.join(os.tmpdir(), `ocr_in_${Date.now()}.heic`);
+           const tmpOut = path.join(os.tmpdir(), `ocr_out_${Date.now()}.png`);
+           await fs.promises.writeFile(tmpIn, req.file.buffer);
+           const candidates = [
+             { cmd: 'magick', args: [tmpIn, tmpOut] },
+             { cmd: 'convert', args: [tmpIn, tmpOut] },
+             { cmd: 'heif-convert', args: [tmpIn, tmpOut] },
+           ];
+           let convertedOk = false;
+           let lastErr: any = null;
+           for (const c of candidates) {
+             try {
+               console.log(`Trying external converter: ${c.cmd}`);
+               const { stdout, stderr } = await execFileP(c.cmd, c.args);
+               console.log(`${c.cmd} stdout:`, (stdout || '').toString().slice(0, 200));
+               console.log(`${c.cmd} stderr:`, (stderr || '').toString().slice(0, 200));
+               const stat = await fs.promises.stat(tmpOut).catch(() => null);
+               if (stat && stat.size > 0) {
+                 // Use .png extension for converted output
+                 const convertedBuf = await fs.promises.readFile(tmpOut);
+                 ext = 'png';
+                 filename = `${timestamp}_${origBase}.${ext}`;
+                 permanentPath = `public/uploads/${filename}`;
+                 imageUrl = `/uploads/${filename}`;
+                 fs.writeFileSync(permanentPath, convertedBuf);
+                 console.log('External conversion successful with', c.cmd, '->', permanentPath);
+                 convertedOk = true;
+                 await fs.promises.unlink(tmpIn).catch(()=>{});
+                 await fs.promises.unlink(tmpOut).catch(()=>{});
+                 break;
+               } else {
+                 lastErr = new Error(`${c.cmd} produced no output`);
+               }
+             } catch (extErr) {
+               console.warn(`${c.cmd} failed:`, (extErr as any)?.message ?? extErr);
+               lastErr = extErr;
+             }
+           }
+           if (!convertedOk) {
+             // cleanup tmp files and fallback to saving original buffer
+             await fs.promises.unlink(tmpIn).catch(()=>{});
+             await fs.promises.unlink(tmpOut).catch(()=>{});
+             console.warn('All external converters failed, saving original buffer as fallback:', lastErr?.message || lastErr);
+            // Save with original extension if conversion failed
+            ext = path.extname(req.file.originalname).replace(/^\./, '') || 'heic';
+            filename = `${timestamp}_${origBase}.${ext}`;
+            permanentPath = `public/uploads/${filename}`;
+            imageUrl = `/uploads/${filename}`;
+            fs.writeFileSync(permanentPath, req.file.buffer);
+           }
+         }
+       } else {
+         fs.writeFileSync(permanentPath, req.file.buffer);
+         console.log(`Receipt image saved to: ${permanentPath}`);
+       }
       
-      // Create uploads directory if it doesn't exist
-      if (!fs.existsSync('public/uploads')) {
-        fs.mkdirSync('public/uploads', { recursive: true });
-      }
-      
-      // Save the uploaded file permanently
-      fs.writeFileSync(permanentPath, req.file.buffer);
-      console.log(`Receipt image saved to: ${permanentPath}`);
-      
-      try {
-        // Extract real data from the receipt image
-        const extractedData = await OCRProcessor.processReceiptImage(permanentPath);
+       try {
+         // Extract real data from the receipt image
+         let extractedData;
+         try {
+           // Dynamically import the OCR processor to avoid runtime/compile errors if it's not present
+           const { OCRProcessor } = await import('./ocr-processor').catch(() => ({} as any));
+           if (typeof OCRProcessor?.processReceiptImage !== 'function') {
+             throw new Error('OCRProcessor.processReceiptImage not available');
+           }
+           extractedData = await OCRProcessor.processReceiptImage(permanentPath);
+         } catch (err: any) {
+           // If OCR explicitly determined this is not a receipt, clean up and return 400
+           if (err && (err.code === 'NOT_A_RECEIPT' || /Not a receipt/i.test(String(err.message || '')))) {
+             await fs.promises.unlink(permanentPath).catch(()=>{});
+             console.warn('Upload rejected - image does not appear to contain a receipt');
+             return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
+           }
+           throw err;
+         }
+
+        // Defensive check: processReceiptImage may return a default "empty" object.
+        if ((!extractedData.items || extractedData.items.length === 0) &&
+            extractedData.total === '0.00' &&
+            /unknown/i.test(String(extractedData.merchantName || ''))) {
+          await fs.promises.unlink(permanentPath).catch(()=>{});
+          console.warn('Upload rejected - OCR produced default/empty receipt data');
+          return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
+        }
+
         console.log('Extracted receipt data:', extractedData);
-        
-        const receiptData = {
-          userId: defaultUserId,
-          merchantName: extractedData.merchantName,
-          location: extractedData.location,
-          total: extractedData.total,
-          subtotal: extractedData.subtotal,
-          tax: extractedData.tax,
-          date: extractedData.date || new Date(),
-          category: "Shopping",
-          paymentMethod: extractedData.paymentMethod || "Unknown",
-          receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-          imageUrl: imageUrl,
-          ecoPoints: 1
-        };
+         
+         const receiptData = {
+           userId: defaultUserId,
+           merchantName: extractedData.merchantName,
+           location: extractedData.location,
+           total: extractedData.total,
+           subtotal: extractedData.subtotal,
+           tax: extractedData.tax,
+           date: extractedData.date || new Date(),
+           category: extractedData.category || "Shopping",
+           paymentMethod: extractedData.paymentMethod || "Unknown",
+           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
+           imageUrl: imageUrl,
+           ecoPoints: 1
+         };
 
         const receipt = await storage.createReceipt(receiptData);
         
@@ -756,141 +820,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch merchants" });
     }
   });
-
-  // Eco metrics routes
-  app.get("/api/eco-metrics", async (req, res) => {
-    try {
-      const { month } = req.query;
-      const metrics = await storage.getEcoMetrics(
-        defaultUserId, 
-        typeof month === 'string' ? month : undefined
-      );
-      
-      if (!metrics) {
-        // Return default empty metrics
-        res.json({
-          papersSaved: 0,
-          co2Reduced: "0",
-          treesEquivalent: "0",
-          ecoPoints: 0
-        });
-      } else {
-        res.json(metrics);
-      }
-    } catch (error) {
-      console.error("Error fetching eco metrics:", error);
-      res.status(500).json({ error: "Failed to fetch eco metrics" });
-    }
-  });
-
-  // Loyalty cards routes
-  app.get("/api/loyalty-cards", async (req, res) => {
-    try {
-      const cards = await storage.getLoyaltyCards(defaultUserId);
-      res.json(cards);
-    } catch (error) {
-      console.error("Error fetching loyalty cards:", error);
-      res.status(500).json({ error: "Failed to fetch loyalty cards" });
-    }
-  });
-
-  app.post("/api/loyalty-cards", async (req, res) => {
-    try {
-      const validatedData = insertLoyaltyCardSchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
-      
-      const card = await storage.createLoyaltyCard(validatedData);
-      res.status(201).json(card);
-    } catch (error) {
-      console.error("Error creating loyalty card:", error);
-      res.status(400).json({ error: "Failed to create loyalty card" });
-    }
-  });
-
-  // Subscriptions routes
-  app.get("/api/subscriptions", async (req, res) => {
-    try {
-      const subscriptions = await storage.getSubscriptions(defaultUserId);
-      res.json(subscriptions);
-    } catch (error) {
-      console.error("Error fetching subscriptions:", error);
-      res.status(500).json({ error: "Failed to fetch subscriptions" });
-    }
-  });
-
-  app.post("/api/subscriptions", async (req, res) => {
-    try {
-      const validatedData = insertSubscriptionSchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
-      
-      const subscription = await storage.createSubscription(validatedData);
-      res.status(201).json(subscription);
-    } catch (error) {
-      console.error("Error creating subscription:", error);
-      res.status(400).json({ error: "Failed to create subscription" });
-    }
-  });
-
-  // Warranties routes
-  app.get("/api/warranties", async (req, res) => {
-    try {
-      const warranties = await storage.getWarranties(defaultUserId);
-      res.json(warranties);
-    } catch (error) {
-      console.error("Error fetching warranties:", error);
-      res.status(500).json({ error: "Failed to fetch warranties" });
-    }
-  });
-
-  app.post("/api/warranties", async (req, res) => {
-    try {
-      const validatedData = insertWarrantySchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
-      
-      const warranty = await storage.createWarranty(validatedData);
-      res.status(201).json(warranty);
-    } catch (error) {
-      console.error("Error creating warranty:", error);
-      res.status(400).json({ error: "Failed to create warranty" });
-    }
-  });
-
-  // Comments routes
-  app.get("/api/comments", async (req, res) => {
-    try {
-      const { receiptId, itemId } = req.query;
-      const comments = await storage.getComments(
-        typeof receiptId === 'string' ? receiptId : undefined,
-        typeof itemId === 'string' ? itemId : undefined
-      );
-      res.json(comments);
-    } catch (error) {
-      console.error("Error fetching comments:", error);
-      res.status(500).json({ error: "Failed to fetch comments" });
-    }
-  });
-
-  app.post("/api/comments", async (req, res) => {
-    try {
-      const validatedData = insertCommentSchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
-      
-      const comment = await storage.createComment(validatedData);
-      res.status(201).json(comment);
-    } catch (error) {
-      console.error("Error creating comment:", error);
-      res.status(400).json({ error: "Failed to create comment" });
-    }
-  });
-
   // Splits routes
   app.get("/api/receipts/:id/splits", async (req, res) => {
     try {
@@ -950,30 +879,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: "Failed to process QR receipt" });
     }
   });
-
-  // Comments routes
-  app.get("/api/comments", async (req, res) => {
-    try {
-      const { receiptId, itemId } = req.query;
-      const comments = await storage.getComments(
-        receiptId as string,
-        itemId as string | undefined
-      );
-      res.json(comments);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch comments: " + error.message });
-    }
-  });
-
-  app.post("/api/comments", async (req, res) => {
-    try {
-      const comment = await storage.createComment(req.body);
-      res.status(201).json(comment);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to create comment: " + error.message });
-    }
-  });
-
   // Splits routes
   app.get("/api/splits", async (req, res) => {
     try {
@@ -1001,7 +906,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
-      const existingUser = await storage.getUserByEmail(validatedData.email);
+      const email = validatedData.email;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Valid email is required" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
       
       if (existingUser) {
         return res.status(409).json({ error: "User already exists" });
@@ -1032,7 +942,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      // Update last login time — cast to any because storage.updateUser's partial type doesn't include lastLoginAt
+      await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
       res.json({ user: { id: user.id, email: user.email, username: user.username } });
     } catch (error) {
       console.error("Error logging in user:", error);
@@ -1095,92 +1006,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error verifying OTP:", error);
       res.status(500).json({ error: "Failed to verify OTP" });
-    }
-  });
-
-  // Enhanced subscription routes
-  app.get("/api/subscriptions", async (req, res) => {
-    try {
-      const subscriptions = await storage.getSubscriptions(defaultUserId);
-      res.json(subscriptions);
-    } catch (error) {
-      console.error("Error fetching subscriptions:", error);
-      res.status(500).json({ error: "Failed to fetch subscriptions" });
-    }
-  });
-
-  app.post("/api/subscriptions/detect", async (req, res) => {
-    try {
-      const detectedSubs = await storage.detectSubscriptions(defaultUserId);
-      res.json(detectedSubs);
-    } catch (error) {
-      console.error("Error detecting subscriptions:", error);
-      res.status(500).json({ error: "Failed to detect subscriptions" });
-    }
-  });
-
-  app.patch("/api/subscriptions/:id/pause", async (req, res) => {
-    try {
-      const subscription = await storage.pauseSubscription(req.params.id);
-      if (!subscription) {
-        return res.status(404).json({ error: "Subscription not found" });
-      }
-      res.json(subscription);
-    } catch (error) {
-      console.error("Error pausing subscription:", error);
-      res.status(500).json({ error: "Failed to pause subscription" });
-    }
-  });
-
-  app.patch("/api/subscriptions/:id/cancel", async (req, res) => {
-    try {
-      const subscription = await storage.cancelSubscription(req.params.id);
-      if (!subscription) {
-        return res.status(404).json({ error: "Subscription not found" });
-      }
-      res.json(subscription);
-    } catch (error) {
-      console.error("Error cancelling subscription:", error);
-      res.status(500).json({ error: "Failed to cancel subscription" });
-    }
-  });
-
-  // Enhanced warranty tracking routes
-  app.get("/api/warranty-claims", async (req, res) => {
-    try {
-      const claims = await storage.getWarrantyClaims(defaultUserId);
-      res.json(claims);
-    } catch (error) {
-      console.error("Error fetching warranty claims:", error);
-      res.status(500).json({ error: "Failed to fetch warranty claims" });
-    }
-  });
-
-  app.post("/api/warranty-claims", async (req, res) => {
-    try {
-      const validatedData = insertWarrantyClaimSchema.parse({
-        ...req.body,
-        userId: defaultUserId,
-      });
-      
-      const claim = await storage.createWarrantyClaim(validatedData);
-      res.status(201).json(claim);
-    } catch (error) {
-      console.error("Error creating warranty claim:", error);
-      res.status(400).json({ error: "Failed to create warranty claim" });
-    }
-  });
-
-  app.patch("/api/warranty-claims/:id", async (req, res) => {
-    try {
-      const claim = await storage.updateWarrantyClaim(req.params.id, req.body);
-      if (!claim) {
-        return res.status(404).json({ error: "Warranty claim not found" });
-      }
-      res.json(claim);
-    } catch (error) {
-      console.error("Error updating warranty claim:", error);
-      res.status(500).json({ error: "Failed to update warranty claim" });
     }
   });
 
@@ -1320,6 +1145,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting receipt design:", error);
       res.status(500).json({ error: "Failed to delete receipt design" });
+    }
+  });
+
+  app.post('/api/receipts/process', async (req, res) => {
+    console.log('POST /api/receipts/process - body:', req.body);
+    try {
+      const { path } = req.body || {};
+      if (!path) {
+        console.warn('No storage path provided in request body');
+        return res.status(400).json({ error: 'Missing path' });
+      }
+
+      // try to download the file from storage
+      let buffer: Buffer | null = null;
+      try {
+        // if you have a helper export, use it; otherwise log the attempt
+        const { downloadBufferFromStorage } = await import('./firebase-storage').catch(() => ({} as any));
+        if (typeof downloadBufferFromStorage === 'function') {
+          buffer = await downloadBufferFromStorage(path);
+          console.log('Downloaded bytes from storage:', buffer?.length);
+        } else {
+          console.warn('downloadBufferFromStorage helper not found - cannot download file for processing');
+        }
+      } catch (dlErr) {
+        console.error('Error downloading from storage:', dlErr);
+        throw dlErr;
+      }
+
+      // Persist downloaded image into public/uploads so UI can load it (convert HEIC/HEIF -> PNG)
+      let savedImageUrl: string | null = null;
+      try {
+        if (buffer) {
+          const uploadsDir = 'public/uploads';
+          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+          // derive extension from storage path string (req body uses `path`)
+          const extMatch = String(path || '').toLowerCase().match(/\.(jpg|jpeg|png|webp|heic|heif)$/);
+          let ext = extMatch ? extMatch[0].replace(/^\./, '') : 'png';
+          let outBuf = buffer;
+
+          if (ext === 'heic' || ext === 'heif') {
+            try {
+              outBuf = await sharp(buffer, { failOnError: false }).png().toBuffer();
+              ext = 'png';
+            } catch (convErr) {
+              console.warn('HEIC -> PNG conversion failed, saving original buffer:', (convErr as any)?.message ?? String(convErr));
+              // fall back to original buffer and original ext (may not display in some browsers)
+            }
+          }
+
+          const filename = `proc_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+          const outPath = `${uploadsDir}/${filename}`;
+          await fs.promises.writeFile(outPath, outBuf);
+          savedImageUrl = await saveBufferToUploads(outBuf, filename);
+          console.log('Saved processing image for UI at:', outPath);
+        }
+      } catch (saveImgErr) {
+        console.error('Failed to persist downloaded image for UI:', saveImgErr);
+      }
+
+      // run OCR/processing if we have buffer
+      let parsed: any = null;
+      try {
+        if (!buffer) {
+          console.warn('No buffer available to run OCRProcessor');
+        } else {
+          const { OCRProcessor } = await import('./ocr-processor').catch(() => ({} as any));
+          if (typeof OCRProcessor?.processReceiptImage === 'function') {
+            parsed = await OCRProcessor.processReceiptImage(buffer);
+            // attach saved image url so downstream save logic persists it
+            if (savedImageUrl && parsed) parsed.imageUrl = parsed.imageUrl || savedImageUrl;
+            console.log('Attached imageUrl to parsed result:', parsed?.imageUrl);
+            console.log('OCRProcessor parsed object:', parsed);
+          } else {
+            console.warn('OCRProcessor.processReceiptImage not available');
+          }
+        }
+      } catch (ocrErr) {
+        console.error('OCR processing error:', ocrErr);
+        throw ocrErr;
+      }
+
+      if (!parsed) {
+        console.warn('No parsed result produced');
+        return res.status(200).json({ ok: true, parsed: null });
+      }
+
+      // ensure a date exists (analytics/filtering often depends on this)
+      if (!parsed.date) {
+        parsed.date = new Date().toISOString();
+        console.log('Assigned fallback date to parsed receipt:', parsed.date);
+      }
+
+      // attempt to save parsed result if a save helper exists (optional)
+      let saved = null;
+      try {
+        let maybe: any = {};
+        // try dynamic helper first (keeps current behaviour)
+        maybe = await import('./receipt-save').catch(() => ({} as any));
+        const saveFn = maybe?.saveParsedReceiptToDb || (global as any).saveParsedReceiptToDb;
+        if (typeof saveFn === 'function') {
+          saved = await saveFn(parsed);
+          console.log('Saved receipt to DB via helper:', saved?.id ?? saved);
+        } else {
+          // Fallback: persist using storage API so parsed receipts are visible in UI
+          console.log('No DB save helper found; falling back to storage.createReceipt');
+          const receiptData = {
+            userId: defaultUserId,
+            merchantName: parsed.merchantName || 'Unknown Merchant',
+            location: parsed.location || null,
+            total: parsed.total || '0.00',
+            subtotal: parsed.subtotal,
+            tax: parsed.tax,
+            date: parsed.date ? new Date(parsed.date) : new Date(),
+            category: parsed.category || 'Shopping',
+            paymentMethod: parsed.paymentMethod || 'Unknown',
+            receiptNumber: parsed.receiptNumber || `PROC${Date.now()}`,
+            imageUrl: parsed.imageUrl || null,
+            ecoPoints: 1
+          };
+
+          const receipt = await storage.createReceipt(receiptData);
+          // attach any items if present
+          if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+            for (const it of parsed.items) {
+              try {
+                await storage.createReceiptItem({
+                  receiptId: receipt.id,
+                  name: it.name || 'Item',
+                  price: it.price || '0.00',
+                  quantity: (it.quantity ?? 1).toString(),
+                  category: 'Other'
+                });
+              } catch (itemErr) {
+                console.error('Error creating receipt item (fallback):', itemErr);
+              }
+            }
+          }
+          saved = receipt;
+          console.log('Saved receipt via storage.createReceipt:', saved.id);
+        }
+      } catch (saveErr) {
+        console.error('Error saving parsed receipt:', saveErr);
+      }
+
+      return res.status(200).json({ ok: true, parsed, saved });
+    } catch (err) {
+      console.error('Error in /api/receipts/process:', err);
+      return res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.get('/api/receipts', async (req, res) => {
+    const userId = (req as any).user?.id;
+    console.log('GET /api/receipts - userId:', userId);
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      // dynamic import for ESM runtime
+      const mod = await import('./receipt-save').catch(() => ({} as any));
+      const getReceiptsForUser = mod.getReceiptsForUser;
+      const uid = (req as any).user?.id;
+      if (typeof getReceiptsForUser === 'function') {
+        const docs = await getReceiptsForUser(uid, 200);
+        return res.json(docs);
+      }
+    } catch (e) {
+      console.warn('Firestore receipts helper not present, falling back to existing DB:', e);
+    }
+    
+    // Fallback: load from Postgres/Drizzle
+    try {
+      const receipts = await storage.getReceipts(userId);
+      res.json(receipts);
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      res.status(500).json({ error: "Failed to fetch receipts" });
     }
   });
 

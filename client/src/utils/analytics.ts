@@ -1,4 +1,4 @@
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 
 export type DateRange = 'month' | 'week' | 'custom';
 
@@ -29,6 +29,52 @@ export interface AnalyticsData {
     end: Date;
     label: string;
   };
+}
+
+export interface MonthOption {
+  key: string;        // "YYYY-MM"
+  label: string;      // "Oct 2025"
+  start: Date;
+  end: Date;
+}
+
+/**
+ * Build a list of months that contain at least one receipt.
+ * Returns options sorted descending (most recent first).
+ */
+export function getAvailableMonthRanges(receipts: Receipt[]): MonthOption[] {
+  const map = new Map<string, MonthOption>();
+
+  receipts.forEach(r => {
+    const d = typeof r.date === 'string' ? parseISO(r.date) : new Date(r.date);
+    if (Number.isNaN(d.getTime())) return;
+    const start = startOfMonth(d);
+    const end = endOfMonth(d);
+    const key = format(start, 'yyyy-MM');
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        label: format(start, 'MMM yyyy'),
+        start,
+        end
+      });
+    }
+  });
+
+  return Array.from(map.values())
+    .sort((a, b) => b.start.getTime() - a.start.getTime());
+}
+
+/**
+ * Given a YYYY-MM key produced above, return its bounds or null.
+ */
+export function getMonthBoundsFromKey(key: string): { start: Date; end: Date; label: string } | null {
+  if (!key || !/^\d{4}-\d{2}$/.test(key)) return null;
+  const [y, m] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, 1);
+  const start = startOfMonth(date);
+  const end = endOfMonth(date);
+  return { start, end, label: format(start, 'MMM yyyy') };
 }
 
 export function getDateRangeBounds(range: DateRange, customStart?: Date, customEnd?: Date): { start: Date; end: Date; label: string } {
