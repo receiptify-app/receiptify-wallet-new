@@ -105,10 +105,12 @@ async function saveBufferToUploads(buffer: Buffer, suggestedName?: string): Prom
   return `/uploads/${filename}`;
 }
 
+import { authMiddleware, requireAuth, getUserId, AuthenticatedRequest } from './auth-middleware';
+
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; [key: string]: any };
+      user?: { id: string; email?: string; name?: string; [key: string]: any };
     }
   }
 }
@@ -116,16 +118,11 @@ declare global {
 const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const defaultUserId = "default-user"; // For demo purposes
-  
   // Serve static files from public directory (for uploaded receipt images)
   app.use('/uploads', express.static('public/uploads'));
   
-  // Mock authentication middleware for testing
-  app.use((req, res, next) => {
-    req.user = { id: defaultUserId };
-    next();
-  });
+  // Authentication middleware - validates Firebase tokens and extracts user ID
+  app.use(authMiddleware);
   
   // Register email import routes
   registerEmailRoutes(app);
@@ -142,6 +139,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { period = 'month' } = req.query;
       
       // Get current month's date range
@@ -149,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       
-      const receipts = await storage.getReceipts(defaultUserId, {
+      const receipts = await storage.getReceipts(userId, {
         startDate: startOfMonth,
         endDate: endOfMonth,
       });
@@ -204,7 +206,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (minAmount && typeof minAmount === 'string') filters.minAmount = parseFloat(minAmount);
       if (maxAmount && typeof maxAmount === 'string') filters.maxAmount = parseFloat(maxAmount);
 
-      const receipts = await storage.getReceipts(defaultUserId, filters);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const receipts = await storage.getReceipts(userId, filters);
       
       // Attach items to each receipt
       const receiptsWithItems = await Promise.all(
@@ -238,8 +245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/receipts", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       // Convert date string to Date object if needed
-      const receiptData = { ...req.body, userId: defaultUserId };
+      const receiptData = { ...req.body, userId };
       if (receiptData.date && typeof receiptData.date === 'string') {
         receiptData.date = new Date(receiptData.date);
       }
@@ -268,6 +280,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/receipts/upload", upload.single('receipt'), async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
@@ -421,7 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Extracted receipt data:', extractedData);
          
          const receiptData = {
-           userId: defaultUserId,
+           userId,
            merchantName: extractedData.merchantName,
            location: extractedData.location,
            total: extractedData.total,
@@ -460,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback: create basic receipt with OCR error indication but keep the image
         console.log('OCR extraction failed, creating placeholder receipt with image');
         const receiptData = {
-          userId: defaultUserId,
+          userId,
           merchantName: "Receipt (OCR Failed)",
           location: "Unknown Location", 
           total: "0.00",
@@ -485,6 +502,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // QR Code processing endpoint
   app.post("/api/receipts/qr", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { qrData } = req.body;
       
       if (!qrData) {
@@ -636,7 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const receiptData = {
-        userId: defaultUserId,
+        userId,
         merchantName,
         location,
         total,
@@ -823,12 +845,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search routes
   app.get("/api/search", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { q } = req.query;
       if (!q || typeof q !== 'string') {
         return res.status(400).json({ error: "Search query required" });
       }
 
-      const receipts = await storage.searchReceipts(defaultUserId, q);
+      const receipts = await storage.searchReceipts(userId, q);
       res.json(receipts);
     } catch (error) {
       console.error("Error searching receipts:", error);
@@ -859,10 +886,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/receipts/:id/splits", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const validatedData = insertSplitSchema.parse({
         ...req.body,
         receiptId: req.params.id,
-        userId: defaultUserId,
+        userId,
       });
       
       const split = await storage.createSplit(validatedData);
@@ -876,9 +908,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // QR code webhook (mock)
   app.post("/api/webhook/qr", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       // Simulate QR code receipt data
       const mockReceiptData = {
-        userId: defaultUserId,
+        userId,
         merchantName: req.body.merchantName || "QR Merchant",
         location: req.body.location || "Unknown Location",
         total: req.body.total || "0.00",
@@ -1074,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (receiptData) {
         const receipt = await storage.createReceipt({
           ...receiptData,
-          userId: session.userId || defaultUserId,
+          userId: session.userId || req.user?.id || 'anonymous',
         });
         receiptId = receipt.id;
       }
