@@ -365,23 +365,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
        }
       
        try {
-         // Extract real data from the receipt image
+         // Extract real data from the receipt image using Gemini AI (primary) or Tesseract OCR (fallback)
          let extractedData;
+         let geminiSucceeded = false;
+         
+         // Try Gemini AI first - it provides better receipt understanding
          try {
-           // Dynamically import the OCR processor to avoid runtime/compile errors if it's not present
-           const { OCRProcessor } = await import('./ocr-processor').catch(() => ({} as any));
-           if (typeof OCRProcessor?.processReceiptImage !== 'function') {
-             throw new Error('OCRProcessor.processReceiptImage not available');
+           console.log('Attempting receipt extraction with Gemini AI...');
+           const { processReceiptWithGemini } = await import('./gemini-receipt-processor').catch(() => ({} as any));
+           
+           if (typeof processReceiptWithGemini === 'function') {
+             extractedData = await processReceiptWithGemini(permanentPath);
+             console.log('Gemini AI extraction successful');
+             geminiSucceeded = true;
+           } else {
+             throw new Error('Gemini processor not available');
            }
-           extractedData = await OCRProcessor.processReceiptImage(permanentPath);
-         } catch (err: any) {
-           // If OCR explicitly determined this is not a receipt, clean up and return 400
-           if (err && (err.code === 'NOT_A_RECEIPT' || /Not a receipt/i.test(String(err.message || '')))) {
+         } catch (geminiErr: any) {
+           // Check if Gemini explicitly determined this is NOT a receipt
+           if (geminiErr?.code === 'NOT_A_RECEIPT' || /NOT_A_RECEIPT/i.test(String(geminiErr?.message || ''))) {
              await fs.promises.unlink(permanentPath).catch(()=>{});
-             console.warn('Upload rejected - image does not appear to contain a receipt');
+             console.warn('Upload rejected - Gemini determined image is not a receipt');
              return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
            }
-           throw err;
+           
+           console.warn('Gemini extraction failed, falling back to Tesseract OCR:', geminiErr?.message || geminiErr);
+           
+           // Fallback to Tesseract OCR - DO NOT delete the image yet
+           try {
+             const { OCRProcessor } = await import('./ocr-processor').catch(() => ({} as any));
+             if (typeof OCRProcessor?.processReceiptImage !== 'function') {
+               throw new Error('OCRProcessor.processReceiptImage not available');
+             }
+             extractedData = await OCRProcessor.processReceiptImage(permanentPath);
+           } catch (ocrErr: any) {
+             // If OCR explicitly determined this is not a receipt, clean up and return 400
+             if (ocrErr && (ocrErr.code === 'NOT_A_RECEIPT' || /Not a receipt/i.test(String(ocrErr.message || '')))) {
+               await fs.promises.unlink(permanentPath).catch(()=>{});
+               console.warn('Upload rejected - image does not appear to contain a receipt');
+               return res.status(400).json({ error: 'Uploaded image does not appear to contain a receipt' });
+             }
+             throw ocrErr;
+           }
          }
 
         // Defensive check: processReceiptImage may return a default "empty" object.
@@ -407,7 +432,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
            paymentMethod: extractedData.paymentMethod || "Unknown",
            receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
            imageUrl: imageUrl,
-           ecoPoints: 1
+           ecoPoints: 1,
+           currency: extractedData.currency || "GBP"
          };
 
         const receipt = await storage.createReceipt(receiptData);
