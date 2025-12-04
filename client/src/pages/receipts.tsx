@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
@@ -29,6 +39,8 @@ export default function ReceiptsPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrency();
 
@@ -137,8 +149,16 @@ export default function ReceiptsPage() {
       e.stopPropagation();
       e.preventDefault();
     }
-    if (!confirm("Delete this receipt? This cannot be undone.")) return;
-    deleteMutation.mutate(id);
+    setReceiptToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (receiptToDelete) {
+      deleteMutation.mutate(receiptToDelete);
+    }
+    setDeleteDialogOpen(false);
+    setReceiptToDelete(null);
   };
 
   // Group receipts by date
@@ -378,6 +398,28 @@ export default function ReceiptsPage() {
         onMove={handleBulkMove}
         onCancel={handleCancelSelection}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-receipt">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Receipt</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this receipt? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete"
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
