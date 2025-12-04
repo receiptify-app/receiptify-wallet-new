@@ -5,20 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import CategoryPickerModal from "@/components/category-picker-modal";
@@ -39,9 +30,8 @@ export default function ReceiptsPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const { toast } = useToast();
+  const { confirm } = useConfirmDialog();
   const { format: formatCurrency } = useCurrency();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
@@ -144,21 +134,23 @@ export default function ReceiptsPage() {
     }
   };
 
-  const handleDeleteReceipt = (id: string, e?: React.MouseEvent) => {
+  const handleDeleteReceipt = async (id: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
       e.preventDefault();
     }
-    setReceiptToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (receiptToDelete) {
-      deleteMutation.mutate(receiptToDelete);
+    
+    const confirmed = await confirm({
+      title: "Delete Receipt",
+      description: "Are you sure you want to delete this receipt? This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+    
+    if (confirmed) {
+      deleteMutation.mutate(id);
     }
-    setDeleteDialogOpen(false);
-    setReceiptToDelete(null);
   };
 
   // Group receipts by date
@@ -398,28 +390,6 @@ export default function ReceiptsPage() {
         onMove={handleBulkMove}
         onCancel={handleCancelSelection}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent data-testid="dialog-delete-receipt">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Receipt</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this receipt? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              data-testid="button-confirm-delete"
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

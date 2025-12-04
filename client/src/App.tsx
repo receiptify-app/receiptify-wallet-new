@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Scan from "@/pages/scan";
@@ -84,19 +85,21 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
-            {/* Status Bar */}
-            <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
-              <div className="flex items-center space-x-1 text-xs">
-                <i className="fas fa-signal"></i>
-                <i className="fas fa-wifi"></i>
-                <i className="fas fa-battery-three-quarters"></i>
+          <ConfirmDialogProvider>
+            <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
+              {/* Status Bar */}
+              <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
+                <div className="flex items-center space-x-1 text-xs">
+                  <i className="fas fa-signal"></i>
+                  <i className="fas fa-wifi"></i>
+                  <i className="fas fa-battery-three-quarters"></i>
+                </div>
               </div>
-            </div>
 
-            <AuthenticatedRouter />
-          </div>
-          <Toaster />
+              <AuthenticatedRouter />
+            </div>
+            <Toaster />
+          </ConfirmDialogProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
