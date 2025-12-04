@@ -1,7 +1,25 @@
 {
   "app": {
     "title": "Receiptify",
-    "subtitle": "Ihre Digitale Brieftasche"
+    "subtitle": "Ihre Digitale Brieftasche",
+    "tagline": "Ihre Beleg-Brieftasche - speichern, verfolgen, stressfrei zurückgeben"
+  },
+  "landing": {
+    "signIn": "Anmelden",
+    "getStarted": "Loslegen",
+    "heroTitle": "Papierlos mit",
+    "heroHighlight": "Intelligenten Belegen",
+    "heroDescription": "Erfassen, organisieren und verfolgen Sie Ihre Belege mühelos. Schützen Sie die Umwelt, während Sie Ihre Ausgaben mit unserer umweltfreundlichen digitalen Belegplattform verwalten.",
+    "startFreeTrial": "Kostenlos Testen",
+    "watchDemo": "Demo Ansehen",
+    "statsTitle": "Schließen Sie sich Tausenden an, die den Planeten retten",
+    "papersSaved": "Papiere Gespart",
+    "treesProtected": "Bäume Geschützt",
+    "happyUsers": "Zufriedene Nutzer",
+    "ctaTitle": "Bereit für papierlos?",
+    "ctaDescription": "Treten Sie noch heute unserer digitalen Belegplattform bei und beginnen Sie, einen positiven Umwelteinfluss zu haben, während Sie Ihre Belege mühelos organisieren.",
+    "startYourFreeTrial": "Starten Sie Ihre Kostenlose Testversion",
+    "footerTagline": "Ein-Klick Belege. Null Papier."
   },
   "nav": {
     "scan": "Scannen",
@@ -11,6 +29,8 @@
   },
   "scan": {
     "title": "Beleg Scannen",
+    "addReceipt": "Beleg Hinzufügen",
+    "addReceiptDesc": "Erfassen, hochladen oder Belegdetails eingeben",
     "cameraCapture": "Kamera-Aufnahme",
     "galleryUpload": "Aus Galerie Hochladen",
     "manualEntry": "Manuelle Eingabe",
@@ -18,10 +38,21 @@
     "uploadSuccessDesc": "Ihr Beleg wurde verarbeitet und zu Ihrer Sammlung hinzugefügt.",
     "uploadError": "Erfassung fehlgeschlagen",
     "uploadErrorDesc": "Ihr Beleg konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
-    "processing": "Beleg wird verarbeitet...",
+    "imageRejected": "Bild abgelehnt",
+    "imageRejectedDesc": "Upload abgelehnt — das Bild scheint keinen Beleg zu enthalten.",
+    "processing": "Verarbeitung...",
     "scanQR": "QR-Code Scannen",
     "takePhoto": "Foto Aufnehmen",
-    "uploadFile": "Datei Hochladen"
+    "takePhotoDesc": "Beleg mit Kamera erfassen",
+    "uploadFromGallery": "Aus Galerie Hochladen",
+    "uploadFromGalleryDesc": "Vorhandenes Foto vom Gerät auswählen",
+    "importReceipt": "Beleg Importieren",
+    "importReceiptDesc": "Beleginformationen manuell eingeben",
+    "smartProcessing": "Intelligente Belegverarbeitung",
+    "smartProcessingDesc": "Ihre Belege, eine digitale Brieftasche. Belege nach Ihren Wünschen organisiert.",
+    "featureAutoExtract": "Automatische Datenextraktion aus Fotos",
+    "featureSecureStorage": "Sichere Bild- und Datenspeicherung",
+    "featureSimplified": "Vereinfachte Verwaltung"
   },
   "receipts": {
     "title": "Meine Belege",
@@ -90,10 +121,13 @@
     "appPreferences": "App-Einstellungen",
     "notifications": "Benachrichtigungen",
     "currency": "Währung",
+    "selectCurrency": "Währung auswählen",
+    "selectLanguage": "Sprache auswählen",
     "language": "Spracheinstellungen",
     "autoCategorize": "Auto-Kategorisieren",
     "data": "Daten",
     "exportReceipts": "Belege Exportieren",
+    "exportReceiptsDesc": "Alle Belege verwalten und herunterladen",
     "signOut": "Abmelden",
     "signOutConfirmTitle": "Abmelden",
     "signOutConfirmDesc": "Sind Sie sicher, dass Sie sich abmelden möchten?",

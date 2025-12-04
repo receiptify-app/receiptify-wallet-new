@@ -1,7 +1,25 @@
 {
   "app": {
     "title": "Receiptify",
-    "subtitle": "Tu Billetera Digital"
+    "subtitle": "Tu Billetera Digital",
+    "tagline": "Tu billetera de recibos - guarda, rastrea, devuelve sin estrés"
+  },
+  "landing": {
+    "signIn": "Iniciar Sesión",
+    "getStarted": "Comenzar",
+    "heroTitle": "Sin Papel con",
+    "heroHighlight": "Recibos Inteligentes",
+    "heroDescription": "Captura, organiza y rastrea tus recibos sin esfuerzo. Ahorra el medio ambiente mientras gestionas tus gastos con nuestra plataforma de recibos digitales ecológica.",
+    "startFreeTrial": "Comenzar Prueba Gratis",
+    "watchDemo": "Ver Demo",
+    "statsTitle": "Únete a miles salvando el planeta",
+    "papersSaved": "Papeles Ahorrados",
+    "treesProtected": "Árboles Protegidos",
+    "happyUsers": "Usuarios Felices",
+    "ctaTitle": "¿Listo para ir sin papel?",
+    "ctaDescription": "Únete a nuestra plataforma de recibos digitales hoy y comienza a tener un impacto ambiental positivo mientras organizas tus recibos sin esfuerzo.",
+    "startYourFreeTrial": "Comienza Tu Prueba Gratis",
+    "footerTagline": "Recibos con un Toque. Cero Papel."
   },
   "nav": {
     "scan": "Escanear",
@@ -11,6 +29,8 @@
   },
   "scan": {
     "title": "Escanear Recibo",
+    "addReceipt": "Añadir Recibo",
+    "addReceiptDesc": "Captura, sube o ingresa los detalles del recibo",
     "cameraCapture": "Captura con Cámara",
     "galleryUpload": "Subir desde Galería",
     "manualEntry": "Entrada Manual",
@@ -18,10 +38,21 @@
     "uploadSuccessDesc": "Tu recibo ha sido procesado y añadido a tu colección.",
     "uploadError": "Captura fallida",
     "uploadErrorDesc": "No se pudo procesar tu recibo. Inténtalo de nuevo.",
-    "processing": "Procesando recibo...",
+    "imageRejected": "Imagen rechazada",
+    "imageRejectedDesc": "Subida rechazada — la imagen no parece contener un recibo.",
+    "processing": "Procesando...",
     "scanQR": "Escanear Código QR",
     "takePhoto": "Tomar Foto",
-    "uploadFile": "Subir Archivo"
+    "takePhotoDesc": "Capturar recibo con cámara",
+    "uploadFromGallery": "Subir desde Galería",
+    "uploadFromGalleryDesc": "Elegir foto existente del dispositivo",
+    "importReceipt": "Importar Recibo",
+    "importReceiptDesc": "Ingresar información del recibo manualmente",
+    "smartProcessing": "Procesamiento Inteligente de Recibos",
+    "smartProcessingDesc": "Tus recibos, una billetera digital. Recibos organizados a tu manera.",
+    "featureAutoExtract": "Extracción automática de datos de fotos",
+    "featureSecureStorage": "Almacenamiento seguro de imagen y datos",
+    "featureSimplified": "Gestión simplificada"
   },
   "receipts": {
     "title": "Mis Recibos",
@@ -90,10 +121,13 @@
     "appPreferences": "Preferencias de la App",
     "notifications": "Notificaciones",
     "currency": "Moneda",
+    "selectCurrency": "Seleccionar moneda",
+    "selectLanguage": "Seleccionar idioma",
     "language": "Preferencias de Idioma",
     "autoCategorize": "Auto-Categorizar",
     "data": "Datos",
     "exportReceipts": "Exportar Recibos",
+    "exportReceiptsDesc": "Gestionar y descargar todos los recibos",
     "signOut": "Cerrar Sesión",
     "signOutConfirmTitle": "Cerrar Sesión",
     "signOutConfirmDesc": "¿Estás seguro de que quieres cerrar sesión?",

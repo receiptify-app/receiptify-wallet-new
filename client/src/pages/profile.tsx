@@ -210,7 +210,7 @@ export default function Profile() {
                       <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.currency')}</span>
                       <Select value={currency} onValueChange={handleCurrencyChange}>
                         <SelectTrigger className="w-full" data-testid="select-currency">
-                          <SelectValue placeholder="Select currency" />
+                          <SelectValue placeholder={t('profile.selectCurrency')} />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
                           {CURRENCIES.map((curr) => (
@@ -235,7 +235,7 @@ export default function Profile() {
                       <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.language')}</span>
                       <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
                         <SelectTrigger className="w-full" data-testid="select-language">
-                          <SelectValue placeholder="Select language" />
+                          <SelectValue placeholder={t('profile.selectLanguage')} />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
                           <SelectItem value="en">English</SelectItem>
@@ -304,7 +304,7 @@ export default function Profile() {
                     <Download className="w-6 h-6 text-gray-700" />
                     <div>
                       <div className="text-lg font-medium text-gray-900">{t('profile.exportReceipts')}</div>
-                      <div className="text-sm text-gray-500">Manage and download all receipts</div>
+                      <div className="text-sm text-gray-500">{t('profile.exportReceiptsDesc')}</div>
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />

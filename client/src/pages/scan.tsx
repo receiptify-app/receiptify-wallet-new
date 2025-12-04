@@ -86,8 +86,8 @@ export default function Scan() {
     },
     onSuccess: () => {
       toast({
-        title: "Receipt captured successfully",
-        description: "Your receipt has been processed and added to your collection.",
+        title: t('scan.uploadSuccess'),
+        description: t('scan.uploadSuccessDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ['/api/receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
@@ -99,14 +99,14 @@ export default function Scan() {
       
       if (status === 400 || /does not appear to contain a receipt/i.test(msg) || /not a receipt/i.test(msg)) {
         toast({
-          title: "Image rejected",
-          description: "Upload rejected — the image does not appear to contain a receipt.",
+          title: t('scan.imageRejected'),
+          description: t('scan.imageRejectedDesc'),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Capture failed",
-          description: msg || "Failed to process your receipt. Please try again.",
+          title: t('scan.uploadError'),
+          description: t('scan.uploadErrorDesc'),
           variant: "destructive",
         });
       }
@@ -175,8 +175,8 @@ export default function Scan() {
 
       {/* Section Header */}
       <div className="mb-6 text-center">
-        <h2 className="text-xl font-bold text-primary mb-2">Add Receipt</h2>
-        <p className="text-sm text-gray-600">Capture, upload or enter receipt details</p>
+        <h2 className="text-xl font-bold text-primary mb-2">{t('scan.addReceipt')}</h2>
+        <p className="text-sm text-gray-600">{t('scan.addReceiptDesc')}</p>
       </div>
 
       {/* Scan Options */}
@@ -201,10 +201,10 @@ export default function Scan() {
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-lg text-gray-900" data-testid="text-camera-title">
-                    {uploadMutation.isPending ? "Processing..." : "Take Photo"}
+                    {uploadMutation.isPending ? t('scan.processing') : t('scan.takePhoto')}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Capture receipt with camera
+                    {t('scan.takePhotoDesc')}
                   </div>
                 </div>
               </div>
@@ -231,10 +231,10 @@ export default function Scan() {
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-lg text-gray-900" data-testid="text-upload-title">
-                    {uploadMutation.isPending ? "Processing..." : "Upload from Gallery"}
+                    {uploadMutation.isPending ? t('scan.processing') : t('scan.uploadFromGallery')}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Choose existing photo from device
+                    {t('scan.uploadFromGalleryDesc')}
                   </div>
                 </div>
               </div>
@@ -255,8 +255,8 @@ export default function Scan() {
                   <Edit className="w-6 h-6 text-white" />
                 </div>
                 <div className="ml-4 text-left">
-                  <div className="font-semibold text-lg text-white">Import Receipt</div>
-                  <div className="text-sm text-white/90">Enter receipt information manually</div>
+                  <div className="font-semibold text-lg text-white">{t('scan.importReceipt')}</div>
+                  <div className="text-sm text-white/90">{t('scan.importReceiptDesc')}</div>
                 </div>
               </div>
             </Button>
@@ -272,14 +272,14 @@ export default function Scan() {
               <FileText className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-primary mb-1">Smart Receipt Processing</h3>
+              <h3 className="font-semibold text-primary mb-1">{t('scan.smartProcessing')}</h3>
               <p className="text-sm text-gray-700 mb-3">
-                Your receipts, one digital wallet. Receipts organised your way.
+                {t('scan.smartProcessingDesc')}
               </p>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>✓ Automatic data extraction from photos</div>
-                <div>✓ Secure image + data storage</div>
-                <div>✓ Simplified management</div>
+                <div>✓ {t('scan.featureAutoExtract')}</div>
+                <div>✓ {t('scan.featureSecureStorage')}</div>
+                <div>✓ {t('scan.featureSimplified')}</div>
               </div>
             </div>
           </div>

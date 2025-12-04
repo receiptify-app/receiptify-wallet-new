@@ -1,7 +1,25 @@
 {
   "app": {
     "title": "Receiptify",
-    "subtitle": "Votre Portefeuille Numérique"
+    "subtitle": "Votre Portefeuille Numérique",
+    "tagline": "Votre portefeuille de reçus - stocker, suivre, retourner sans stress"
+  },
+  "landing": {
+    "signIn": "Connexion",
+    "getStarted": "Commencer",
+    "heroTitle": "Sans Papier avec des",
+    "heroHighlight": "Reçus Intelligents",
+    "heroDescription": "Capturez, organisez et suivez vos reçus sans effort. Préservez l'environnement tout en gérant vos dépenses avec notre plateforme de reçus numériques écologique.",
+    "startFreeTrial": "Essai Gratuit",
+    "watchDemo": "Voir Démo",
+    "statsTitle": "Rejoignez des milliers qui sauvent la planète",
+    "papersSaved": "Papiers Économisés",
+    "treesProtected": "Arbres Protégés",
+    "happyUsers": "Utilisateurs Satisfaits",
+    "ctaTitle": "Prêt à passer au sans papier ?",
+    "ctaDescription": "Rejoignez notre plateforme de reçus numériques aujourd'hui et commencez à avoir un impact environnemental positif tout en organisant vos reçus facilement.",
+    "startYourFreeTrial": "Commencez Votre Essai Gratuit",
+    "footerTagline": "Reçus en un Clic. Zéro Papier."
   },
   "nav": {
     "scan": "Scanner",
@@ -11,6 +29,8 @@
   },
   "scan": {
     "title": "Scanner Reçu",
+    "addReceipt": "Ajouter Reçu",
+    "addReceiptDesc": "Capturer, télécharger ou saisir les détails du reçu",
     "cameraCapture": "Capture Caméra",
     "galleryUpload": "Télécharger depuis Galerie",
     "manualEntry": "Saisie Manuelle",
@@ -18,10 +38,21 @@
     "uploadSuccessDesc": "Votre reçu a été traité et ajouté à votre collection.",
     "uploadError": "Échec de la capture",
     "uploadErrorDesc": "Impossible de traiter votre reçu. Veuillez réessayer.",
-    "processing": "Traitement du reçu...",
+    "imageRejected": "Image rejetée",
+    "imageRejectedDesc": "Téléchargement rejeté — l'image ne semble pas contenir un reçu.",
+    "processing": "Traitement...",
     "scanQR": "Scanner Code QR",
     "takePhoto": "Prendre Photo",
-    "uploadFile": "Télécharger Fichier"
+    "takePhotoDesc": "Capturer le reçu avec la caméra",
+    "uploadFromGallery": "Télécharger depuis Galerie",
+    "uploadFromGalleryDesc": "Choisir une photo existante depuis l'appareil",
+    "importReceipt": "Importer Reçu",
+    "importReceiptDesc": "Saisir les informations du reçu manuellement",
+    "smartProcessing": "Traitement Intelligent des Reçus",
+    "smartProcessingDesc": "Vos reçus, un portefeuille numérique. Reçus organisés à votre façon.",
+    "featureAutoExtract": "Extraction automatique des données des photos",
+    "featureSecureStorage": "Stockage sécurisé des images et données",
+    "featureSimplified": "Gestion simplifiée"
   },
   "receipts": {
     "title": "Mes Reçus",
@@ -90,10 +121,13 @@
     "appPreferences": "Préférences de l'App",
     "notifications": "Notifications",
     "currency": "Devise",
+    "selectCurrency": "Sélectionner devise",
+    "selectLanguage": "Sélectionner langue",
     "language": "Préférences de Langue",
     "autoCategorize": "Auto-Catégoriser",
     "data": "Données",
     "exportReceipts": "Exporter Reçus",
+    "exportReceiptsDesc": "Gérer et télécharger tous les reçus",
     "signOut": "Déconnexion",
     "signOutConfirmTitle": "Déconnexion",
     "signOutConfirmDesc": "Êtes-vous sûr de vouloir vous déconnecter ?",

@@ -3,8 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Leaf, QrCode, Smartphone, TrendingUp, Users, ShieldCheck } from "lucide-react";
 import { Link } from "wouter";
+import { useTranslation } from 'react-i18next';
 
 export default function Landing() {
+  const { t } = useTranslation();
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
       {/* Header */}
@@ -13,20 +16,20 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-              <p className="text-sm text-gray-600">Your receipt wallet - store, track, return stress-free</p>
+              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
+              <p className="text-sm text-gray-600">{t('app.tagline')}</p>
             </div>
           </div>
           
           <div className="flex gap-3">
             <Link href="/login">
               <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
-                Sign In
+                {t('landing.signIn')}
               </Button>
             </Link>
             <Link href="/signup">
               <Button className="bg-green-600 hover:bg-green-700">
-                Get Started
+                {t('landing.getStarted')}
               </Button>
             </Link>
             <Link href="/test-auth">
@@ -42,19 +45,19 @@ export default function Landing() {
       <section className="px-6 py-16 text-center">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            Go Paperless with <span className="text-green-600">Smart Receipts</span>
+            {t('landing.heroTitle')} <span className="text-green-600">{t('landing.heroHighlight')}</span>
           </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Capture, organize, and track your receipts effortlessly. Save the environment while managing your expenses with our eco-friendly digital receipt platform.
+            {t('landing.heroDescription')}
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/signup">
               <Button size="lg" className="bg-green-600 hover:bg-green-700 px-8 py-4 text-lg">
-                Start Free Trial
+                {t('landing.startFreeTrial')}
               </Button>
             </Link>
             <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
-              Watch Demo
+              {t('landing.watchDemo')}
             </Button>
           </div>
         </div>
@@ -147,19 +150,19 @@ export default function Landing() {
       {/* Stats Section */}
       <section className="px-6 py-16 bg-green-600 text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-3xl font-bold mb-12">Join thousands saving the planet</h3>
+          <h3 className="text-3xl font-bold mb-12">{t('landing.statsTitle')}</h3>
           <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="text-4xl font-bold mb-2">50K+</div>
-              <div className="text-green-100">Papers Saved</div>
+              <div className="text-green-100">{t('landing.papersSaved')}</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2">2.5K</div>
-              <div className="text-green-100">Trees Protected</div>
+              <div className="text-green-100">{t('landing.treesProtected')}</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2">15K</div>
-              <div className="text-green-100">Happy Users</div>
+              <div className="text-green-100">{t('landing.happyUsers')}</div>
             </div>
           </div>
         </div>
@@ -169,14 +172,14 @@ export default function Landing() {
       <section className="px-6 py-16 text-center">
         <div className="max-w-3xl mx-auto">
           <h3 className="text-3xl font-bold text-gray-900 mb-6">
-            Ready to go paperless?
+            {t('landing.ctaTitle')}
           </h3>
           <p className="text-xl text-gray-600 mb-8">
-            Join our digital receipt platform today and start making a positive environmental impact while organizing your receipts effortlessly.
+            {t('landing.ctaDescription')}
           </p>
           <Link href="/signup">
             <Button size="lg" className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg">
-              Start Your Free Trial
+              {t('landing.startYourFreeTrial')}
             </Button>
           </Link>
         </div>
@@ -187,9 +190,9 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-6 h-6 text-green-400" />
-            <span className="text-xl font-bold">Receiptify</span>
+            <span className="text-xl font-bold">{t('app.title')}</span>
           </div>
-          <p className="text-gray-400">OneTap Receipts. Zero Paper. © 2025</p>
+          <p className="text-gray-400">{t('landing.footerTagline')} © 2025</p>
         </div>
       </footer>
     </div>

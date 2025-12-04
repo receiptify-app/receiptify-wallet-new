@@ -1,7 +1,25 @@
 {
   "app": {
     "title": "Receiptify",
-    "subtitle": "Your Digital Wallet"
+    "subtitle": "Your Digital Wallet",
+    "tagline": "Your receipt wallet - store, track, return stress-free"
+  },
+  "landing": {
+    "signIn": "Sign In",
+    "getStarted": "Get Started",
+    "heroTitle": "Go Paperless with",
+    "heroHighlight": "Smart Receipts",
+    "heroDescription": "Capture, organize, and track your receipts effortlessly. Save the environment while managing your expenses with our eco-friendly digital receipt platform.",
+    "startFreeTrial": "Start Free Trial",
+    "watchDemo": "Watch Demo",
+    "statsTitle": "Join thousands saving the planet",
+    "papersSaved": "Papers Saved",
+    "treesProtected": "Trees Protected",
+    "happyUsers": "Happy Users",
+    "ctaTitle": "Ready to go paperless?",
+    "ctaDescription": "Join our digital receipt platform today and start making a positive environmental impact while organizing your receipts effortlessly.",
+    "startYourFreeTrial": "Start Your Free Trial",
+    "footerTagline": "OneTap Receipts. Zero Paper."
   },
   "nav": {
     "scan": "Scan",
@@ -11,6 +29,8 @@
   },
   "scan": {
     "title": "Scan Receipt",
+    "addReceipt": "Add Receipt",
+    "addReceiptDesc": "Capture, upload or enter receipt details",
     "cameraCapture": "Camera Capture",
     "galleryUpload": "Gallery Upload",
     "manualEntry": "Manual Entry",
@@ -18,10 +38,21 @@
     "uploadSuccessDesc": "Your receipt has been processed and added to your collection.",
     "uploadError": "Capture failed",
     "uploadErrorDesc": "Failed to process your receipt. Please try again.",
-    "processing": "Processing receipt...",
+    "imageRejected": "Image rejected",
+    "imageRejectedDesc": "Upload rejected — the image does not appear to contain a receipt.",
+    "processing": "Processing...",
     "scanQR": "Scan QR Code",
     "takePhoto": "Take Photo",
-    "uploadFile": "Upload File"
+    "takePhotoDesc": "Capture receipt with camera",
+    "uploadFromGallery": "Upload from Gallery",
+    "uploadFromGalleryDesc": "Choose existing photo from device",
+    "importReceipt": "Import Receipt",
+    "importReceiptDesc": "Enter receipt information manually",
+    "smartProcessing": "Smart Receipt Processing",
+    "smartProcessingDesc": "Your receipts, one digital wallet. Receipts organised your way.",
+    "featureAutoExtract": "Automatic data extraction from photos",
+    "featureSecureStorage": "Secure image + data storage",
+    "featureSimplified": "Simplified management"
   },
   "receipts": {
     "title": "My Receipts",
@@ -90,10 +121,13 @@
     "appPreferences": "App Preferences",
     "notifications": "Notifications",
     "currency": "Currency",
+    "selectCurrency": "Select currency",
+    "selectLanguage": "Select language",
     "language": "Language Preferences",
     "autoCategorize": "Auto-Categorise",
     "data": "Data",
     "exportReceipts": "Export Receipts",
+    "exportReceiptsDesc": "Manage and download all receipts",
     "signOut": "Sign Out",
     "signOutConfirmTitle": "Sign Out",
     "signOutConfirmDesc": "Are you sure you want to sign out?",
