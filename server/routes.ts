@@ -256,6 +256,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptData.date = new Date(receiptData.date);
       }
       
+      // Convert latitude/longitude to strings if they're numbers (decimal columns expect strings)
+      if (typeof receiptData.latitude === 'number') {
+        receiptData.latitude = String(receiptData.latitude);
+      }
+      if (typeof receiptData.longitude === 'number') {
+        receiptData.longitude = String(receiptData.longitude);
+      }
+      
       const validatedData = insertReceiptSchema.parse(receiptData);
       
       const receipt = await storage.createReceipt(validatedData);
