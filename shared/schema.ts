@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, jsonb, integer, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, jsonb, integer, boolean, uuid, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -49,7 +49,10 @@ export const receipts = pgTable("receipts", {
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   ecoPoints: integer("ecoPoints").default(1),
   createdAt: timestamp("createdAt").defaultNow(),
-});
+}, (table) => [
+  index("receipts_user_id_idx").on(table.userId),
+  index("receipts_user_date_idx").on(table.userId, table.date),
+]);
 
 export const receiptItems = pgTable("receipt_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -69,7 +72,9 @@ export const loyaltyCards = pgTable("loyalty_cards", {
   cardName: text("card_name").notNull(),
   points: integer("points").default(0),
   isActive: boolean("is_active").default(true),
-});
+}, (table) => [
+  index("loyalty_cards_user_id_idx").on(table.userId),
+]);
 
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -90,7 +95,9 @@ export const subscriptions = pgTable("subscriptions", {
   lastReceiptId: varchar("last_receipt_id"),
   autoDetected: boolean("auto_detected").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("subscriptions_user_id_idx").on(table.userId),
+]);
 
 export const warranties = pgTable("warranties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -119,7 +126,9 @@ export const warranties = pgTable("warranties", {
   isActive: boolean("is_active").default(true),
   reminderSent: boolean("reminder_sent").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("warranties_user_id_idx").on(table.userId),
+]);
 
 export const ecoMetrics = pgTable("eco_metrics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
