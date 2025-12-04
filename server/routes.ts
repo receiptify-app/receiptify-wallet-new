@@ -256,12 +256,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptData.date = new Date(receiptData.date);
       }
       
-      // Convert latitude/longitude to strings if they're numbers (decimal columns expect strings)
-      if (typeof receiptData.latitude === 'number') {
-        receiptData.latitude = String(receiptData.latitude);
-      }
-      if (typeof receiptData.longitude === 'number') {
-        receiptData.longitude = String(receiptData.longitude);
+      // Convert numeric fields to strings for decimal columns
+      const numericFields = ['total', 'subtotal', 'tax', 'latitude', 'longitude'];
+      for (const field of numericFields) {
+        if (typeof receiptData[field] === 'number') {
+          receiptData[field] = String(receiptData[field]);
+        }
       }
       
       const validatedData = insertReceiptSchema.parse(receiptData);
@@ -271,10 +271,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process items if provided
       if (req.body.items && Array.isArray(req.body.items)) {
         for (const item of req.body.items) {
-          const validatedItem = insertReceiptItemSchema.parse({
+          // Convert numeric fields to strings for decimal columns
+          const itemData = {
             ...item,
             receiptId: receipt.id,
-          });
+            price: typeof item.price === 'number' ? String(item.price) : item.price,
+            quantity: typeof item.quantity === 'number' ? String(item.quantity) : item.quantity,
+          };
+          const validatedItem = insertReceiptItemSchema.parse(itemData);
           await storage.createReceiptItem(validatedItem);
         }
       }
