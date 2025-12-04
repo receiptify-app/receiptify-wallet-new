@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ export default function ReceiptsPage() {
   const { toast } = useToast();
   const { confirm } = useConfirmDialog();
   const { format: formatCurrency } = useCurrency();
+  const { t } = useTranslation();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ['/api/receipts'],
@@ -49,14 +51,14 @@ export default function ReceiptsPage() {
       setSelectionMode(false);
       setSelectedReceipts(new Set());
       toast({
-        title: "Receipts moved",
-        description: `Successfully moved ${selectedReceipts.size} receipt(s).`,
+        title: t('receipts.moved'),
+        description: t('receipts.movedDesc'),
       });
     },
     onError: () => {
       toast({
-        title: "Move failed",
-        description: "Failed to move receipts. Please try again.",
+        title: t('receipts.moveFailed'),
+        description: t('receipts.moveFailedDesc'),
         variant: "destructive",
       });
     }
@@ -75,12 +77,12 @@ export default function ReceiptsPage() {
         copy.delete(id);
         return copy;
       });
-      toast({ title: "Receipt deleted", description: "Receipt removed successfully" });
+      toast({ title: t('receipts.deleted'), description: t('receipts.deletedDesc') });
     },
     onError: (err: any) => {
       toast({
-        title: "Delete failed",
-        description: err?.message || "Failed to delete receipt",
+        title: t('receipts.deleteFailed'),
+        description: t('receipts.deleteFailedDesc'),
         variant: "destructive",
       });
     }
@@ -141,10 +143,10 @@ export default function ReceiptsPage() {
     }
     
     const confirmed = await confirm({
-      title: "Delete Receipt",
-      description: "Are you sure you want to delete this receipt? This action cannot be undone.",
-      confirmText: "Delete",
-      cancelText: "Cancel",
+      title: t('receipts.deleteConfirmTitle'),
+      description: t('receipts.deleteConfirmDesc'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: "destructive",
     });
     
@@ -159,9 +161,9 @@ export default function ReceiptsPage() {
     let groupKey = '';
     
     if (isToday(receiptDate)) {
-      groupKey = 'Today';
+      groupKey = t('receipts.today');
     } else if (isYesterday(receiptDate)) {
-      groupKey = 'Yesterday';
+      groupKey = t('receipts.yesterday');
     } else {
       groupKey = format(receiptDate, 'EEEE, MMMM d');
     }
@@ -221,7 +223,7 @@ export default function ReceiptsPage() {
         <div className="max-w-sm mx-auto p-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-900">
-              {selectionMode ? `${selectedReceipts.size} selected` : 'My Receipts'}
+              {selectionMode ? `${selectedReceipts.size} ${t('common.selected').toLowerCase()}` : t('receipts.title')}
             </h1>
             <div className="flex items-center space-x-2">
               {selectionMode && (
@@ -231,7 +233,7 @@ export default function ReceiptsPage() {
                   onClick={handleSelectAll}
                   data-testid="button-select-all"
                 >
-                  {selectedReceipts.size === receipts.length ? 'Deselect All' : 'Select All'}
+                  {selectedReceipts.size === receipts.length ? t('receipts.deselectAll') : t('receipts.selectAll')}
                 </Button>
               )}
               {!selectionMode && (
@@ -262,12 +264,12 @@ export default function ReceiptsPage() {
         {receipts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Receipt className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No receipts yet</h3>
-            <p className="text-gray-500 mb-6">Add your first receipt</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('receipts.noReceipts')}</h3>
+            <p className="text-gray-500 mb-6">{t('receipts.noReceiptsDesc')}</p>
             <Link href="/scan">
               <Button>
                 <ShoppingBag className="h-4 w-4 mr-2" />
-                Scan Your First Receipt
+                {t('scan.title')}
               </Button>
             </Link>
           </div>

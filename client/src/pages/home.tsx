@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +39,7 @@ export default function Home() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrency();
+  const { t } = useTranslation();
 
   // Fetch all receipts
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
@@ -225,7 +227,7 @@ export default function Home() {
           </Select>
 
           <div className="text-right">
-            <p className="text-sm text-gray-600">Total Spending</p>
+            <p className="text-sm text-gray-600">{t('analytics.totalSpent')}</p>
             <h2 className="text-4xl font-bold text-gray-900" data-testid="text-total-spending">
               {formatCurrency(analytics.total)}
             </h2>
@@ -235,7 +237,7 @@ export default function Home() {
         {/* Category Breakdown with Donut Chart */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('analytics.categories')}</h3>
             
             {chartData.length > 0 ? (
               <div className="flex flex-col items-center">
@@ -298,7 +300,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <p>No data for this period</p>
+                <p>{t('analytics.noData')}</p>
               </div>
             )}
           </CardContent>
@@ -308,7 +310,7 @@ export default function Home() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-gray-900">
-              Recent Activity
+              {t('analytics.recentActivity')}
               {selectedCategory && (
                 <span className="text-sm font-normal text-gray-600 ml-2">
                   ({selectedCategory})
@@ -322,7 +324,7 @@ export default function Home() {
                 onClick={() => setSelectedCategory(null)}
                 data-testid="button-clear-filter"
               >
-                Clear Filter
+                {t('common.filter')}
               </Button>
             )}
           </div>
@@ -344,7 +346,7 @@ export default function Home() {
           ) : (
             <Card className="bg-white shadow-sm">
               <CardContent className="p-8 text-center text-gray-500">
-                <p>No receipts found {selectedCategory ? 'in this category' : 'for this period'}</p>
+                <p>{t('analytics.noData')}</p>
               </CardContent>
             </Card>
           )}

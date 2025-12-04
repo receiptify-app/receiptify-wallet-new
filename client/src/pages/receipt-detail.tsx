@@ -1,5 +1,6 @@
 import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -16,6 +17,7 @@ export default function ReceiptDetailPage() {
   const params = useParams();
   const receiptId = params.id;
   const { format: formatCurrency } = useCurrency();
+  const { t } = useTranslation();
 
   const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
     queryKey: ["/api/receipts", receiptId],
@@ -79,7 +81,7 @@ export default function ReceiptDetailPage() {
         {receipt.imageUrl && (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-              Receipt Image
+              {t('receiptDetail.receiptImage')}
             </h3>
             <ImageViewer imageUrl={receipt.imageUrl} alt="Receipt" />
           </div>
@@ -103,7 +105,7 @@ export default function ReceiptDetailPage() {
             {receipt.tax && (
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
-                  <span>Tax</span>
+                  <span>{t('receiptDetail.tax')}</span>
                   <span>{formatCurrency(parseFloat(receipt.tax))}</span>
                 </div>
               </div>
@@ -111,7 +113,7 @@ export default function ReceiptDetailPage() {
             
             <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
-                <span>Total</span>
+                <span>{t('receiptDetail.total')}</span>
                 <span>{formatCurrency(parseFloat(receipt.total))}</span>
               </div>
             </div>
