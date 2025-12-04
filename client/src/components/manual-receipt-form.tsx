@@ -13,6 +13,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from 'react-i18next';
 
 interface ReceiptItem {
   name: string;
@@ -39,21 +40,35 @@ interface ManualReceiptFormProps {
   initialData?: Partial<ManualReceiptForm>;
 }
 
-const paymentMethods = [
-  "Cash", "Credit Card", "Debit Card", "Apple Pay", "Google Pay", 
-  "PayPal", "Bank Transfer", "Other"
-];
-
-const itemCategories = [
-  "Food & Drinks", "Groceries", "Transport", "Shopping", "Healthcare", 
-  "Entertainment", "Bills", "Education", "Other"
-];
-
 export default function ManualReceiptForm({ open, onOpenChange, initialData }: ManualReceiptFormProps) {
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  const paymentMethodOptions = [
+    { key: 'cash', label: t('paymentMethods.cash') },
+    { key: 'creditCard', label: t('paymentMethods.creditCard') },
+    { key: 'debitCard', label: t('paymentMethods.debitCard') },
+    { key: 'applePay', label: t('paymentMethods.applePay') },
+    { key: 'googlePay', label: t('paymentMethods.googlePay') },
+    { key: 'bankTransfer', label: t('paymentMethods.bankTransfer') },
+    { key: 'other', label: t('paymentMethods.other') },
+  ];
+
+  const itemCategoryOptions = [
+    { key: 'groceries', label: t('categories.groceries') },
+    { key: 'fashion', label: t('categories.fashion') },
+    { key: 'electronics', label: t('categories.electronics') },
+    { key: 'fuel', label: t('categories.fuel') },
+    { key: 'dining', label: t('categories.dining') },
+    { key: 'entertainment', label: t('categories.entertainment') },
+    { key: 'healthcare', label: t('categories.healthcare') },
+    { key: 'travel', label: t('categories.travel') },
+    { key: 'utilities', label: t('categories.utilities') },
+    { key: 'other', label: t('categories.other') },
+  ];
 
   const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<ManualReceiptForm>({
     defaultValues: {
@@ -80,7 +95,6 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
 
   const createReceiptMutation = useMutation({
     mutationFn: async (data: ManualReceiptForm) => {
-      // Get current location if available
       let latitude: number | undefined;
       let longitude: number | undefined;
       
@@ -100,7 +114,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
 
       const receiptData = {
         merchantName: data.merchantName,
-        location: data.merchantAddress || "Manual Entry",
+        location: data.merchantAddress || t('manual.title'),
         total: data.totalAmount.toString(),
         date: `${data.date}T${data.time}:00`,
         category: "Other",
@@ -116,8 +130,8 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
     },
     onSuccess: () => {
       toast({
-        title: "Receipt Added",
-        description: "Your manual receipt has been successfully added!",
+        title: t('manual.receiptAdded'),
+        description: t('manual.receiptAddedDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
       reset();
@@ -126,8 +140,8 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: "Failed to add receipt. Please try again.",
+        title: t('manual.error'),
+        description: t('manual.errorDesc'),
         variant: "destructive",
       });
       console.error("Receipt creation error:", error);
@@ -146,7 +160,6 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
   };
 
   const onSubmit = (data: ManualReceiptForm) => {
-    // Auto-calculate total if items exist but total is 0
     if (data.totalAmount === 0 && calculatedTotal > 0) {
       data.totalAmount = calculatedTotal;
     }
@@ -164,7 +177,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-green-600" />
-            Add Receipt Manually
+            {t('manual.addManually')}
           </DialogTitle>
         </DialogHeader>
 
@@ -172,14 +185,14 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
           {/* Photo Section */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Receipt Photo (Optional)</CardTitle>
+              <CardTitle className="text-lg">{t('manual.receiptPhotoOptional')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {capturedPhoto ? (
                 <div className="relative">
                   <img 
                     src={capturedPhoto} 
-                    alt="Receipt photo" 
+                    alt={t('manual.receiptPhoto')} 
                     className="w-full max-h-48 object-contain rounded-lg border"
                   />
                   <Button
@@ -203,7 +216,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                   />
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-400 transition-colors cursor-pointer">
                     <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">Tap to take photo of receipt</p>
+                    <p className="text-sm text-gray-600">{t('manual.tapToTakePhoto')}</p>
                   </div>
                 </label>
               )}
@@ -213,16 +226,16 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
           {/* Merchant Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Merchant Details</CardTitle>
+              <CardTitle className="text-lg">{t('manual.merchantDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="merchantName">Merchant Name *</Label>
+                  <Label htmlFor="merchantName">{t('manual.merchantName')} *</Label>
                   <Input
                     id="merchantName"
-                    placeholder="e.g., Tesco Express"
-                    {...register("merchantName", { required: "Merchant name is required" })}
+                    placeholder={t('manual.merchantNamePlaceholder')}
+                    {...register("merchantName", { required: t('manual.merchantNameRequired') })}
                   />
                   {errors.merchantName && (
                     <p className="text-sm text-red-500">{errors.merchantName.message}</p>
@@ -230,21 +243,21 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                 </div>
                 
                 <div>
-                  <Label htmlFor="receiptNumber">Receipt Number</Label>
+                  <Label htmlFor="receiptNumber">{t('manual.receiptNumber')}</Label>
                   <Input
                     id="receiptNumber"
-                    placeholder="e.g., #12345"
+                    placeholder={t('manual.receiptNumberPlaceholder')}
                     {...register("receiptNumber")}
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="merchantAddress">Address</Label>
+                <Label htmlFor="merchantAddress">{t('manual.address')}</Label>
                 <div className="relative">
                   <Input
                     id="merchantAddress"
-                    placeholder="e.g., 123 High Street, London"
+                    placeholder={t('manual.addressPlaceholder')}
                     {...register("merchantAddress")}
                   />
                   <MapPin className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
@@ -256,17 +269,17 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
           {/* Date & Payment */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Transaction Details</CardTitle>
+              <CardTitle className="text-lg">{t('manual.transactionDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="date">Date *</Label>
+                  <Label htmlFor="date">{t('manual.date')} *</Label>
                   <div className="relative">
                     <Input
                       id="date"
                       type="date"
-                      {...register("date", { required: "Date is required" })}
+                      {...register("date", { required: t('manual.dateRequired') })}
                     />
                     <Calendar className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
                   </div>
@@ -276,7 +289,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                 </div>
 
                 <div>
-                  <Label htmlFor="time">Time</Label>
+                  <Label htmlFor="time">{t('manual.time')}</Label>
                   <Input
                     id="time"
                     type="time"
@@ -285,15 +298,15 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                 </div>
 
                 <div>
-                  <Label htmlFor="paymentMethod">Payment Method *</Label>
+                  <Label htmlFor="paymentMethod">{t('manual.paymentMethod')} *</Label>
                   <Select onValueChange={(value) => setValue("paymentMethod", value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select method" />
+                      <SelectValue placeholder={t('manual.selectPayment')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {paymentMethods.map((method) => (
-                        <SelectItem key={method} value={method}>
-                          {method}
+                      {paymentMethodOptions.map((method) => (
+                        <SelectItem key={method.key} value={method.key}>
+                          {method.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -309,7 +322,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
           {/* Items */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Receipt Items</CardTitle>
+              <CardTitle className="text-lg">{t('manual.receiptItems')}</CardTitle>
               <Button
                 type="button"
                 variant="outline"
@@ -317,14 +330,14 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                 onClick={addNewItem}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Item
+                {t('manual.addItem')}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="space-y-3 p-4 bg-gray-50 rounded-lg">
                   <div className="flex justify-between items-center">
-                    <Badge variant="secondary">Item #{index + 1}</Badge>
+                    <Badge variant="secondary">{t('manual.items')} #{index + 1}</Badge>
                     {fields.length > 1 && (
                       <Button
                         type="button"
@@ -339,15 +352,15 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
-                      <Label>Item Name *</Label>
+                      <Label>{t('manual.itemName')} *</Label>
                       <Input
-                        placeholder="e.g., Bread"
+                        placeholder={t('manual.itemNamePlaceholder')}
                         {...register(`items.${index}.name`, { required: true })}
                       />
                     </div>
                     
                     <div>
-                      <Label>Price (£) *</Label>
+                      <Label>{t('manual.price')} (£) *</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -361,7 +374,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                     </div>
                     
                     <div>
-                      <Label>Quantity</Label>
+                      <Label>{t('manual.qty')}</Label>
                       <Input
                         type="number"
                         min="1"
@@ -373,15 +386,15 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                     </div>
                     
                     <div>
-                      <Label>Category</Label>
+                      <Label>{t('manual.category')}</Label>
                       <Select onValueChange={(value) => setValue(`items.${index}.category`, value)}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder={t('manual.selectCategory')} />
                         </SelectTrigger>
                         <SelectContent>
-                          {itemCategories.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
+                          {itemCategoryOptions.map((category) => (
+                            <SelectItem key={category.key} value={category.key}>
+                              {category.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -398,21 +411,21 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="totalAmount">Total Amount (£) *</Label>
+                  <Label htmlFor="totalAmount">{t('manual.total')} (£) *</Label>
                   <Input
                     id="totalAmount"
                     type="number"
                     step="0.01"
                     placeholder={calculatedTotal > 0 ? calculatedTotal.toFixed(2) : "0.00"}
                     {...register("totalAmount", { 
-                      required: "Total amount is required",
+                      required: t('manual.error'),
                       valueAsNumber: true,
                       min: 0
                     })}
                   />
                   {calculatedTotal > 0 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      Calculated from items: £{calculatedTotal.toFixed(2)}
+                      {t('manual.itemsTotal')}: £{calculatedTotal.toFixed(2)}
                     </p>
                   )}
                   {errors.totalAmount && (
@@ -422,10 +435,10 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
               </div>
 
               <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Label htmlFor="notes">{t('manual.notes')}</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Any additional notes about this purchase..."
+                  placeholder={t('manual.notesPlaceholder')}
                   rows={3}
                   {...register("notes")}
                 />
@@ -442,14 +455,14 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={createReceiptMutation.isPending}
               className="bg-green-600 hover:bg-green-700"
             >
-              {createReceiptMutation.isPending ? "Adding..." : "Add Receipt"}
+              {createReceiptMutation.isPending ? t('manual.addingReceipt') : t('manual.save')}
             </Button>
           </div>
         </form>
