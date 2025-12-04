@@ -1373,20 +1373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    try {
-      // dynamic import for ESM runtime
-      const mod = await import('./receipt-save').catch(() => ({} as any));
-      const getReceiptsForUser = mod.getReceiptsForUser;
-      const uid = (req as any).user?.id;
-      if (typeof getReceiptsForUser === 'function') {
-        const docs = await getReceiptsForUser(uid, 200);
-        return res.json(docs);
-      }
-    } catch (e) {
-      console.warn('Firestore receipts helper not present, falling back to existing DB:', e);
-    }
-    
-    // Fallback: load from Postgres/Drizzle
+    // Load receipts directly from PostgreSQL (indexed for fast user queries)
     try {
       const receipts = await storage.getReceipts(userId);
       res.json(receipts);
