@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import * as fs from "fs";
 import pRetry, { AbortError } from "p-retry";
+import sharp from "sharp";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -55,21 +56,40 @@ IMPORTANT RULES:
 
 Be thorough and accurate. This is a real receipt that needs precise data extraction.`;
 
+async function optimizeImageForOCR(imagePath: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const originalBuffer = fs.readFileSync(imagePath);
+  const originalSize = originalBuffer.length;
+  
+  try {
+    const optimizedBuffer = await sharp(originalBuffer)
+      .resize(1600, 1600, { 
+        fit: 'inside', 
+        withoutEnlargement: true 
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    
+    console.log(`Image optimized: ${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(optimizedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+    return { buffer: optimizedBuffer, mimeType: 'image/jpeg' };
+  } catch (err) {
+    console.warn('Image optimization failed, using original:', err);
+    const ext = imagePath.toLowerCase().split('.').pop();
+    let mimeType = "image/jpeg";
+    if (ext === "png") mimeType = "image/png";
+    else if (ext === "webp") mimeType = "image/webp";
+    return { buffer: originalBuffer, mimeType };
+  }
+}
+
 export async function processReceiptWithGemini(imagePath: string): Promise<ParsedReceiptData | null> {
   console.log("=== Starting Gemini Receipt Processing ===");
   console.log("Image path:", imagePath);
 
   try {
-    const imageBuffer = fs.readFileSync(imagePath);
+    const { buffer: imageBuffer, mimeType } = await optimizeImageForOCR(imagePath);
     const base64Image = imageBuffer.toString("base64");
-    
-    const ext = imagePath.toLowerCase().split('.').pop();
-    let mimeType = "image/jpeg";
-    if (ext === "png") mimeType = "image/png";
-    else if (ext === "webp") mimeType = "image/webp";
-    else if (ext === "gif") mimeType = "image/gif";
 
-    console.log("Image size:", imageBuffer.length, "bytes, mimeType:", mimeType);
+    console.log("Optimized image size:", imageBuffer.length, "bytes, mimeType:", mimeType);
 
     const response = await pRetry(
       async () => {
@@ -134,9 +154,9 @@ export async function processReceiptWithGemini(imagePath: string): Promise<Parse
         }
       },
       {
-        retries: 5,
-        minTimeout: 2000,
-        maxTimeout: 30000,
+        retries: 2,
+        minTimeout: 1000,
+        maxTimeout: 5000,
         factor: 2,
       }
     );
