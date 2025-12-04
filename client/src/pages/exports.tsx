@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, ChevronLeft } from "lucide-react";
+import { Download } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useTranslation } from 'react-i18next';
 
 export default function ExportReceiptsPage() {
   const [, navigate] = useLocation();
   const [receiptsList, setReceiptsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     let mounted = true;
@@ -83,7 +85,7 @@ export default function ExportReceiptsPage() {
       <AppHeader 
         showBackButton={true}
         onBackClick={() => navigate('/profile')}
-        title="Exports"
+        title={t('exports.title')}
       />
 
       <div className="px-6 py-6 space-y-6">
@@ -92,27 +94,27 @@ export default function ExportReceiptsPage() {
             <div className="flex items-center gap-4">
               <Download className="w-6 h-6 text-gray-700" />
               <div>
-                <div className="text-lg font-medium text-gray-900">Export Receipts</div>
-                <div className="text-sm text-gray-500">Download individual receipts or all as a ZIP</div>
+                <div className="text-lg font-medium text-gray-900">{t('exports.exportReceipts')}</div>
+                <div className="text-sm text-gray-500">{t('exports.exportDesc')}</div>
               </div>
             </div>
-            <Button onClick={downloadAllAsZip} size="sm">Download All</Button>
+            <Button onClick={downloadAllAsZip} size="sm" data-testid="button-download-all">{t('exports.downloadAll')}</Button>
           </CardContent>
         </Card>
 
         <div>
           <div className="space-y-2">
-            {loading && <div className="text-sm text-gray-600">Loading receipts…</div>}
-            {!loading && receiptsList.length === 0 && <div className="text-sm text-gray-600">No receipts found.</div>}
+            {loading && <div className="text-sm text-gray-600">{t('exports.loading')}</div>}
+            {!loading && receiptsList.length === 0 && <div className="text-sm text-gray-600">{t('exports.noReceipts')}</div>}
             {!loading && receiptsList.map((r) => (
               <Card key={r.id} className="bg-white shadow-sm border-0">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="text-sm text-gray-800">
-                    <div className="font-medium">{r.merchantName || 'Unknown'}</div>
+                    <div className="font-medium">{r.merchantName || t('exports.unknown')}</div>
                     <div className="text-xs text-gray-500">{r.date ? new Date(r.date).toLocaleString() : ''}</div>
                   </div>
                   <div>
-                    <Button onClick={() => downloadReceipt(r)} size="sm" variant="ghost">Download</Button>
+                    <Button onClick={() => downloadReceipt(r)} size="sm" variant="ghost" data-testid={`button-download-${r.id}`}>{t('exports.download')}</Button>
                   </div>
                 </CardContent>
               </Card>

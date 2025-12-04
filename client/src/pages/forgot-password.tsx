@@ -7,6 +7,7 @@ import { Leaf, Mail, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
+import { useTranslation } from 'react-i18next';
 
 interface ForgotPasswordForm {
   email: string;
@@ -16,6 +17,7 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const { resetPassword } = useAuth();
+  const { t } = useTranslation();
   
   const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordForm>();
 
@@ -39,15 +41,15 @@ export default function ForgotPassword() {
             <div className="flex items-center justify-center gap-2 mb-4">
               <Leaf className="w-8 h-8 text-green-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-                <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+                <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
+                <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
               </div>
             </div>
             <CardTitle className="text-2xl font-bold text-gray-900">
-              Check your email
+              {t('auth.checkEmail')}
             </CardTitle>
             <p className="text-gray-600">
-              We've sent a password reset link to your email address. Click the link to reset your password.
+              {t('auth.checkEmailDesc')}
             </p>
           </CardHeader>
 
@@ -55,7 +57,7 @@ export default function ForgotPassword() {
             <Link href="/login">
               <Button className="w-full h-12 bg-green-600 hover:bg-green-700">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Sign In
+                {t('auth.backToSignIn')}
               </Button>
             </Link>
           </CardContent>
@@ -71,34 +73,34 @@ export default function ForgotPassword() {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-              <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
+              <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Reset your password
+            {t('auth.resetPasswordTitle')}
           </CardTitle>
           <p className="text-gray-600">
-            Enter your email address and we'll send you a link to reset your password
+            {t('auth.resetPasswordDesc')}
           </p>
         </CardHeader>
 
         <CardContent className="space-y-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('auth.enterEmail')}
                   className="pl-10 h-12"
                   {...register("email", {
-                    required: "Email is required",
+                    required: t('auth.emailRequired'),
                     pattern: {
                       value: /^\S+@\S+$/i,
-                      message: "Invalid email address"
+                      message: t('auth.emailInvalid')
                     }
                   })}
                 />
@@ -113,7 +115,7 @@ export default function ForgotPassword() {
               className="w-full h-12 bg-green-600 hover:bg-green-700"
               disabled={isLoading}
             >
-              {isLoading ? "Sending..." : "Send Reset Link"}
+              {isLoading ? t('auth.sendingLink') : t('auth.sendResetLink')}
             </Button>
           </form>
 
@@ -121,7 +123,7 @@ export default function ForgotPassword() {
             <Link href="/login">
               <Button variant="link" className="p-0 h-auto text-green-600 hover:text-green-700">
                 <ArrowLeft className="w-4 h-4 mr-1" />
-                Back to Sign In
+                {t('auth.backToSignIn')}
               </Button>
             </Link>
           </div>

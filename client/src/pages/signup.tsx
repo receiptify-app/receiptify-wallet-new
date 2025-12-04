@@ -10,6 +10,7 @@ import { FaGoogle, FaFacebook, FaApple } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
+import { useTranslation } from 'react-i18next';
 
 interface SignupForm {
   name: string;
@@ -25,6 +26,7 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
   const { signup, signInWithGoogle, signInWithFacebook, signInWithApple } = useAuth();
+  const { t } = useTranslation();
   
   const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>();
   const password = watch("password");
@@ -74,15 +76,15 @@ export default function Signup() {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-              <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
+              <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Create your account
+            {t('auth.createAccountTitle')}
           </CardTitle>
           <p className="text-gray-600">
-            Join thousands saving the planet with digital receipts
+            {t('auth.createAccountDesc')}
           </p>
         </CardHeader>
 
@@ -96,7 +98,7 @@ export default function Signup() {
               disabled={isLoading}
             >
               <FaGoogle className="w-5 h-5 mr-3 text-red-500" />
-              Continue with Google
+              {t('auth.continueWithGoogle')}
             </Button>
 
             <Button
@@ -106,7 +108,7 @@ export default function Signup() {
               disabled={isLoading}
             >
               <FaFacebook className="w-5 h-5 mr-3 text-blue-600" />
-              Continue with Facebook
+              {t('auth.continueWithFacebook')}
             </Button>
 
             <Button
@@ -116,7 +118,7 @@ export default function Signup() {
               disabled={isLoading}
             >
               <FaApple className="w-5 h-5 mr-3 text-gray-900" />
-              Continue with Apple
+              {t('auth.continueWithApple')}
             </Button>
           </div>
 
@@ -125,26 +127,26 @@ export default function Signup() {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or create with email</span>
+              <span className="bg-white px-2 text-gray-500">{t('auth.createWithEmail')}</span>
             </div>
           </div>
 
           {/* Email Signup Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">{t('auth.fullName')}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Enter your full name"
+                  placeholder={t('auth.enterFullName')}
                   className="pl-10 h-12"
                   {...register("name", {
-                    required: "Name is required",
+                    required: t('auth.nameRequired'),
                     minLength: {
                       value: 2,
-                      message: "Name must be at least 2 characters"
+                      message: t('auth.nameMinLength')
                     }
                   })}
                 />
@@ -155,19 +157,19 @@ export default function Signup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('auth.enterEmail')}
                   className="pl-10 h-12"
                   {...register("email", {
-                    required: "Email is required",
+                    required: t('auth.emailRequired'),
                     pattern: {
                       value: /^\S+@\S+$/i,
-                      message: "Invalid email address"
+                      message: t('auth.emailInvalid')
                     }
                   })}
                 />
@@ -178,19 +180,19 @@ export default function Signup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
+                  placeholder={t('auth.createPassword')}
                   className="pl-10 pr-10 h-12"
                   {...register("password", {
-                    required: "Password is required",
+                    required: t('auth.passwordRequired'),
                     minLength: {
                       value: 6,
-                      message: "Password must be at least 6 characters"
+                      message: t('auth.passwordMinLength')
                     }
                   })}
                 />
@@ -208,17 +210,17 @@ export default function Signup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm your password"
+                  placeholder={t('auth.confirmYourPassword')}
                   className="pl-10 pr-10 h-12"
                   {...register("confirmPassword", {
-                    required: "Please confirm your password",
-                    validate: value => value === password || "Passwords do not match"
+                    required: t('auth.confirmPasswordRequired'),
+                    validate: value => value === password || t('auth.passwordsMustMatch')
                   })}
                 />
                 <button
@@ -238,17 +240,17 @@ export default function Signup() {
               <Checkbox
                 id="terms"
                 {...register("terms", {
-                  required: "You must agree to the terms and conditions"
+                  required: t('auth.termsRequired')
                 })}
               />
               <Label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to the{" "}
+                {t('auth.agreeToTerms')}{" "}
                 <Link href="/terms">
-                  <span className="text-green-600 hover:text-green-700">Terms of Service</span>
+                  <span className="text-green-600 hover:text-green-700">{t('auth.termsOfService')}</span>
                 </Link>
-                {" "}and{" "}
+                {" "}{t('auth.and')}{" "}
                 <Link href="/privacy">
-                  <span className="text-green-600 hover:text-green-700">Privacy Policy</span>
+                  <span className="text-green-600 hover:text-green-700">{t('auth.privacyPolicy')}</span>
                 </Link>
               </Label>
             </div>
@@ -261,15 +263,15 @@ export default function Signup() {
               className="w-full h-12 bg-green-600 hover:bg-green-700"
               disabled={isLoading}
             >
-              {isLoading ? "Creating account..." : "Create Account"}
+              {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
             </Button>
           </form>
 
           <div className="text-center">
-            <span className="text-gray-600">Already have an account? </span>
+            <span className="text-gray-600">{t('auth.haveAccount')} </span>
             <Link href="/login">
               <Button variant="link" className="p-0 h-auto text-green-600 hover:text-green-700">
-                Sign in
+                {t('auth.signIn')}
               </Button>
             </Link>
           </div>

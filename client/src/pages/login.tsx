@@ -9,6 +9,7 @@ import { FaGoogle, FaFacebook, FaApple } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
+import { useTranslation } from 'react-i18next';
 
 interface LoginForm {
   email: string;
@@ -20,6 +21,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
   const { login, signInWithGoogle, signInWithFacebook, signInWithApple } = useAuth();
+  const { t } = useTranslation();
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
 
@@ -64,15 +66,15 @@ export default function Login() {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Receiptify</h1>
-              <p className="text-sm text-gray-600">OneTap Receipts. Zero Paper.</p>
+              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
+              <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Welcome back
+            {t('auth.welcomeBack')}
           </CardTitle>
           <p className="text-gray-600">
-            Sign in to your account to continue managing your receipts
+            {t('auth.signInDesc')}
           </p>
         </CardHeader>
 
@@ -86,7 +88,7 @@ export default function Login() {
               disabled={isLoading}
             >
               <FaGoogle className="w-5 h-5 mr-3 text-red-500" />
-              Continue with Google
+              {t('auth.continueWithGoogle')}
             </Button>
 
             <Button
@@ -96,7 +98,7 @@ export default function Login() {
               disabled={isLoading}
             >
               <FaFacebook className="w-5 h-5 mr-3 text-blue-600" />
-              Continue with Facebook
+              {t('auth.continueWithFacebook')}
             </Button>
 
             <Button
@@ -106,7 +108,7 @@ export default function Login() {
               disabled={isLoading}
             >
               <FaApple className="w-5 h-5 mr-3 text-gray-900" />
-              Continue with Apple
+              {t('auth.continueWithApple')}
             </Button>
           </div>
 
@@ -115,26 +117,26 @@ export default function Login() {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or continue with email</span>
+              <span className="bg-white px-2 text-gray-500">{t('auth.continueWithEmail')}</span>
             </div>
           </div>
 
           {/* Email Login Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('auth.enterEmail')}
                   className="pl-10 h-12"
                   {...register("email", {
-                    required: "Email is required",
+                    required: t('auth.emailRequired'),
                     pattern: {
                       value: /^\S+@\S+$/i,
-                      message: "Invalid email address"
+                      message: t('auth.emailInvalid')
                     }
                   })}
                 />
@@ -145,16 +147,16 @@ export default function Login() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.enterPassword')}
                   className="pl-10 pr-10 h-12"
                   {...register("password", {
-                    required: "Password is required"
+                    required: t('auth.passwordRequired')
                   })}
                 />
                 <button
@@ -173,7 +175,7 @@ export default function Login() {
             <div className="flex items-center justify-between">
               <Link href="/forgot-password">
                 <Button variant="link" className="p-0 h-auto text-green-600 hover:text-green-700">
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </Button>
               </Link>
             </div>
@@ -183,15 +185,15 @@ export default function Login() {
               className="w-full h-12 bg-green-600 hover:bg-green-700"
               disabled={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
           </form>
 
           <div className="text-center">
-            <span className="text-gray-600">Don't have an account? </span>
+            <span className="text-gray-600">{t('auth.noAccount')} </span>
             <Link href="/signup">
               <Button variant="link" className="p-0 h-auto text-green-600 hover:text-green-700">
-                Sign up
+                {t('auth.signup')}
               </Button>
             </Link>
           </div>
