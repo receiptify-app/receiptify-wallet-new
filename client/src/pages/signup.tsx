@@ -5,6 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Leaf, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { FaGoogle, FaFacebook, FaApple } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
@@ -24,6 +32,8 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
   const [, navigate] = useLocation();
   const { signup, signInWithGoogle, signInWithFacebook, signInWithApple } = useAuth();
   const { t } = useTranslation();
@@ -245,13 +255,23 @@ export default function Signup() {
               />
               <Label htmlFor="terms" className="text-sm text-gray-600">
                 {t('auth.agreeToTerms')}{" "}
-                <Link href="/terms">
-                  <span className="text-green-600 hover:text-green-700">{t('auth.termsOfService')}</span>
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowTermsDialog(true)}
+                  className="text-green-600 hover:text-green-700 underline cursor-pointer"
+                  data-testid="link-terms-of-service"
+                >
+                  {t('auth.termsOfService')}
+                </button>
                 {" "}{t('auth.and')}{" "}
-                <Link href="/privacy">
-                  <span className="text-green-600 hover:text-green-700">{t('auth.privacyPolicy')}</span>
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyDialog(true)}
+                  className="text-green-600 hover:text-green-700 underline cursor-pointer"
+                  data-testid="link-privacy-policy"
+                >
+                  {t('auth.privacyPolicy')}
+                </button>
               </Label>
             </div>
             {errors.terms && (
@@ -277,6 +297,130 @@ export default function Signup() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Terms of Service Dialog */}
+      <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{t('legal.termsTitle')}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {t('legal.termsTitle')}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-4 text-sm text-gray-700">
+              <p className="text-xs text-gray-500">{t('legal.termsLastUpdated')}</p>
+              
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsAcceptanceTitle')}</h3>
+                <p>{t('legal.termsAcceptanceContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsServiceTitle')}</h3>
+                <p>{t('legal.termsServiceContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsAccountTitle')}</h3>
+                <p>{t('legal.termsAccountContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsUsageTitle')}</h3>
+                <p>{t('legal.termsUsageContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsIntellectualTitle')}</h3>
+                <p>{t('legal.termsIntellectualContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsLiabilityTitle')}</h3>
+                <p>{t('legal.termsLiabilityContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsChangesTitle')}</h3>
+                <p>{t('legal.termsChangesContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.termsContactTitle')}</h3>
+                <p>{t('legal.termsContactContent')}</p>
+              </section>
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end pt-4">
+            <Button onClick={() => setShowTermsDialog(false)} data-testid="button-close-terms">
+              {t('common.close')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Privacy Policy Dialog */}
+      <Dialog open={showPrivacyDialog} onOpenChange={setShowPrivacyDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{t('legal.privacyTitle')}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {t('legal.privacyTitle')}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-4 text-sm text-gray-700">
+              <p className="text-xs text-gray-500">{t('legal.privacyLastUpdated')}</p>
+              
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyIntroTitle')}</h3>
+                <p>{t('legal.privacyIntroContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyCollectionTitle')}</h3>
+                <p>{t('legal.privacyCollectionContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyUseTitle')}</h3>
+                <p>{t('legal.privacyUseContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyStorageTitle')}</h3>
+                <p>{t('legal.privacyStorageContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacySharingTitle')}</h3>
+                <p>{t('legal.privacySharingContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyRightsTitle')}</h3>
+                <p>{t('legal.privacyRightsContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyCookiesTitle')}</h3>
+                <p>{t('legal.privacyCookiesContent')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900 mb-2">{t('legal.privacyContactTitle')}</h3>
+                <p>{t('legal.privacyContactContent')}</p>
+              </section>
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end pt-4">
+            <Button onClick={() => setShowPrivacyDialog(false)} data-testid="button-close-privacy">
+              {t('common.close')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
