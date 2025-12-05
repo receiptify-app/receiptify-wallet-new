@@ -448,22 +448,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log('Extracted receipt data:', extractedData);
-         
-         const receiptData = {
-           userId,
-           merchantName: extractedData.merchantName,
-           location: extractedData.location,
-           total: extractedData.total,
-           subtotal: extractedData.subtotal,
-           tax: extractedData.tax,
-           date: extractedData.date || new Date(),
-           category: extractedData.category || "Shopping",
-           paymentMethod: extractedData.paymentMethod || "Unknown",
-           receiptNumber: extractedData.receiptNumber || `OCR${Date.now()}`,
-           imageUrl: imageUrl,
-           ecoPoints: 1,
-           currency: extractedData.currency || "GBP"
-         };
+
+        // sanitize parsed OCR output before saving
+        const sanitized = sanitizeParsedForDb(extractedData || {});
+
+        const receiptData = {
+          userId,
+          merchantName: sanitized.merchantName || 'Unknown Merchant',
+          location: sanitized.location || null,
+          total: sanitized.total !== null ? String(sanitized.total) : '0.00',
+          subtotal: sanitized.subtotal !== null ? String(sanitized.subtotal) : undefined,
+          tax: sanitized.tax !== null ? String(sanitized.tax) : undefined,
+          date: sanitized.date ? new Date(sanitized.date) : new Date(),
+          category: sanitized.category || 'Shopping',
+          paymentMethod: sanitized.paymentMethod || 'Unknown',
+          receiptNumber: sanitized.receiptNumber || `OCR${Date.now()}`,
+          imageUrl: imageUrl,
+          ecoPoints: 1,
+          currency: sanitized.currency || 'GBP'
+        };
 
         const receipt = await storage.createReceipt(receiptData);
         
@@ -1313,62 +1316,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Assigned fallback date to parsed receipt:', parsed.date);
       }
 
-      // attempt to save parsed result if a save helper exists (optional)
-      let saved = null;
-      try {
-        let maybe: any = {};
-        // try dynamic helper first (keeps current behaviour)
-        maybe = await import('./receipt-save').catch(() => ({} as any));
-        const saveFn = maybe?.saveParsedReceiptToDb || (global as any).saveParsedReceiptToDb;
-        if (typeof saveFn === 'function') {
-          saved = await saveFn(parsed);
-          console.log('Saved receipt to DB via helper:', saved?.id ?? saved);
-        } else {
-          // Fallback: persist using storage API so parsed receipts are visible in UI
-          console.log('No DB save helper found; falling back to storage.createReceipt');
-          const userId = req.user?.id;
-          if (!userId) {
-            console.warn('No authenticated user for receipt save');
-            return res.status(401).json({ error: 'Authentication required' });
-          }
-          const receiptData = {
-            userId,
-            merchantName: parsed.merchantName || 'Unknown Merchant',
-            location: parsed.location || null,
-            total: parsed.total || '0.00',
-            subtotal: parsed.subtotal,
-            tax: parsed.tax,
-            date: parsed.date ? new Date(parsed.date) : new Date(),
-            category: parsed.category || 'Shopping',
-            paymentMethod: parsed.paymentMethod || 'Unknown',
-            receiptNumber: parsed.receiptNumber || `PROC${Date.now()}`,
-            imageUrl: parsed.imageUrl || null,
-            ecoPoints: 1
-          };
+      // sanitize parsed result before saving to DB/storage
+      const parsedForDb = sanitizeParsedForDb(parsed || {});
 
-          const receipt = await storage.createReceipt(receiptData);
-          // attach any items if present
-          if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-            for (const it of parsed.items) {
-              try {
-                await storage.createReceiptItem({
-                  receiptId: receipt.id,
-                  name: it.name || 'Item',
-                  price: it.price || '0.00',
-                  quantity: (it.quantity ?? 1).toString(),
-                  category: 'Other'
-                });
-              } catch (itemErr) {
-                console.error('Error creating receipt item (fallback):', itemErr);
-              }
-            }
-          }
-          saved = receipt;
-          console.log('Saved receipt via storage.createReceipt:', saved.id);
-        }
-      } catch (saveErr) {
-        console.error('Error saving parsed receipt:', saveErr);
-      }
+       // attempt to save parsed result if a save helper exists (optional)
+       let saved = null;
+       try {
+         let maybe: any = {};
+         // try dynamic helper first (keeps current behaviour)
+         maybe = await import('./receipt-save').catch(() => ({} as any));
+         const saveFn = maybe?.saveParsedReceiptToDb || (global as any).saveParsedReceiptToDb;
+         if (typeof saveFn === 'function') {
+          saved = await saveFn(parsedForDb);
+           console.log('Saved receipt to DB via helper:', saved?.id ?? saved);
+         } else {
+           // Fallback: persist using storage API so parsed receipts are visible in UI
+           console.log('No DB save helper found; falling back to storage.createReceipt');
+           const userId = req.user?.id;
+           if (!userId) {
+             console.warn('No authenticated user for receipt save');
+             return res.status(401).json({ error: 'Authentication required' });
+           }
+           const receiptData = {
+            userId,
+            merchantName: parsedForDb.merchantName || 'Unknown Merchant',
+            location: parsedForDb.location || null,
+            total: parsedForDb.total !== null ? String(parsedForDb.total) : '0.00',
+            subtotal: parsedForDb.subtotal !== null ? String(parsedForDb.subtotal) : undefined,
+            tax: parsedForDb.tax !== null ? String(parsedForDb.tax) : undefined,
+            date: parsedForDb.date ? new Date(parsedForDb.date) : new Date(),
+            category: parsedForDb.category || 'Shopping',
+            paymentMethod: parsedForDb.paymentMethod || 'Unknown',
+            receiptNumber: parsedForDb.receiptNumber || `PROC${Date.now()}`,
+            imageUrl: parsedForDb.imageUrl || null,
+            ecoPoints: 1
+           };
+ 
+           const receipt = await storage.createReceipt(receiptData);
+           // attach any items if present
+           if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+             for (const it of parsed.items) {
+               try {
+                 await storage.createReceiptItem({
+                   receiptId: receipt.id,
+                   name: it.name || 'Item',
+                   price: it.price || '0.00',
+                   quantity: (it.quantity ?? 1).toString(),
+                   category: 'Other'
+                 });
+               } catch (itemErr) {
+                 console.error('Error creating receipt item (fallback):', itemErr);
+               }
+             }
+           }
+           saved = receipt;
+           console.log('Saved receipt via storage.createReceipt:', saved.id);
+         }
+       } catch (saveErr) {
+         console.error('Error saving parsed receipt:', saveErr);
+       }
 
       return res.status(200).json({ ok: true, parsed, saved });
     } catch (err) {
@@ -1394,6 +1400,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch receipts" });
     }
   });
+
+  function sanitizeParsedForDb(parsed: any) {
+    if (!parsed || typeof parsed !== 'object') return parsed;
+    const copy: any = { ...parsed };
+
+    const toNum = (v: any): number | null => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === 'number') return v;
+      if (typeof v === 'string') {
+        const s = v.trim();
+        if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'n/a') return null;
+        const n = parseFloat(s.replace(/[^\d\-\.\+]/g, ''));
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    };
+
+    copy.total = toNum(copy.total);
+    copy.subtotal = toNum(copy.subtotal);
+    copy.tax = toNum(copy.tax);
+    copy.confidence = toNum(copy.confidence);
+
+    if (copy.items && Array.isArray(copy.items)) {
+      copy.items = copy.items.map((it: any) => ({
+        name: it?.name || '',
+        price: toNum(it?.price),
+        quantity: it?.quantity ? Number(it.quantity) || 1 : 1
+      }));
+    }
+
+    if (typeof copy.date === 'string') {
+      const d = new Date(copy.date);
+      copy.date = isNaN(d.getTime()) ? null : d.toISOString();
+    }
+
+    return copy;
+  }
 
   const httpServer = createServer(app);
   return httpServer;
