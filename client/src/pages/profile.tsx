@@ -242,7 +242,7 @@ export default function Profile() {
                           <SelectItem value="es">Español (Spanish)</SelectItem>
                           <SelectItem value="fr">Français (French)</SelectItem>
                           <SelectItem value="de">Deutsch (German)</SelectItem>
-                          <SelectItem value="it">Italiano (Italian)</SelectItem>
+                          {/* <SelectItem value="it">Italiano (Italian)</SelectItem>
                           <SelectItem value="pt">Português (Portuguese)</SelectItem>
                           <SelectItem value="nl">Nederlands (Dutch)</SelectItem>
                           <SelectItem value="pl">Polski (Polish)</SelectItem>
@@ -267,7 +267,7 @@ export default function Profile() {
                           <SelectItem value="ms">Bahasa Melayu (Malay)</SelectItem>
                           <SelectItem value="uk">Українська (Ukrainian)</SelectItem>
                           <SelectItem value="he">עברית (Hebrew)</SelectItem>
-                          <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+                          <SelectItem value="bn">বাংলা (Bengali)</SelectItem> */}
                         </SelectContent>
                       </Select>
                     </div>

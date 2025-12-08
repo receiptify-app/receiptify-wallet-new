@@ -6,7 +6,14 @@ import { Link } from "wouter";
 import { useTranslation } from 'react-i18next';
 
 export default function Landing() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(i18n?.language || 'en');
+
+  const handleLanguageChange = (lang: string) => {
+    setSelectedLanguage(lang);
+    i18n.changeLanguage(lang);
+    try { localStorage.setItem('language', lang); } catch {}
+  };
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
@@ -40,6 +47,23 @@ export default function Landing() {
           </div>
         </div>
       </header>
+
+      {/* Language selector (above hero) */}
+      <div className="px-6 mt-6 max-w-4xl mx-auto flex justify-center">
+        <label htmlFor="lang-select" className="sr-only">Language</label>
+        <select
+          id="lang-select"
+          value={selectedLanguage}
+          onChange={(e) => handleLanguageChange(e.target.value)}
+          className="rounded-md border-2 border-gray-300 px-3 py-2 text-sm bg-white"
+          aria-label="Select language"
+        >
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
 
       {/* Hero Section */}
       <section className="px-6 py-16 text-center">

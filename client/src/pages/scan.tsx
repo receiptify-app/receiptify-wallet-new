@@ -130,7 +130,7 @@ export default function Scan() {
         
         {/* Language Selector - Small Dropdown */}
         <div className="flex justify-center">
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+          {/* <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
             <Languages className="w-3.5 h-3.5 text-gray-600" />
             <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
               <SelectTrigger className="w-[100px] h-6 text-xs border-0 focus:ring-0 p-0" data-testid="select-language-scan">
@@ -169,7 +169,7 @@ export default function Scan() {
                 <SelectItem value="bn">বাংলা</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </div> */}
         </div>
       </div>
 
