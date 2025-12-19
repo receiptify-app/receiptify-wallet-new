@@ -28,6 +28,13 @@ import { promisify } from "util";
 const execFileP = promisify(execFile);
 import sharp from 'sharp';
 
+// helper: safely parse date, returns valid Date or null
+function safeParseDate(value: any): Date | null {
+  if (!value || value === 'null' || value === 'undefined') return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
 // helper: save buffer into public/uploads, convert HEIC/HEIF -> PNG for browser compatibility
 async function saveBufferToUploads(buffer: Buffer, suggestedName?: string): Promise<string> {
   const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
@@ -459,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: sanitized.total !== null ? String(sanitized.total) : '0.00',
           subtotal: sanitized.subtotal !== null ? String(sanitized.subtotal) : undefined,
           tax: sanitized.tax !== null ? String(sanitized.tax) : undefined,
-          date: sanitized.date ? new Date(sanitized.date) : new Date(),
+          date: safeParseDate(sanitized.date) || new Date(),
           category: sanitized.category || 'Shopping',
           paymentMethod: sanitized.paymentMethod || 'Unknown',
           receiptNumber: sanitized.receiptNumber || `OCR${Date.now()}`,
@@ -1344,7 +1351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             total: parsedForDb.total !== null ? String(parsedForDb.total) : '0.00',
             subtotal: parsedForDb.subtotal !== null ? String(parsedForDb.subtotal) : undefined,
             tax: parsedForDb.tax !== null ? String(parsedForDb.tax) : undefined,
-            date: parsedForDb.date ? new Date(parsedForDb.date) : new Date(),
+            date: safeParseDate(parsedForDb.date) || new Date(),
             category: parsedForDb.category || 'Shopping',
             paymentMethod: parsedForDb.paymentMethod || 'Unknown',
             receiptNumber: parsedForDb.receiptNumber || `PROC${Date.now()}`,
