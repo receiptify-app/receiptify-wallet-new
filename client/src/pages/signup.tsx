@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Leaf, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Leaf, Mail, Lock, Eye, EyeOff, User, ArrowLeft } from "lucide-react";
 import { FaGoogle } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,7 +71,18 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-0">
+      <div className="w-full max-w-md">
+        <Link href="/">
+          <Button 
+            variant="ghost" 
+            className="mb-4 text-gray-600 hover:text-gray-900"
+            data-testid="button-back-home"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t('common.back')}
+          </Button>
+        </Link>
+        <Card className="w-full shadow-xl border-0">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-8 h-8 text-green-600" />
@@ -268,6 +279,7 @@ export default function Signup() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Terms of Service Dialog */}
       <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
