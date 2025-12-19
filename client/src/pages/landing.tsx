@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, QrCode, Smartphone, TrendingUp, Users, ShieldCheck } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Leaf, QrCode, Smartphone, TrendingUp, Users, ShieldCheck, X } from "lucide-react";
 import { Link } from "wouter";
 import { useTranslation } from 'react-i18next';
+import demoVideo from '@assets/generated_videos/receiptify_app_demo_explainer_video.mp4';
 
 export default function Landing() {
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState<string>(i18n?.language || 'en');
+  const [showDemoModal, setShowDemoModal] = useState(false);
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
@@ -80,7 +89,13 @@ export default function Landing() {
                 {t('landing.startFreeTrial')}
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="px-8 py-4 text-lg"
+              onClick={() => setShowDemoModal(true)}
+              data-testid="button-watch-demo"
+            >
               {t('landing.watchDemo')}
             </Button>
           </div>
@@ -219,6 +234,44 @@ export default function Landing() {
           <p className="text-gray-400">{t('landing.footerTagline')} © 2025</p>
         </div>
       </footer>
+
+      {/* Demo Video Modal */}
+      <Dialog open={showDemoModal} onOpenChange={setShowDemoModal}>
+        <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Leaf className="w-5 h-5 text-green-600" />
+              {t('app.title')} - {t('landing.watchDemo')}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t('landing.heroDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4">
+            <video 
+              src={demoVideo} 
+              controls 
+              autoPlay 
+              className="w-full rounded-lg"
+              data-testid="demo-video"
+            >
+              Your browser does not support the video tag.
+            </video>
+            <div className="mt-4 text-center">
+              <p className="text-gray-600 mb-4">{t('landing.heroDescription')}</p>
+              <Link href="/signup">
+                <Button 
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => setShowDemoModal(false)}
+                  data-testid="button-get-started-modal"
+                >
+                  {t('landing.getStarted')}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
