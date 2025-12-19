@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Leaf, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
-import { FaGoogle, FaFacebook, FaApple } from "react-icons/fa";
+import { FaGoogle } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
@@ -35,7 +35,7 @@ export default function Signup() {
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
   const [, navigate] = useLocation();
-  const { signup, signInWithGoogle, signInWithFacebook, signInWithApple } = useAuth();
+  const { signup, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   
   const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>();
@@ -57,20 +57,10 @@ export default function Signup() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google') => {
     setIsLoading(true);
     try {
-      switch (provider) {
-        case 'google':
-          await signInWithGoogle();
-          break;
-        case 'facebook':
-          await signInWithFacebook();
-          break;
-        case 'apple':
-          await signInWithApple();
-          break;
-      }
+      await signInWithGoogle();
       navigate("/");
     } catch (error) {
       console.error(`${provider} signup error:`, error);
@@ -111,25 +101,6 @@ export default function Signup() {
               {t('auth.continueWithGoogle')}
             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full h-12 text-gray-700 border-gray-200 hover:bg-gray-50"
-              onClick={() => handleSocialLogin('facebook')}
-              disabled={isLoading}
-            >
-              <FaFacebook className="w-5 h-5 mr-3 text-blue-600" />
-              {t('auth.continueWithFacebook')}
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full h-12 text-gray-700 border-gray-200 hover:bg-gray-50"
-              onClick={() => handleSocialLogin('apple')}
-              disabled={isLoading}
-            >
-              <FaApple className="w-5 h-5 mr-3 text-gray-900" />
-              {t('auth.continueWithApple')}
-            </Button>
           </div>
 
           <div className="relative">
