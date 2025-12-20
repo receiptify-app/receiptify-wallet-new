@@ -27,6 +27,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 const execFileP = promisify(execFile);
 import sharp from 'sharp';
+import heicConvert from 'heic-convert';
 
 // helper: safely parse date, returns valid Date or null
 function safeParseDate(value: any): Date | null {
@@ -52,54 +53,30 @@ async function saveBufferToUploads(buffer: Buffer, suggestedName?: string): Prom
   let finalExt = isHeic ? 'png' : 'png'; // default to png for web
 
   if (isHeic) {
-    // try sharp first
+    // try heic-convert npm package first (most reliable in Node.js)
     try {
-      finalBuf = await sharp(buffer, { failOnError: false }).png().toBuffer();
-      finalExt = 'png';
-      console.log('saveBufferToUploads: converted HEIC -> PNG with sharp');
-    } catch (sharpErr) {
-      console.warn('saveBufferToUploads: sharp conversion failed, trying external converters:', (sharpErr as any)?.message || sharpErr);
-
-      // fallback to external converters using temp files
-      const tmpIn = path.join(os.tmpdir(), `in_${Date.now()}.heic`);
-      const tmpOut = path.join(os.tmpdir(), `out_${Date.now()}.png`);
-      await fs.promises.writeFile(tmpIn, buffer);
-
+      const jpegBuffer = await heicConvert({
+        buffer: buffer,
+        format: 'JPEG',
+        quality: 0.9
+      });
+      finalBuf = Buffer.from(jpegBuffer);
+      finalExt = 'jpg';
+      console.log('saveBufferToUploads: converted HEIC -> JPEG with heic-convert');
+    } catch (heicConvertErr) {
+      console.warn('saveBufferToUploads: heic-convert failed, trying sharp:', (heicConvertErr as any)?.message || heicConvertErr);
+      
+      // try sharp as fallback
       try {
-        let converted = false;
-
-        const tryCmd = async (cmd: string, args: string[]) => {
-          try {
-            await execFileP(cmd, args);
-            const stat = await fs.promises.stat(tmpOut).catch(() => null);
-            if (stat && stat.size > 0) {
-              converted = true;
-              console.log(`saveBufferToUploads: ${cmd} conversion succeeded`);
-            } else {
-              console.warn(`saveBufferToUploads: ${cmd} produced no output`);
-            }
-          } catch (e) {
-            console.warn(`saveBufferToUploads: ${cmd} failed:`, (e as any)?.message || e);
-          }
-        };
-
-        // Try common converters in order
-        await tryCmd('magick', [tmpIn, tmpOut]);        // ImageMagick (modern)
-        if (!converted) await tryCmd('convert', [tmpIn, tmpOut]); // ImageMagick older name
-        if (!converted) await tryCmd('heif-convert', [tmpIn, tmpOut]); // libheif
-        if (!converted) await tryCmd('sips', ['-s', 'format', 'png', tmpIn, '--out', tmpOut]); // macOS fallback
-
-        if (converted) {
-          finalBuf = await fs.promises.readFile(tmpOut);
-          finalExt = 'png';
-        } else {
-          console.warn('saveBufferToUploads: all external converters failed; saving original HEIC as fallback');
-          finalBuf = buffer;
-          finalExt = 'heic';
-        }
-      } finally {
-        try { await fs.promises.unlink(tmpIn); } catch {}
-        try { await fs.promises.unlink(tmpOut); } catch {}
+        finalBuf = await sharp(buffer, { failOnError: false }).png().toBuffer();
+        finalExt = 'png';
+        console.log('saveBufferToUploads: converted HEIC -> PNG with sharp');
+      } catch (sharpErr) {
+        console.warn('saveBufferToUploads: sharp conversion also failed:', (sharpErr as any)?.message || sharpErr);
+        // Save original as fallback - browser won't display but at least data is preserved
+        console.warn('saveBufferToUploads: saving original HEIC as fallback (browser may not display)');
+        finalBuf = buffer;
+        finalExt = 'heic';
       }
     }
   }
@@ -332,68 +309,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
        
        if (isHeic) {
          console.log('HEIC/HEIF upload detected — attempting conversion before saving');
+         let converted = false;
+         
+         // Try heic-convert npm package first (most reliable in Node.js)
          try {
-          // Try sharp first and update filename/paths to .png when conversion succeeds
-          const converted = await sharp(req.file.buffer, { failOnError: false }).png().toBuffer();
-          ext = 'png';
-          filename = `${timestamp}_${origBase}.${ext}`;
-          permanentPath = `public/uploads/${filename}`;
-          imageUrl = `/uploads/${filename}`;
-          fs.writeFileSync(permanentPath, converted);
-          console.log(`Converted HEIC -> PNG (sharp) and saved to: ${permanentPath}`);
-         } catch (sharpErr) {
-           console.warn('Sharp HEIC conversion failed, trying external converters:', (sharpErr as any)?.message || String(sharpErr));
-           // try external converters
-           const tmpIn = path.join(os.tmpdir(), `ocr_in_${Date.now()}.heic`);
-           const tmpOut = path.join(os.tmpdir(), `ocr_out_${Date.now()}.png`);
-           await fs.promises.writeFile(tmpIn, req.file.buffer);
-           const candidates = [
-             { cmd: 'magick', args: [tmpIn, tmpOut] },
-             { cmd: 'convert', args: [tmpIn, tmpOut] },
-             { cmd: 'heif-convert', args: [tmpIn, tmpOut] },
-           ];
-           let convertedOk = false;
-           let lastErr: any = null;
-           for (const c of candidates) {
-             try {
-               console.log(`Trying external converter: ${c.cmd}`);
-               const { stdout, stderr } = await execFileP(c.cmd, c.args);
-               console.log(`${c.cmd} stdout:`, (stdout || '').toString().slice(0, 200));
-               console.log(`${c.cmd} stderr:`, (stderr || '').toString().slice(0, 200));
-               const stat = await fs.promises.stat(tmpOut).catch(() => null);
-               if (stat && stat.size > 0) {
-                 // Use .png extension for converted output
-                 const convertedBuf = await fs.promises.readFile(tmpOut);
-                 ext = 'png';
-                 filename = `${timestamp}_${origBase}.${ext}`;
-                 permanentPath = `public/uploads/${filename}`;
-                 imageUrl = `/uploads/${filename}`;
-                 fs.writeFileSync(permanentPath, convertedBuf);
-                 console.log('External conversion successful with', c.cmd, '->', permanentPath);
-                 convertedOk = true;
-                 await fs.promises.unlink(tmpIn).catch(()=>{});
-                 await fs.promises.unlink(tmpOut).catch(()=>{});
-                 break;
-               } else {
-                 lastErr = new Error(`${c.cmd} produced no output`);
-               }
-             } catch (extErr) {
-               console.warn(`${c.cmd} failed:`, (extErr as any)?.message ?? extErr);
-               lastErr = extErr;
-             }
+           const jpegBuffer = await heicConvert({
+             buffer: req.file.buffer,
+             format: 'JPEG',
+             quality: 0.9
+           });
+           ext = 'jpg';
+           filename = `${timestamp}_${origBase}.${ext}`;
+           permanentPath = `public/uploads/${filename}`;
+           imageUrl = `/uploads/${filename}`;
+           fs.writeFileSync(permanentPath, Buffer.from(jpegBuffer));
+           console.log(`Converted HEIC -> JPEG (heic-convert) and saved to: ${permanentPath}`);
+           converted = true;
+         } catch (heicConvertErr) {
+           console.warn('heic-convert failed, trying sharp:', (heicConvertErr as any)?.message || heicConvertErr);
+           
+           // Try sharp as fallback
+           try {
+             const pngBuffer = await sharp(req.file.buffer, { failOnError: false }).png().toBuffer();
+             ext = 'png';
+             filename = `${timestamp}_${origBase}.${ext}`;
+             permanentPath = `public/uploads/${filename}`;
+             imageUrl = `/uploads/${filename}`;
+             fs.writeFileSync(permanentPath, pngBuffer);
+             console.log(`Converted HEIC -> PNG (sharp) and saved to: ${permanentPath}`);
+             converted = true;
+           } catch (sharpErr) {
+             console.warn('Sharp conversion also failed:', (sharpErr as any)?.message || sharpErr);
            }
-           if (!convertedOk) {
-             // cleanup tmp files and fallback to saving original buffer
-             await fs.promises.unlink(tmpIn).catch(()=>{});
-             await fs.promises.unlink(tmpOut).catch(()=>{});
-             console.warn('All external converters failed, saving original buffer as fallback:', lastErr?.message || lastErr);
-            // Save with original extension if conversion failed
-            ext = path.extname(req.file.originalname).replace(/^\./, '') || 'heic';
-            filename = `${timestamp}_${origBase}.${ext}`;
-            permanentPath = `public/uploads/${filename}`;
-            imageUrl = `/uploads/${filename}`;
-            fs.writeFileSync(permanentPath, req.file.buffer);
-           }
+         }
+         
+         if (!converted) {
+           // Save original as fallback - browser won't display but data is preserved
+           console.warn('All HEIC converters failed, saving original buffer as fallback');
+           ext = path.extname(req.file.originalname).replace(/^\./, '') || 'heic';
+           filename = `${timestamp}_${origBase}.${ext}`;
+           permanentPath = `public/uploads/${filename}`;
+           imageUrl = `/uploads/${filename}`;
+           fs.writeFileSync(permanentPath, req.file.buffer);
          }
        } else {
          fs.writeFileSync(permanentPath, req.file.buffer);
