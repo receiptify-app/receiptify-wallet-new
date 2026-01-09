@@ -6,6 +6,7 @@ import { registerEmailRoutes } from "./email-routes";
 import { emailOAuthRouter } from "./email-oauth";
 import { forwardingInboxRouter } from "./forwarding-inbox";
 import { adminRouter } from "./admin-routes";
+import { ObjectStorageService, registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema,
@@ -101,12 +102,44 @@ declare global {
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Helper: upload buffer to Object Storage for persistent storage
+async function uploadToObjectStorage(buffer: Buffer, filename: string, contentType: string): Promise<string> {
+  const objectStorageService = new ObjectStorageService();
+  
+  try {
+    // Get presigned URL for upload
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    
+    // Upload the buffer directly to Object Storage
+    const response = await fetch(uploadURL, {
+      method: 'PUT',
+      body: buffer,
+      headers: { 'Content-Type': contentType },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Object Storage upload failed: ${response.status}`);
+    }
+    
+    // Return the normalized path for accessing the object
+    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    console.log(`Uploaded to Object Storage: ${objectPath}`);
+    return objectPath;
+  } catch (err) {
+    console.error('Object Storage upload failed:', err);
+    throw err;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve static files from public directory (for uploaded receipt images)
+  // Serve static files from public directory (for uploaded receipt images - fallback)
   app.use('/uploads', express.static('public/uploads'));
   
   // Authentication middleware - validates Firebase tokens and extracts user ID
   app.use(authMiddleware);
+  
+  // Register Object Storage routes for persistent file storage
+  registerObjectStorageRoutes(app);
   
   // Register email import routes
   registerEmailRoutes(app);
@@ -413,6 +446,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log('Extracted receipt data:', extractedData);
 
+        // Upload image to persistent Object Storage
+        let persistentImageUrl = imageUrl;
+        try {
+          const localBuffer = await fs.promises.readFile(permanentPath);
+          const contentType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/jpeg';
+          persistentImageUrl = await uploadToObjectStorage(localBuffer, filename, contentType);
+          console.log(`Image uploaded to persistent storage: ${persistentImageUrl}`);
+          // Clean up local file after successful upload to Object Storage
+          await fs.promises.unlink(permanentPath).catch(() => {});
+        } catch (storageErr) {
+          console.warn('Object Storage upload failed, keeping local file as fallback:', storageErr);
+          // Keep local imageUrl as fallback
+        }
+
         // sanitize parsed OCR output before saving
         const sanitized = sanitizeParsedForDb(extractedData || {});
 
@@ -427,7 +474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: sanitized.category || 'Shopping',
           paymentMethod: sanitized.paymentMethod || 'Unknown',
           receiptNumber: sanitized.receiptNumber || `OCR${Date.now()}`,
-          imageUrl: imageUrl,
+          imageUrl: persistentImageUrl,
           ecoPoints: 1,
           currency: sanitized.currency || 'GBP'
         };
@@ -455,6 +502,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Fallback: create basic receipt with OCR error indication but keep the image
         console.log('OCR extraction failed, creating placeholder receipt with image');
+        
+        // Still try to upload to Object Storage for persistence
+        let persistentImageUrl = imageUrl;
+        try {
+          const localBuffer = await fs.promises.readFile(permanentPath);
+          const contentType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/jpeg';
+          persistentImageUrl = await uploadToObjectStorage(localBuffer, filename, contentType);
+          await fs.promises.unlink(permanentPath).catch(() => {});
+        } catch (storageErr) {
+          console.warn('Object Storage upload failed in fallback:', storageErr);
+        }
+        
         const receiptData = {
           userId,
           merchantName: "Receipt (OCR Failed)",
@@ -464,7 +523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: "Other",
           paymentMethod: "Unknown",
           receiptNumber: `ERR${Date.now()}`,
-          imageUrl: imageUrl,
+          imageUrl: persistentImageUrl,
           ecoPoints: 1
         };
         

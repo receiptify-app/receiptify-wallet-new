@@ -42,4 +42,4 @@ exposeLocalhost = true
 
 [agent]
 expertMode = true
-integrations = ["javascript_gemini_ai_integrations:1.0.0"]
+integrations = ["javascript_gemini_ai_integrations:1.0.0", "javascript_object_storage:2.0.0"]
