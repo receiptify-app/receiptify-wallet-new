@@ -71,12 +71,6 @@ export default function AdminDashboard() {
   const [newAdminForm, setNewAdminForm] = useState({ name: "", email: "", password: "" });
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate("/admin");
-    }
-  }, [loading, isAuthenticated, navigate]);
-
   const { data: metricsData, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery({
     queryKey: ["/api/admin/metrics"],
     queryFn: async () => {
@@ -182,12 +176,28 @@ export default function AdminDashboard() {
   const admins: AdminUser[] = adminsData?.admins || [];
   const users: AppUser[] = usersData?.users || [];
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate("/admin");
+    }
+  }, [loading, isAuthenticated, navigate]);
+
+  // Show loading while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-slate-400">Loading admin panel...</p>
+        </div>
       </div>
     );
+  }
+
+  // Don't render dashboard if not authenticated (will redirect via useEffect)
+  if (!isAuthenticated) {
+    return null;
   }
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
