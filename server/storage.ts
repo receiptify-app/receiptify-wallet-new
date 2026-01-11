@@ -17,11 +17,13 @@ import {
   type ProcessedMessage, type InsertProcessedMessage,
   type ForwardingAddress, type InsertForwardingAddress,
   type ReceiptDesign, type InsertReceiptDesign,
+  type Admin, type InsertAdmin,
+  type UserActivity, type InsertUserActivity,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses, receiptDesigns } from "@shared/schema";
-import { eq, and, like, gte, lte, desc, asc } from "drizzle-orm";
+import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses, receiptDesigns, admins, userActivity } from "@shared/schema";
+import { eq, and, like, gte, lte, desc, asc, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -141,6 +143,23 @@ export interface IStorage {
   // Forwarding address operations
   getForwardingAddress(userId: string): Promise<ForwardingAddress | undefined>;
   createForwardingAddress(address: InsertForwardingAddress): Promise<ForwardingAddress>;
+
+  // Admin operations
+  getAdmin(id: string): Promise<Admin | undefined>;
+  getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getAdmins(): Promise<Admin[]>;
+  createAdmin(admin: InsertAdmin): Promise<Admin>;
+  updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined>;
+  updateAdminLastLogin(id: string): Promise<void>;
+  getAdminCount(): Promise<number>;
+
+  // User activity and metrics operations
+  createUserActivity(activity: InsertUserActivity): Promise<UserActivity>;
+  getTotalSignups(): Promise<number>;
+  getDailyActiveUsers(date?: Date): Promise<number>;
+  getSignupDropoffs(): Promise<number>;
+  getAllUsers(): Promise<User[]>;
+  getTotalUsers(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -1374,6 +1393,91 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceiptDesign(id: string): Promise<void> {
     await db.delete(receiptDesigns).where(eq(receiptDesigns.id, id));
+  }
+
+  // Admin operations
+  async getAdmin(id: string): Promise<Admin | undefined> {
+    const [admin] = await db.select().from(admins).where(eq(admins.id, id));
+    return admin;
+  }
+
+  async getAdminByEmail(email: string): Promise<Admin | undefined> {
+    const [admin] = await db.select().from(admins).where(eq(admins.email, email.toLowerCase()));
+    return admin;
+  }
+
+  async getAdmins(): Promise<Admin[]> {
+    return await db.select().from(admins).orderBy(desc(admins.createdAt));
+  }
+
+  async createAdmin(admin: InsertAdmin): Promise<Admin> {
+    const [newAdmin] = await db.insert(admins).values({
+      ...admin,
+      email: admin.email.toLowerCase(),
+    }).returning();
+    return newAdmin;
+  }
+
+  async updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined> {
+    const [updated] = await db.update(admins)
+      .set(updates)
+      .where(eq(admins.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateAdminLastLogin(id: string): Promise<void> {
+    await db.update(admins)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(admins.id, id));
+  }
+
+  async getAdminCount(): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(admins);
+    return result?.count || 0;
+  }
+
+  // User activity and metrics operations
+  async createUserActivity(activity: InsertUserActivity): Promise<UserActivity> {
+    const [newActivity] = await db.insert(userActivity).values(activity).returning();
+    return newActivity;
+  }
+
+  async getTotalSignups(): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(users);
+    return result?.count || 0;
+  }
+
+  async getDailyActiveUsers(date?: Date): Promise<number> {
+    const targetDate = date || new Date();
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const [result] = await db.select({ count: count() })
+      .from(users)
+      .where(and(
+        gte(users.lastLoginAt, startOfDay),
+        lte(users.lastLoginAt, endOfDay)
+      ));
+    return result?.count || 0;
+  }
+
+  async getSignupDropoffs(): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(userActivity)
+      .where(eq(userActivity.activityType, 'signup_dropped'));
+    return result?.count || 0;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getTotalUsers(): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(users);
+    return result?.count || 0;
   }
 }
 

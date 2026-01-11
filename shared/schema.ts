@@ -288,6 +288,31 @@ export const emailSyncJobs = pgTable("email_sync_jobs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Admin users table
+export const admins = pgTable("admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: text("name").notNull(),
+  createdBy: varchar("created_by"), // null for the first admin, then admin id for subsequent admins
+  isActive: boolean("is_active").default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User activity tracking for metrics
+export const userActivity = pgTable("user_activity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  activityType: text("activity_type").notNull(), // 'login', 'signup_started', 'signup_completed', 'signup_dropped'
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("user_activity_user_id_idx").on(table.userId),
+  index("user_activity_type_idx").on(table.activityType),
+  index("user_activity_created_at_idx").on(table.createdAt),
+]);
+
 // Receipt Design Customization
 export const receiptDesigns = pgTable("receipt_designs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -361,6 +386,17 @@ export const insertReceiptDesignSchema = createInsertSchema(receiptDesigns).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertAdminSchema = createInsertSchema(admins).omit({
+  id: true,
+  createdAt: true,
+  lastLoginAt: true,
+});
+
+export const insertUserActivitySchema = createInsertSchema(userActivity).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
@@ -485,3 +521,9 @@ export type InsertEmailSyncJob = z.infer<typeof insertEmailSyncJobSchema>;
 
 export type ReceiptDesign = typeof receiptDesigns.$inferSelect;
 export type InsertReceiptDesign = z.infer<typeof insertReceiptDesignSchema>;
+
+export type Admin = typeof admins.$inferSelect;
+export type InsertAdmin = z.infer<typeof insertAdminSchema>;
+
+export type UserActivity = typeof userActivity.$inferSelect;
+export type InsertUserActivity = z.infer<typeof insertUserActivitySchema>;
