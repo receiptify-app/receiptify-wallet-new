@@ -76,6 +76,9 @@ function AuthenticatedRouter() {
         <Route path="/inbox/imports" component={EmailImports} />
         <Route path="/exports" component={ExportReceiptsPage} />
         <Route path="/test-auth" component={TestAuth} />
+        <Route path="/login">{() => { window.location.href = "/"; return null; }}</Route>
+        <Route path="/signup">{() => { window.location.href = "/"; return null; }}</Route>
+        <Route path="/forgot-password">{() => { window.location.href = "/"; return null; }}</Route>
         <Route component={NotFound} />
       </Switch>
       <BottomNavigation />
