@@ -72,8 +72,10 @@ export interface IStorage {
 
   // Warranty operations
   getWarranties(userId: string): Promise<Warranty[]>;
+  getWarrantyByReceiptId(receiptId: string, userId: string): Promise<Warranty | undefined>;
   createWarranty(warranty: InsertWarranty): Promise<Warranty>;
   updateWarranty(id: string, updates: Partial<InsertWarranty>): Promise<Warranty | undefined>;
+  deleteWarranty(id: string): Promise<boolean>;
 
   // Eco metrics operations
   getEcoMetrics(userId: string, month?: string): Promise<EcoMetrics | undefined>;
@@ -520,6 +522,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.warranties.values()).filter(warranty => warranty.userId === userId);
   }
 
+  async getWarrantyByReceiptId(receiptId: string, userId: string): Promise<Warranty | undefined> {
+    return Array.from(this.warranties.values()).find(
+      warranty => warranty.receiptId === receiptId && warranty.userId === userId
+    );
+  }
+
   async createWarranty(warranty: InsertWarranty): Promise<Warranty> {
     const id = randomUUID();
     const newWarranty: Warranty = { 
@@ -540,6 +548,10 @@ export class MemStorage implements IStorage {
     const updatedWarranty = { ...warranty, ...updates };
     this.warranties.set(id, updatedWarranty);
     return updatedWarranty;
+  }
+
+  async deleteWarranty(id: string): Promise<boolean> {
+    return this.warranties.delete(id);
   }
 
   async getEcoMetrics(userId: string, month?: string): Promise<EcoMetrics | undefined> {
@@ -1073,6 +1085,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(warranties).where(eq(warranties.userId, userId));
   }
 
+  async getWarrantyByReceiptId(receiptId: string, userId: string): Promise<Warranty | undefined> {
+    const [warranty] = await db.select().from(warranties)
+      .where(and(eq(warranties.receiptId, receiptId), eq(warranties.userId, userId)));
+    return warranty;
+  }
+
   async createWarranty(warranty: InsertWarranty): Promise<Warranty> {
     const [newWarranty] = await db.insert(warranties).values(warranty).returning();
     return newWarranty;
@@ -1084,6 +1102,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(warranties.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteWarranty(id: string): Promise<boolean> {
+    const result = await db.delete(warranties).where(eq(warranties.id, id));
+    return true;
   }
 
   // Warranty claims

@@ -1424,6 +1424,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Warranty routes
+  app.get('/api/warranties', async (req, res) => {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const warranties = await storage.getWarranties(userId);
+      res.json(warranties);
+    } catch (error) {
+      console.error("Error fetching warranties:", error);
+      res.status(500).json({ error: "Failed to fetch warranties" });
+    }
+  });
+
+  app.get('/api/warranties/receipt/:receiptId', async (req, res) => {
+    const userId = (req as any).user?.id;
+    const { receiptId } = req.params;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const warranty = await storage.getWarrantyByReceiptId(receiptId, userId);
+      res.json(warranty || null);
+    } catch (error) {
+      console.error("Error fetching warranty:", error);
+      res.status(500).json({ error: "Failed to fetch warranty" });
+    }
+  });
+
+  app.post('/api/warranties', async (req, res) => {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const { receiptId, productName, durationMonths, warrantyType, notes } = req.body;
+      
+      if (!receiptId || !productName || !durationMonths) {
+        return res.status(400).json({ error: 'Missing required fields: receiptId, productName, durationMonths' });
+      }
+      
+      // Get the receipt to use its date as warranty start date
+      const receipt = await storage.getReceipt(receiptId);
+      if (!receipt) {
+        return res.status(404).json({ error: 'Receipt not found' });
+      }
+      
+      // Check if warranty already exists for this receipt
+      const existingWarranty = await storage.getWarrantyByReceiptId(receiptId, userId);
+      if (existingWarranty) {
+        return res.status(409).json({ error: 'Warranty already exists for this receipt' });
+      }
+      
+      const warrantyStartDate = receipt.date || new Date();
+      const warrantyEndDate = new Date(warrantyStartDate);
+      warrantyEndDate.setMonth(warrantyEndDate.getMonth() + durationMonths);
+      
+      const warranty = await storage.createWarranty({
+        userId,
+        receiptId,
+        productName,
+        retailer: receipt.merchantName || 'Unknown',
+        warrantyStartDate,
+        warrantyEndDate,
+        warrantyPeriodMonths: durationMonths,
+        warrantyType: warrantyType || 'manufacturer',
+        warrantyTerms: notes || null,
+        isActive: true,
+      });
+      
+      res.status(201).json(warranty);
+    } catch (error) {
+      console.error("Error creating warranty:", error);
+      res.status(500).json({ error: "Failed to create warranty" });
+    }
+  });
+
+  app.patch('/api/warranties/:id', async (req, res) => {
+    const userId = (req as any).user?.id;
+    const { id } = req.params;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const { productName, durationMonths, warrantyType, notes } = req.body;
+      
+      const updates: any = {};
+      if (productName) updates.productName = productName;
+      if (warrantyType) updates.warrantyType = warrantyType;
+      if (notes !== undefined) updates.warrantyTerms = notes;
+      
+      // If duration changed, recalculate end date
+      if (durationMonths) {
+        // Get existing warranty to use its start date
+        const warranties = await storage.getWarranties(userId);
+        const existingWarranty = warranties.find(w => w.id === id);
+        if (existingWarranty) {
+          const warrantyEndDate = new Date(existingWarranty.warrantyStartDate);
+          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + durationMonths);
+          updates.warrantyEndDate = warrantyEndDate;
+          updates.warrantyPeriodMonths = durationMonths;
+        }
+      }
+      
+      const warranty = await storage.updateWarranty(id, updates);
+      if (!warranty) {
+        return res.status(404).json({ error: 'Warranty not found' });
+      }
+      
+      res.json(warranty);
+    } catch (error) {
+      console.error("Error updating warranty:", error);
+      res.status(500).json({ error: "Failed to update warranty" });
+    }
+  });
+
+  app.delete('/api/warranties/:id', async (req, res) => {
+    const userId = (req as any).user?.id;
+    const { id } = req.params;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const deleted = await storage.deleteWarranty(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Warranty not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting warranty:", error);
+      res.status(500).json({ error: "Failed to delete warranty" });
+    }
+  });
+
   function sanitizeParsedForDb(parsed: any) {
     if (!parsed || typeof parsed !== 'object') return parsed;
     const copy: any = { ...parsed };
