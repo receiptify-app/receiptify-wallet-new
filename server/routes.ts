@@ -1476,6 +1476,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Receipt not found' });
       }
       
+      // Verify the receipt belongs to this user (critical ownership check)
+      if (receipt.userId !== userId) {
+        return res.status(403).json({ error: 'Forbidden: Receipt does not belong to this user' });
+      }
+      
       // Check if warranty already exists for this receipt
       const existingWarranty = await storage.getWarrantyByReceiptId(receiptId, userId);
       if (existingWarranty) {
@@ -1515,6 +1520,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
+      // First verify ownership by checking warranty belongs to user
+      const warranties = await storage.getWarranties(userId);
+      const existingWarranty = warranties.find(w => w.id === id);
+      
+      if (!existingWarranty) {
+        return res.status(404).json({ error: 'Warranty not found or access denied' });
+      }
+      
+      // Additional check: verify the warranty's userId matches
+      if (existingWarranty.userId !== userId) {
+        return res.status(403).json({ error: 'Forbidden: Warranty does not belong to this user' });
+      }
+      
       const { productName, durationMonths, warrantyType, notes } = req.body;
       
       const updates: any = {};
@@ -1524,18 +1542,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If duration changed, recalculate end date
       if (durationMonths) {
-        // Get existing warranty to use its start date
-        const warranties = await storage.getWarranties(userId);
-        const existingWarranty = warranties.find(w => w.id === id);
-        if (existingWarranty) {
-          const warrantyEndDate = new Date(existingWarranty.warrantyStartDate);
-          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + durationMonths);
-          updates.warrantyEndDate = warrantyEndDate;
-          updates.warrantyPeriodMonths = durationMonths;
-        }
+        const warrantyEndDate = new Date(existingWarranty.warrantyStartDate);
+        warrantyEndDate.setMonth(warrantyEndDate.getMonth() + durationMonths);
+        updates.warrantyEndDate = warrantyEndDate;
+        updates.warrantyPeriodMonths = durationMonths;
       }
       
-      const warranty = await storage.updateWarranty(id, updates);
+      const warranty = await storage.updateWarranty(id, updates, userId);
       if (!warranty) {
         return res.status(404).json({ error: 'Warranty not found' });
       }
@@ -1556,7 +1569,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const deleted = await storage.deleteWarranty(id);
+      // Verify ownership by checking warranty belongs to user
+      const warranties = await storage.getWarranties(userId);
+      const existingWarranty = warranties.find(w => w.id === id);
+      
+      if (!existingWarranty) {
+        return res.status(404).json({ error: 'Warranty not found or access denied' });
+      }
+      
+      // Additional check: verify the warranty's userId matches
+      if (existingWarranty.userId !== userId) {
+        return res.status(403).json({ error: 'Forbidden: Warranty does not belong to this user' });
+      }
+      
+      const deleted = await storage.deleteWarranty(id, userId);
       if (!deleted) {
         return res.status(404).json({ error: 'Warranty not found' });
       }

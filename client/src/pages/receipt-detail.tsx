@@ -1,16 +1,29 @@
+import { useState } from "react";
 import { useLocation, useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Download, 
-  Utensils
+  Utensils,
+  Shield,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
+  Plus,
+  Trash2,
+  Edit2
 } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
-import type { Receipt, ReceiptItem } from "@shared/schema";
+import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
 import { useCurrency } from "@/hooks/use-currency";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
@@ -18,9 +31,59 @@ export default function ReceiptDetailPage() {
   const receiptId = params.id;
   const { format: formatCurrency } = useCurrency();
   const { t } = useTranslation();
+  
+  const [showWarrantyForm, setShowWarrantyForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [warrantyForm, setWarrantyForm] = useState({
+    productName: "",
+    durationMonths: 12,
+    warrantyType: "manufacturer",
+    notes: ""
+  });
 
   const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
     queryKey: ["/api/receipts", receiptId],
+  });
+
+  const { data: warranty, isLoading: warrantyLoading } = useQuery<Warranty | null>({
+    queryKey: ["/api/warranties/receipt", receiptId],
+    enabled: !!receiptId,
+  });
+
+  const createWarrantyMutation = useMutation({
+    mutationFn: async (data: typeof warrantyForm) => {
+      return apiRequest("POST", "/api/warranties", {
+        receiptId,
+        ...data
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
+      setShowWarrantyForm(false);
+      setWarrantyForm({ productName: "", durationMonths: 12, warrantyType: "manufacturer", notes: "" });
+    },
+  });
+
+  const updateWarrantyMutation = useMutation({
+    mutationFn: async (data: typeof warrantyForm) => {
+      return apiRequest("PATCH", `/api/warranties/${warranty?.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
+      setIsEditing(false);
+    },
+  });
+
+  const deleteWarrantyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/warranties/${warranty?.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
+    },
   });
 
   const downloadReceipt = async () => {
@@ -40,6 +103,39 @@ export default function ReceiptDetailPage() {
     } catch (e) {
       console.error("Download failed:", e);
     }
+  };
+
+  const handleWarrantySubmit = () => {
+    if (!warrantyForm.productName) return;
+    if (isEditing) {
+      updateWarrantyMutation.mutate(warrantyForm);
+    } else {
+      createWarrantyMutation.mutate(warrantyForm);
+    }
+  };
+
+  const startEdit = () => {
+    if (warranty) {
+      setWarrantyForm({
+        productName: warranty.productName,
+        durationMonths: warranty.warrantyPeriodMonths || 12,
+        warrantyType: warranty.warrantyType || "manufacturer",
+        notes: warranty.warrantyTerms || ""
+      });
+      setIsEditing(true);
+    }
+  };
+
+  const getWarrantyStatus = (endDate: Date) => {
+    const now = new Date();
+    const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining < 0) {
+      return { status: "expired", color: "text-red-600", bg: "bg-red-100", icon: AlertTriangle };
+    } else if (daysRemaining <= 30) {
+      return { status: "expiring", color: "text-yellow-600", bg: "bg-yellow-100", icon: AlertTriangle };
+    }
+    return { status: "active", color: "text-green-600", bg: "bg-green-100", icon: CheckCircle };
   };
 
   if (isLoading || !receipt) {
@@ -117,6 +213,190 @@ export default function ReceiptDetailPage() {
                 <span>{formatCurrency(parseFloat(receipt.total))}</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Warranty Section */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-green-600" />
+                <h3 className="font-semibold text-gray-900">Warranty</h3>
+              </div>
+              {!warranty && !showWarrantyForm && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setShowWarrantyForm(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              )}
+            </div>
+
+            {warrantyLoading && (
+              <div className="py-4 text-center text-gray-500">Loading...</div>
+            )}
+
+            {warranty && !isEditing && (
+              <div className="space-y-3">
+                {(() => {
+                  const endDate = new Date(warranty.warrantyEndDate);
+                  const statusInfo = getWarrantyStatus(endDate);
+                  const StatusIcon = statusInfo.icon;
+                  const daysRemaining = Math.ceil((endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  return (
+                    <>
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${statusInfo.bg}`}>
+                        <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
+                        <span className={`text-sm font-medium ${statusInfo.color}`}>
+                          {daysRemaining < 0 
+                            ? `Expired ${Math.abs(daysRemaining)} days ago`
+                            : daysRemaining === 0 
+                              ? "Expires today"
+                              : `${daysRemaining} days remaining`}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Product</span>
+                          <p className="font-medium text-gray-900">{warranty.productName}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Type</span>
+                          <p className="font-medium text-gray-900 capitalize">{warranty.warrantyType}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Start Date</span>
+                          <p className="font-medium text-gray-900">
+                            {new Date(warranty.warrantyStartDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">End Date</span>
+                          <p className="font-medium text-gray-900">
+                            {endDate.toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {warranty.warrantyTerms && (
+                        <div className="text-sm">
+                          <span className="text-gray-500">Notes</span>
+                          <p className="text-gray-700">{warranty.warrantyTerms}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" variant="outline" onClick={startEdit}>
+                          <Edit2 className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => deleteWarrantyMutation.mutate()}
+                          disabled={deleteWarrantyMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {(showWarrantyForm || isEditing) && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="productName">Product Name</Label>
+                  <Input
+                    id="productName"
+                    placeholder="e.g. Samsung TV, Apple iPhone"
+                    value={warrantyForm.productName}
+                    onChange={(e) => setWarrantyForm(prev => ({ ...prev, productName: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="duration">Warranty Duration (months)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={warrantyForm.durationMonths}
+                    onChange={(e) => setWarrantyForm(prev => ({ ...prev, durationMonths: parseInt(e.target.value) || 12 }))}
+                  />
+                  {receipt.date && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      <Calendar className="h-3 w-3 inline mr-1" />
+                      Starts from receipt date: {new Date(receipt.date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                
+                <div>
+                  <Label htmlFor="warrantyType">Type</Label>
+                  <Select 
+                    value={warrantyForm.warrantyType}
+                    onValueChange={(value) => setWarrantyForm(prev => ({ ...prev, warrantyType: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                      <SelectItem value="extended">Extended</SelectItem>
+                      <SelectItem value="retailer">Retailer</SelectItem>
+                      <SelectItem value="insurance">Insurance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Any additional warranty details..."
+                    value={warrantyForm.notes}
+                    onChange={(e) => setWarrantyForm(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleWarrantySubmit}
+                    disabled={!warrantyForm.productName || createWarrantyMutation.isPending || updateWarrantyMutation.isPending}
+                  >
+                    {(createWarrantyMutation.isPending || updateWarrantyMutation.isPending) 
+                      ? "Saving..." 
+                      : isEditing ? "Update Warranty" : "Add Warranty"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setShowWarrantyForm(false);
+                      setIsEditing(false);
+                      setWarrantyForm({ productName: "", durationMonths: 12, warrantyType: "manufacturer", notes: "" });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!warranty && !showWarrantyForm && !warrantyLoading && (
+              <p className="text-gray-500 text-sm">No warranty added for this purchase.</p>
+            )}
           </CardContent>
         </Card>
 

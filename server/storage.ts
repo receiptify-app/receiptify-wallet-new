@@ -541,16 +541,25 @@ export class MemStorage implements IStorage {
     return newWarranty;
   }
 
-  async updateWarranty(id: string, updates: Partial<InsertWarranty>): Promise<Warranty | undefined> {
+  async updateWarranty(id: string, updates: Partial<InsertWarranty>, userId?: string): Promise<Warranty | undefined> {
     const warranty = this.warranties.get(id);
     if (!warranty) return undefined;
+    
+    // If userId provided, enforce ownership
+    if (userId && warranty.userId !== userId) return undefined;
 
     const updatedWarranty = { ...warranty, ...updates };
     this.warranties.set(id, updatedWarranty);
     return updatedWarranty;
   }
 
-  async deleteWarranty(id: string): Promise<boolean> {
+  async deleteWarranty(id: string, userId?: string): Promise<boolean> {
+    const warranty = this.warranties.get(id);
+    if (!warranty) return false;
+    
+    // If userId provided, enforce ownership
+    if (userId && warranty.userId !== userId) return false;
+    
     return this.warranties.delete(id);
   }
 
@@ -1096,16 +1105,26 @@ export class DatabaseStorage implements IStorage {
     return newWarranty;
   }
 
-  async updateWarranty(id: string, updates: Partial<InsertWarranty>): Promise<Warranty | undefined> {
+  async updateWarranty(id: string, updates: Partial<InsertWarranty>, userId?: string): Promise<Warranty | undefined> {
+    // If userId provided, enforce ownership by including in where clause
+    const whereClause = userId 
+      ? and(eq(warranties.id, id), eq(warranties.userId, userId))
+      : eq(warranties.id, id);
+    
     const [updated] = await db.update(warranties)
       .set(updates)
-      .where(eq(warranties.id, id))
+      .where(whereClause)
       .returning();
     return updated;
   }
 
-  async deleteWarranty(id: string): Promise<boolean> {
-    const result = await db.delete(warranties).where(eq(warranties.id, id));
+  async deleteWarranty(id: string, userId?: string): Promise<boolean> {
+    // If userId provided, enforce ownership by including in where clause
+    const whereClause = userId 
+      ? and(eq(warranties.id, id), eq(warranties.userId, userId))
+      : eq(warranties.id, id);
+    
+    await db.delete(warranties).where(whereClause);
     return true;
   }
 
