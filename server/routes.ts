@@ -156,6 +156,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin routes
   app.use("/api/admin", adminRouter);
 
+  // Get current user profile
+  app.get("/api/user", async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const userEmail = req.user?.email;
+      const userName = req.user?.name;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      // Try to find existing user in database
+      let user = await storage.getUser(userId);
+      
+      // If user doesn't exist in our DB, create them (auto-registration from Firebase)
+      if (!user) {
+        user = await storage.createUser({
+          email: userEmail || null,
+          username: userName || userEmail?.split('@')[0] || null,
+          firstName: userName?.split(' ')[0] || null,
+          lastName: userName?.split(' ').slice(1).join(' ') || null,
+          authProvider: 'firebase',
+          providerId: userId,
+        });
+      }
+      
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.username || user.firstName || 'User',
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatar: user.profileImageUrl,
+        gender: user.gender,
+      });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
     try {

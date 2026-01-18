@@ -28,12 +28,8 @@ import { useCurrency } from "@/hooks/use-currency";
 import { CURRENCIES } from "@/lib/currency";
 import { apiRequest } from "@/lib/queryClient";
 
-// Sample user data matching the mockup
-const sampleUser = {
-  name: "Alex Green",
-  email: "alex.green@email.com",
-  avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
-};
+// Default avatar fallback
+const defaultAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face";
 
 export default function Profile() {
   const [, navigate] = useLocation();
@@ -52,7 +48,7 @@ export default function Profile() {
     updateCurrency(currencyCode);
   };
 
-  const { data: user = sampleUser } = useQuery<typeof sampleUser>({
+  const { data: apiUser } = useQuery<{ id: string; email: string; name: string; avatar: string | null }>({
     queryKey: ["/api/user"],
     retry: false,
   });
@@ -129,12 +125,12 @@ export default function Profile() {
     }
   };
 
-  // Use Firebase user data if available, fallback to sample data
-  const displayUser = currentUser ? {
-    name: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
-    email: currentUser.email || "user@example.com",
-    avatar: currentUser.photoURL || sampleUser.avatar
-  } : user;
+  // Use API user data (from our database) with Firebase fallback
+  const displayUser = {
+    name: apiUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || "User",
+    email: apiUser?.email || currentUser?.email || "user@example.com",
+    avatar: apiUser?.avatar || currentUser?.photoURL || defaultAvatar
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
