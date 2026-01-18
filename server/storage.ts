@@ -25,6 +25,12 @@ import { db } from "./db";
 import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses, receiptDesigns, admins, userActivity } from "@shared/schema";
 import { eq, and, like, gte, lte, desc, asc, sql, count } from "drizzle-orm";
 
+const PROFILE_EMOJIS = ['🦊', '🐼', '🦋', '🌸', '🍀', '🌈', '⭐', '🎨', '🚀', '🎵'];
+
+function getRandomProfileEmoji(): string {
+  return PROFILE_EMOJIS[Math.floor(Math.random() * PROFILE_EMOJIS.length)];
+}
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -326,6 +332,7 @@ export class MemStorage implements IStorage {
       ...insertUser,
       email: insertUser.email || null,
       phone: insertUser.phone || null,
+      profileImageUrl: insertUser.profileImageUrl || getRandomProfileEmoji(),
       id, 
       createdAt: new Date() 
     };
@@ -899,7 +906,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
+    const userData = {
+      ...user,
+      profileImageUrl: user.profileImageUrl || getRandomProfileEmoji(),
+    };
+    const [newUser] = await db.insert(users).values(userData).returning();
     return newUser;
   }
 
