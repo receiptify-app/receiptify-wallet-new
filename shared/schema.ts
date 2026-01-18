@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  gender: text("gender"), // male, female, other, prefer_not_to_say
   profileImageUrl: text("profile_image_url"),
   authProvider: text("auth_provider").default("local"), // local, google, apple, facebook, phone
   providerId: text("provider_id"), // External provider user ID

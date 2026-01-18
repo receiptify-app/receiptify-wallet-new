@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ interface SignupForm {
   email: string;
   password: string;
   confirmPassword: string;
+  gender: string;
   terms: boolean;
 }
 
@@ -38,7 +40,7 @@ export default function Signup() {
   const { signup, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>();
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<SignupForm>();
   const password = watch("password");
 
   const onSubmit = async (data: SignupForm) => {
@@ -48,7 +50,7 @@ export default function Signup() {
     
     setIsLoading(true);
     try {
-      await signup(data.email, data.password, data.name);
+      await signup(data.email, data.password, data.name, data.gender);
       navigate("/");
     } catch (error) {
       console.error("Signup error:", error);
@@ -146,6 +148,21 @@ export default function Signup() {
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name.message}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              <Select onValueChange={(value) => setValue("gender", value)}>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select your gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
