@@ -135,6 +135,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public directory (for uploaded receipt images - fallback)
   app.use('/uploads', express.static('public/uploads'));
   
+  // Serve avatar images from attached_assets
+  app.use('/assets', express.static('attached_assets'));
+  
   // Authentication middleware - validates Firebase tokens and extracts user ID
   app.use(authMiddleware);
   

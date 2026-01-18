@@ -25,10 +25,21 @@ import { db } from "./db";
 import { users, receipts, receiptItems, merchants, loyaltyCards, subscriptions, warranties, ecoMetrics, comments, splits, otpVerifications, kioskSessions, warrantyClaims, emailIntegrations, pendingReceipts, processedMessages, forwardingAddresses, receiptDesigns, admins, userActivity } from "@shared/schema";
 import { eq, and, like, gte, lte, desc, asc, sql, count } from "drizzle-orm";
 
-const PROFILE_EMOJIS = ['🦊', '🐼', '🦋', '🌸', '🍀', '🌈', '⭐', '🎨', '🚀', '🎵'];
+const PROFILE_AVATARS = [
+  '/assets/generated_images/einstein-style_scientist_avatar.png',
+  '/assets/generated_images/tech_founder_turtleneck_avatar.png',
+  '/assets/generated_images/female_scientist_avatar.png',
+  '/assets/generated_images/renaissance_inventor_avatar.png',
+  '/assets/generated_images/startup_founder_hoodie_avatar.png',
+  '/assets/generated_images/edison_lightbulb_inventor_avatar.png',
+  '/assets/generated_images/space_entrepreneur_avatar.png',
+  '/assets/generated_images/female_tech_ceo_avatar.png',
+  '/assets/generated_images/engineer_inventor_avatar.png',
+  '/assets/generated_images/robotics_inventor_avatar.png',
+];
 
-function getRandomProfileEmoji(): string {
-  return PROFILE_EMOJIS[Math.floor(Math.random() * PROFILE_EMOJIS.length)];
+function getRandomProfileAvatar(): string {
+  return PROFILE_AVATARS[Math.floor(Math.random() * PROFILE_AVATARS.length)];
 }
 
 export interface IStorage {
@@ -332,7 +343,7 @@ export class MemStorage implements IStorage {
       ...insertUser,
       email: insertUser.email || null,
       phone: insertUser.phone || null,
-      profileImageUrl: insertUser.profileImageUrl || getRandomProfileEmoji(),
+      profileImageUrl: insertUser.profileImageUrl || getRandomProfileAvatar(),
       id, 
       createdAt: new Date() 
     };
@@ -908,7 +919,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const userData = {
       ...user,
-      profileImageUrl: user.profileImageUrl || getRandomProfileEmoji(),
+      profileImageUrl: user.profileImageUrl || getRandomProfileAvatar(),
     };
     const [newUser] = await db.insert(users).values(userData).returning();
     return newUser;
