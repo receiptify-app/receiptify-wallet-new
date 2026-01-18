@@ -44,6 +44,8 @@ const FEMALE_AVATARS = [
   '/assets/generated_images/female_startup_founder_avatar.png',
 ];
 
+const NEUTRAL_AVATAR = '/assets/generated_images/friendly_monkey_avatar.png';
+
 const ALL_AVATARS = [...MALE_AVATARS, ...FEMALE_AVATARS];
 
 function getRandomProfileAvatar(gender?: string | null): string {
@@ -51,6 +53,8 @@ function getRandomProfileAvatar(gender?: string | null): string {
     return MALE_AVATARS[Math.floor(Math.random() * MALE_AVATARS.length)];
   } else if (gender === 'female') {
     return FEMALE_AVATARS[Math.floor(Math.random() * FEMALE_AVATARS.length)];
+  } else if (gender === 'other' || gender === 'prefer_not_to_say') {
+    return NEUTRAL_AVATAR;
   }
   return ALL_AVATARS[Math.floor(Math.random() * ALL_AVATARS.length)];
 }
