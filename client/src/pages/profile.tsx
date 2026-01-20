@@ -39,22 +39,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 // Default avatar fallback
-const defaultAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face";
+const defaultAvatar = "/assets/generated_images/friendly_monkey_avatar.png";
 
-// Avatar options for users to choose from
+// Avatar options matching the pre-assigned avatars from signup
 const AVATAR_OPTIONS = [
-  { id: 'avatar1', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4', label: 'Felix' },
-  { id: 'avatar2', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=c0aede', label: 'Aneka' },
-  { id: 'avatar3', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max&backgroundColor=d1d4f9', label: 'Max' },
-  { id: 'avatar4', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc', label: 'Luna' },
-  { id: 'avatar5', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver&backgroundColor=ffdfbf', label: 'Oliver' },
-  { id: 'avatar6', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie&backgroundColor=c1f0c1', label: 'Sophie' },
-  { id: 'avatar7', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Robot1&backgroundColor=b6e3f4', label: 'Robot' },
-  { id: 'avatar8', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Robot2&backgroundColor=c0aede', label: 'Bot' },
-  { id: 'avatar9', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Happy&backgroundColor=ffdfbf', label: 'Happy' },
-  { id: 'avatar10', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cool&backgroundColor=d1d4f9', label: 'Cool' },
-  { id: 'avatar11', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Aria&backgroundColor=ffd5dc', label: 'Aria' },
-  { id: 'avatar12', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Zara&backgroundColor=c1f0c1', label: 'Zara' },
+  { id: 'einstein', url: '/assets/generated_images/einstein-style_scientist_avatar.png', label: 'Einstein' },
+  { id: 'tech_founder', url: '/assets/generated_images/tech_founder_turtleneck_avatar.png', label: 'Tech Founder' },
+  { id: 'renaissance', url: '/assets/generated_images/renaissance_inventor_avatar.png', label: 'Renaissance' },
+  { id: 'startup', url: '/assets/generated_images/startup_founder_hoodie_avatar.png', label: 'Startup' },
+  { id: 'edison', url: '/assets/generated_images/edison_lightbulb_inventor_avatar.png', label: 'Edison' },
+  { id: 'space', url: '/assets/generated_images/space_entrepreneur_avatar.png', label: 'Space' },
+  { id: 'engineer', url: '/assets/generated_images/engineer_inventor_avatar.png', label: 'Engineer' },
+  { id: 'robotics', url: '/assets/generated_images/robotics_inventor_avatar.png', label: 'Robotics' },
+  { id: 'scientist', url: '/assets/generated_images/female_scientist_avatar.png', label: 'Scientist' },
+  { id: 'tech_ceo', url: '/assets/generated_images/female_tech_ceo_avatar.png', label: 'Tech CEO' },
+  { id: 'aerospace', url: '/assets/generated_images/female_aerospace_engineer_avatar.png', label: 'Aerospace' },
+  { id: 'robotics_sci', url: '/assets/generated_images/female_robotics_scientist_avatar.png', label: 'Robotics Sci' },
+  { id: 'founder', url: '/assets/generated_images/female_startup_founder_avatar.png', label: 'Founder' },
+  { id: 'monkey', url: '/assets/generated_images/friendly_monkey_avatar.png', label: 'Monkey' },
 ];
 
 export default function Profile() {
