@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +12,9 @@ import {
   Download,
   Receipt,
   LogOut,
-  Languages
+  Languages,
+  Camera,
+  Check
 } from "lucide-react";
 import {
   Select,
@@ -21,15 +23,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import AppHeader from "@/components/app-header";
 import { useCurrency } from "@/hooks/use-currency";
 import { CURRENCIES } from "@/lib/currency";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // Default avatar fallback
 const defaultAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face";
+
+// Avatar options for users to choose from
+const AVATAR_OPTIONS = [
+  { id: 'avatar1', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4', label: 'Felix' },
+  { id: 'avatar2', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=c0aede', label: 'Aneka' },
+  { id: 'avatar3', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max&backgroundColor=d1d4f9', label: 'Max' },
+  { id: 'avatar4', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc', label: 'Luna' },
+  { id: 'avatar5', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver&backgroundColor=ffdfbf', label: 'Oliver' },
+  { id: 'avatar6', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie&backgroundColor=c1f0c1', label: 'Sophie' },
+  { id: 'avatar7', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Robot1&backgroundColor=b6e3f4', label: 'Robot' },
+  { id: 'avatar8', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Robot2&backgroundColor=c0aede', label: 'Bot' },
+  { id: 'avatar9', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Happy&backgroundColor=ffdfbf', label: 'Happy' },
+  { id: 'avatar10', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cool&backgroundColor=d1d4f9', label: 'Cool' },
+  { id: 'avatar11', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Aria&backgroundColor=ffd5dc', label: 'Aria' },
+  { id: 'avatar12', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Zara&backgroundColor=c1f0c1', label: 'Zara' },
+];
 
 export default function Profile() {
   const [, navigate] = useLocation();
@@ -37,6 +63,8 @@ export default function Profile() {
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const { currency, symbol, updateCurrency } = useCurrency();
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const { toast } = useToast();
   
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
@@ -46,6 +74,32 @@ export default function Profile() {
 
   const handleCurrencyChange = (currencyCode: string) => {
     updateCurrency(currencyCode);
+  };
+
+  const updateAvatarMutation = useMutation({
+    mutationFn: async (avatarUrl: string) => {
+      const res = await apiRequest("PATCH", "/api/user/avatar", { avatar: avatarUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setShowAvatarPicker(false);
+      toast({
+        title: t('profile.avatarUpdated') || "Avatar updated",
+        description: t('profile.avatarUpdatedDesc') || "Your profile picture has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error') || "Error",
+        description: t('profile.avatarUpdateFailed') || "Failed to update avatar. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAvatarSelect = (avatarUrl: string) => {
+    updateAvatarMutation.mutate(avatarUrl);
   };
 
   const { data: apiUser } = useQuery<{ id: string; email: string; name: string; avatar: string | null }>({
@@ -142,20 +196,26 @@ export default function Profile() {
 
       <div className="px-6 py-6 space-y-8">
         {/* User Profile Section */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
-                  <img 
-                    src={displayUser.avatar} 
-                    alt={displayUser.name}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
+                    <img 
+                      src={displayUser.avatar} 
+                      alt={displayUser.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
+                    <Camera className="w-3 h-3 text-white" />
+                  </div>
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{displayUser.name}</h2>
                   <p className="text-gray-600">{displayUser.email}</p>
+                  <p className="text-sm text-emerald-600">{t('profile.tapToChangeAvatar') || 'Tap to change avatar'}</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -326,6 +386,49 @@ export default function Profile() {
           </Card>
         </div>
       </div>
+
+      {/* Avatar Picker Dialog */}
+      <Dialog open={showAvatarPicker} onOpenChange={setShowAvatarPicker}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('profile.chooseAvatar') || 'Choose Your Avatar'}</DialogTitle>
+            <DialogDescription>
+              {t('profile.chooseAvatarDesc') || 'Select an avatar to personalize your profile'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-4 py-4">
+            {AVATAR_OPTIONS.map((avatar) => (
+              <button
+                key={avatar.id}
+                onClick={() => handleAvatarSelect(avatar.url)}
+                disabled={updateAvatarMutation.isPending}
+                className={`relative p-2 rounded-xl border-2 transition-all hover:scale-105 hover:shadow-md ${
+                  displayUser.avatar === avatar.url 
+                    ? 'border-emerald-500 bg-emerald-50' 
+                    : 'border-gray-200 hover:border-emerald-300'
+                } ${updateAvatarMutation.isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <img 
+                  src={avatar.url} 
+                  alt={avatar.label}
+                  className="w-full aspect-square rounded-lg object-cover"
+                />
+                {displayUser.avatar === avatar.url && (
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+                <p className="text-xs text-center mt-1 text-gray-600">{avatar.label}</p>
+              </button>
+            ))}
+          </div>
+          {updateAvatarMutation.isPending && (
+            <div className="text-center text-sm text-gray-500">
+              {t('common.updating') || 'Updating...'}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

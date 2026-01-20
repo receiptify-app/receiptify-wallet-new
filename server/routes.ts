@@ -197,6 +197,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user avatar
+  app.patch("/api/user/avatar", async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { avatar } = req.body;
+      if (!avatar || typeof avatar !== 'string') {
+        return res.status(400).json({ error: 'Avatar URL is required' });
+      }
+
+      await storage.updateUser(userId, { profileImageUrl: avatar });
+      
+      res.json({ success: true, avatar });
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      res.status(500).json({ error: "Failed to update avatar" });
+    }
+  });
+
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
     try {

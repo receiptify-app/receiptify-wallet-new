@@ -37,13 +37,20 @@ export default function AnalyticsReceiptCard({
   onSelect,
   onMove,
   onShare,
-  onClick
+  onClick,
 }: AnalyticsReceiptCardProps) {
   const { format: formatCurrency } = useCurrency();
-  const amount = typeof receipt.total === 'string' ? parseFloat(receipt.total) : receipt.total;
+  const amount =
+    typeof receipt.total === "string"
+      ? parseFloat(receipt.total)
+      : receipt.total;
   const receiptDate = new Date(receipt.date);
-  const categoryColor = receipt.category ? getCategoryColor(receipt.category) : '#757575';
-  const categoryIcon = receipt.category ? getCategoryIcon(receipt.category) : '📦';
+  const categoryColor = receipt.category
+    ? getCategoryColor(receipt.category)
+    : "#757575";
+  const categoryIcon = receipt.category
+    ? getCategoryIcon(receipt.category)
+    : "📦";
 
   const handleCardClick = () => {
     if (selectionMode && onSelect) {
@@ -61,9 +68,9 @@ export default function AnalyticsReceiptCard({
   };
 
   return (
-    <Card 
+    <Card
       className={`bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
-        isSelected ? 'ring-2 ring-primary' : ''
+        isSelected ? "ring-2 ring-primary" : ""
       }`}
       onClick={handleCardClick}
       data-testid={`card-receipt-${receipt.id}`}
@@ -73,7 +80,7 @@ export default function AnalyticsReceiptCard({
           {/* Selection checkbox */}
           {selectionMode && (
             <div onClick={handleCheckboxClick}>
-              <Checkbox 
+              <Checkbox
                 checked={isSelected}
                 data-testid={`checkbox-receipt-${receipt.id}`}
               />
@@ -83,8 +90,8 @@ export default function AnalyticsReceiptCard({
           {/* Receipt thumbnail */}
           <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
             {receipt.imageUrl ? (
-              <img 
-                src={receipt.imageUrl} 
+              <img
+                src={receipt.imageUrl}
                 alt={receipt.merchantName}
                 className="w-full h-full object-cover"
                 data-testid={`img-receipt-${receipt.id}`}
@@ -100,15 +107,24 @@ export default function AnalyticsReceiptCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-gray-900 truncate" data-testid={`text-merchant-${receipt.id}`}>
+                <h4
+                  className="font-semibold text-gray-900 truncate"
+                  data-testid={`text-merchant-${receipt.id}`}
+                >
                   {receipt.merchantName}
                 </h4>
-                <p className="text-sm text-gray-600" data-testid={`text-date-${receipt.id}`}>
-                  {format(receiptDate, 'MMM d, yyyy')}
+                <p
+                  className="text-sm text-gray-600"
+                  data-testid={`text-date-${receipt.id}`}
+                >
+                  {format(receiptDate, "MMM d, yyyy")}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="font-bold text-gray-900" data-testid={`text-amount-${receipt.id}`}>
+                <p
+                  className="font-bold text-gray-900"
+                  data-testid={`text-amount-${receipt.id}`}
+                >
                   {formatCurrency(amount)}
                 </p>
               </div>
@@ -116,12 +132,12 @@ export default function AnalyticsReceiptCard({
 
             {/* Category badge */}
             {receipt.category && (
-              <Badge 
+              <Badge
                 className="mt-2 text-xs"
-                style={{ 
-                  backgroundColor: `${categoryColor}20`, 
+                style={{
+                  backgroundColor: `${categoryColor}20`,
                   color: categoryColor,
-                  border: `1px solid ${categoryColor}40`
+                  border: `1px solid ${categoryColor}40`,
                 }}
                 data-testid={`badge-category-${receipt.id}`}
               >
@@ -134,8 +150,8 @@ export default function AnalyticsReceiptCard({
           {!selectionMode && (onMove || onShare) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="flex-shrink-0"
                   data-testid={`button-menu-${receipt.id}`}
@@ -145,7 +161,7 @@ export default function AnalyticsReceiptCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {onMove && (
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
                       onMove(receipt.id);
@@ -153,11 +169,11 @@ export default function AnalyticsReceiptCard({
                     data-testid={`menu-move-${receipt.id}`}
                   >
                     <MoveRight className="w-4 h-4 mr-2" />
-                    Move to Category
+                    Change Category
                   </DropdownMenuItem>
                 )}
                 {onShare && (
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
                       onShare(receipt.id);

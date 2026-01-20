@@ -10,12 +10,12 @@ interface BulkSelectToolbarProps {
 export default function BulkSelectToolbar({
   selectedCount,
   onMove,
-  onCancel
+  onCancel,
 }: BulkSelectToolbarProps) {
   if (selectedCount === 0) return null;
 
   return (
-    <div 
+    <div
       className="fixed bottom-20 left-0 right-0 bg-primary text-white py-4 px-6 shadow-lg z-50"
       data-testid="toolbar-bulk-select"
     >
@@ -43,7 +43,7 @@ export default function BulkSelectToolbar({
           data-testid="button-bulk-move"
         >
           <MoveRight className="w-4 h-4 mr-2" />
-          Move to Category
+          Change category
         </Button>
       </div>
     </div>
