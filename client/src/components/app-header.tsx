@@ -10,13 +10,13 @@ export default function AppHeader({ showBackButton = false, onBackClick, title }
   return (
     <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100">
       {showBackButton && onBackClick ? (
-        <button onClick={onBackClick} className="p-2">
+        <button onClick={onBackClick} className="p-2 w-9">
           <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
       ) : (
-        <div />
+        <div className="w-9" />
       )}
       
       <div className="flex flex-col items-center">
