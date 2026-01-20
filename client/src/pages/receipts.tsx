@@ -312,31 +312,26 @@ export default function ReceiptsPage() {
                               {getMerchantIcon(receipt.merchantName)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="relative w-full overflow-hidden">
-                                {/* merchant name will truncate and leave room for badge on the right */}
-                                <div className="relative">
-                                  <p
-                                    className="text-sm font-medium text-gray-900 truncate pr-20"
-                                    title={receipt.merchantName}
-                                  >
-                                    {receipt.merchantName}
-                                  </p>
-                                  {receipt.category && (
-                                    <div className="absolute top-0 right-0 pointer-events-none">
-                                      <Badge
-                                        variant="secondary"
-                                        className={`text-xs ${getCategoryColor(receipt.category)}`}
-                                      >
-                                        {receipt.category}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500 truncate mt-1">
-                                  {format(new Date(receipt.date), 'h:mm a')}
-                                  {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                              <div className="flex items-center gap-2">
+                                <p
+                                  className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0"
+                                  title={receipt.merchantName}
+                                >
+                                  {receipt.merchantName}
                                 </p>
+                                {receipt.category && (
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs flex-shrink-0 ${getCategoryColor(receipt.category)}`}
+                                  >
+                                    {receipt.category}
+                                  </Badge>
+                                )}
                               </div>
+                              <p className="text-xs text-gray-500 truncate mt-1">
+                                {format(new Date(receipt.date), 'h:mm a')}
+                                {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
