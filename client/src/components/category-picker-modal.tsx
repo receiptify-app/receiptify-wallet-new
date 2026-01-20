@@ -42,7 +42,7 @@ export default function CategoryPickerModal({
                 className={`h-auto py-4 px-3 flex flex-col items-center gap-2 relative ${
                   isSelected ? 'border-2 border-primary' : ''
                 }`}
-                onClick={() => handleSelect(category.id)}
+                onClick={() => handleSelect(category.name)}
                 data-testid={`button-category-${category.id}`}
                 style={{
                   backgroundColor: isSelected ? category.color : 'transparent',

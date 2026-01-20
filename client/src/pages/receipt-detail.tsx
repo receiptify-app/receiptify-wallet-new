@@ -6,10 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Download, 
+import {
+  Download,
   Utensils,
   Shield,
   Calendar,
@@ -17,7 +23,7 @@ import {
   CheckCircle,
   Plus,
   Trash2,
-  Edit2
+  Edit2,
 } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
@@ -31,37 +37,47 @@ export default function ReceiptDetailPage() {
   const receiptId = params.id;
   const { format: formatCurrency } = useCurrency();
   const { t } = useTranslation();
-  
+
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [warrantyForm, setWarrantyForm] = useState({
     productName: "",
     durationMonths: 12,
     warrantyType: "manufacturer",
-    notes: ""
+    notes: "",
   });
 
-  const { data: receipt, isLoading } = useQuery<Receipt & { items?: ReceiptItem[] }>({
+  const { data: receipt, isLoading } = useQuery<
+    Receipt & { items?: ReceiptItem[] }
+  >({
     queryKey: ["/api/receipts", receiptId],
   });
 
-  const { data: warranty, isLoading: warrantyLoading } = useQuery<Warranty | null>({
-    queryKey: ["/api/warranties/receipt", receiptId],
-    enabled: !!receiptId,
-  });
+  const { data: warranty, isLoading: warrantyLoading } =
+    useQuery<Warranty | null>({
+      queryKey: ["/api/warranties/receipt", receiptId],
+      enabled: !!receiptId,
+    });
 
   const createWarrantyMutation = useMutation({
     mutationFn: async (data: typeof warrantyForm) => {
       return apiRequest("POST", "/api/warranties", {
         receiptId,
-        ...data
+        ...data,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/warranties/receipt", receiptId],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
       setShowWarrantyForm(false);
-      setWarrantyForm({ productName: "", durationMonths: 12, warrantyType: "manufacturer", notes: "" });
+      setWarrantyForm({
+        productName: "",
+        durationMonths: 12,
+        warrantyType: "manufacturer",
+        notes: "",
+      });
     },
   });
 
@@ -70,7 +86,9 @@ export default function ReceiptDetailPage() {
       return apiRequest("PATCH", `/api/warranties/${warranty?.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/warranties/receipt", receiptId],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
       setIsEditing(false);
     },
@@ -81,7 +99,9 @@ export default function ReceiptDetailPage() {
       return apiRequest("DELETE", `/api/warranties/${warranty?.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warranties/receipt", receiptId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/warranties/receipt", receiptId],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/warranties"] });
     },
   });
@@ -93,7 +113,10 @@ export default function ReceiptDetailPage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const safeName = (receipt.merchantName || "receipt").replace(/[^\w-_]/g, "_");
+      const safeName = (receipt.merchantName || "receipt").replace(
+        /[^\w-_]/g,
+        "_",
+      );
       a.href = url;
       a.download = `${safeName}_${receipt.id || ""}`;
       document.body.appendChild(a);
@@ -120,7 +143,7 @@ export default function ReceiptDetailPage() {
         productName: warranty.productName,
         durationMonths: warranty.warrantyPeriodMonths || 12,
         warrantyType: warranty.warrantyType || "manufacturer",
-        notes: warranty.warrantyTerms || ""
+        notes: warranty.warrantyTerms || "",
       });
       setIsEditing(true);
     }
@@ -128,14 +151,31 @@ export default function ReceiptDetailPage() {
 
   const getWarrantyStatus = (endDate: Date) => {
     const now = new Date();
-    const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
+    const daysRemaining = Math.ceil(
+      (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
     if (daysRemaining < 0) {
-      return { status: "expired", color: "text-red-600", bg: "bg-red-100", icon: AlertTriangle };
+      return {
+        status: "expired",
+        color: "text-red-600",
+        bg: "bg-red-100",
+        icon: AlertTriangle,
+      };
     } else if (daysRemaining <= 30) {
-      return { status: "expiring", color: "text-yellow-600", bg: "bg-yellow-100", icon: AlertTriangle };
+      return {
+        status: "expiring",
+        color: "text-yellow-600",
+        bg: "bg-yellow-100",
+        icon: AlertTriangle,
+      };
     }
-    return { status: "active", color: "text-green-600", bg: "bg-green-100", icon: CheckCircle };
+    return {
+      status: "active",
+      color: "text-green-600",
+      bg: "bg-green-100",
+      icon: CheckCircle,
+    };
   };
 
   if (isLoading || !receipt) {
@@ -147,17 +187,17 @@ export default function ReceiptDetailPage() {
   }
 
   const items = receipt.items || [];
-  const receiptDate = new Date(receipt.date).toLocaleDateString('en-US', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+  const receiptDate = new Date(receipt.date).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <AppHeader 
+      <AppHeader
         showBackButton={true}
         onBackClick={() => window.history.back()}
       />
@@ -177,12 +217,11 @@ export default function ReceiptDetailPage() {
         {receipt.imageUrl && (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-              {t('receiptDetail.receiptImage')}
+              {t("receiptDetail.receiptImage")}
             </h3>
             <ImageViewer imageUrl={receipt.imageUrl} alt="Receipt" />
           </div>
         )}
-
 
         {/* Items List */}
         <Card className="bg-white shadow-sm border-0">
@@ -190,26 +229,31 @@ export default function ReceiptDetailPage() {
             {items.map((item) => (
               <div key={item.id} className="flex items-center justify-between">
                 <span className="text-gray-900 font-medium">
-                  {item.quantity && parseInt(item.quantity) > 1 ? `${item.quantity}x ` : ''}{item.name}
+                  {item.quantity && parseInt(item.quantity) > 1
+                    ? `${item.quantity}x `
+                    : ""}
+                  {item.name}
                 </span>
                 <span className="text-gray-900 font-semibold">
                   {formatCurrency(parseFloat(item.price))}
                 </span>
               </div>
             ))}
-            
+
             {receipt.tax && (
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
-                  <span>{t('receiptDetail.tax')}</span>
+                  <span>{t("receiptDetail.tax")}</span>
                   <span>{formatCurrency(parseFloat(receipt.tax))}</span>
                 </div>
               </div>
             )}
-            
-            <div className={`${receipt.tax ? 'pt-2' : 'border-t border-gray-200 pt-4 mt-4'}`}>
+
+            <div
+              className={`${receipt.tax ? "pt-2" : "border-t border-gray-200 pt-4 mt-4"}`}
+            >
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
-                <span>{t('receiptDetail.total')}</span>
+                <span>{t("receiptDetail.total")}</span>
                 <span>{formatCurrency(parseFloat(receipt.total))}</span>
               </div>
             </div>
@@ -217,7 +261,7 @@ export default function ReceiptDetailPage() {
         </Card>
 
         {/* Warranty Section */}
-        <Card className="bg-white shadow-sm border-0">
+        {/* <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -398,7 +442,7 @@ export default function ReceiptDetailPage() {
               <p className="text-gray-500 text-sm">No warranty added for this purchase.</p>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Download Receipt */}
         {receipt.imageUrl && (
@@ -425,7 +469,9 @@ export default function ReceiptDetailPage() {
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                 <Utensils className="h-4 w-4 text-green-600" />
               </div>
-              <span className="text-gray-900 font-medium">{receipt.category || 'Other'}</span>
+              <span className="text-gray-900 font-medium">
+                {receipt.category || "Other"}
+              </span>
             </div>
           </CardContent>
         </Card>
