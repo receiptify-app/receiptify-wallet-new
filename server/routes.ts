@@ -159,26 +159,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current user profile
   app.get("/api/user", async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const firebaseUid = req.user?.id;
       const userEmail = req.user?.email;
       const userName = req.user?.name;
       
-      if (!userId) {
+      if (!firebaseUid) {
         return res.status(401).json({ error: 'Authentication required' });
       }
       
-      // Try to find existing user in database
-      let user = await storage.getUser(userId);
+      // Try to find existing user by Firebase providerId first (correct lookup)
+      let user = await storage.getUserByProviderId('firebase', firebaseUid);
+      
+      // Fallback: try by email if providerId lookup fails
+      if (!user && userEmail) {
+        user = await storage.getUserByEmail(userEmail);
+        // Update providerId if found by email but missing providerId
+        if (user && !user.providerId) {
+          await storage.updateUser(user.id, { providerId: firebaseUid, authProvider: 'firebase' });
+        }
+      }
       
       // If user doesn't exist in our DB, create them (auto-registration from Firebase)
       if (!user) {
+        // Generate unique username to avoid conflicts
+        const baseUsername = userName || userEmail?.split('@')[0] || 'User';
+        const uniqueUsername = `${baseUsername}_${Date.now().toString(36)}`;
+        
         user = await storage.createUser({
           email: userEmail || null,
-          username: userName || userEmail?.split('@')[0] || null,
+          username: uniqueUsername,
           firstName: userName?.split(' ')[0] || null,
           lastName: userName?.split(' ').slice(1).join(' ') || null,
           authProvider: 'firebase',
-          providerId: userId,
+          providerId: firebaseUid,
         });
       }
       
@@ -200,8 +213,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update user avatar
   app.patch("/api/user/avatar", async (req, res) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
+      const firebaseUid = req.user?.id;
+      if (!firebaseUid) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
@@ -210,7 +223,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Avatar URL is required' });
       }
 
-      await storage.updateUser(userId, { profileImageUrl: avatar });
+      // Find user by Firebase providerId
+      const user = await storage.getUserByProviderId('firebase', firebaseUid);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      await storage.updateUser(user.id, { profileImageUrl: avatar });
       
       res.json({ success: true, avatar });
     } catch (error) {
