@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronRight, ChevronDown, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -31,6 +32,7 @@ export default function ReceiptsPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { confirm } = useConfirmDialog();
   const { format: formatCurrency } = useCurrency();
@@ -155,25 +157,44 @@ export default function ReceiptsPage() {
     }
   };
 
-  // Group receipts by date
-  const groupedReceipts = receipts.reduce((groups: Record<string, Receipt[]>, receipt: Receipt) => {
-    const receiptDate = new Date(receipt.date);
-    let groupKey = '';
+  // Toggle month expansion
+  const toggleMonth = (monthKey: string) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
+  };
+
+  // Group receipts by month and sort by date descending
+  const groupedReceipts = useMemo(() => {
+    const groups: Record<string, { receipts: Receipt[]; sortKey: number }> = {};
     
-    if (isToday(receiptDate)) {
-      groupKey = t('receipts.today');
-    } else if (isYesterday(receiptDate)) {
-      groupKey = t('receipts.yesterday');
-    } else {
-      groupKey = format(receiptDate, 'EEEE, MMMM d');
-    }
-    
-    if (!groups[groupKey]) {
-      groups[groupKey] = [];
-    }
-    groups[groupKey].push(receipt);
-    return groups;
-  }, {});
+    receipts.forEach((receipt: Receipt) => {
+      const receiptDate = new Date(receipt.date);
+      const monthKey = format(receiptDate, 'MMMM yyyy');
+      const sortKey = receiptDate.getFullYear() * 100 + receiptDate.getMonth();
+      
+      if (!groups[monthKey]) {
+        groups[monthKey] = { receipts: [], sortKey };
+      }
+      groups[monthKey].receipts.push(receipt);
+    });
+
+    // Sort receipts within each month by date descending
+    Object.values(groups).forEach(group => {
+      group.receipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+
+    // Convert to array sorted by month descending (newest first)
+    return Object.entries(groups)
+      .sort(([, a], [, b]) => b.sortKey - a.sortKey)
+      .map(([monthKey, { receipts }]) => ({ monthKey, receipts }));
+  }, [receipts]);
 
   const getMerchantIcon = (merchantName: string) => {
     const name = merchantName.toLowerCase();
@@ -274,101 +295,123 @@ export default function ReceiptsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedReceipts).map(([dateGroup, groupReceipts]) => (
-              <div key={dateGroup}>
-                <h2 className="text-sm font-medium text-gray-500 mb-3 px-1">
-                  {dateGroup}
-                </h2>
-                <div className="space-y-2">
-                  {groupReceipts.map((receipt: Receipt) => (
-                    <Card 
-                      key={receipt.id} 
-                      className={`hover:shadow-md transition-shadow cursor-pointer ${
-                        selectedReceipts.has(receipt.id) ? 'ring-2 ring-primary' : ''
-                      }`}
-                      onClick={(e) => {
-                        if (selectionMode) {
-                          handleReceiptSelect(receipt.id, e);
-                          return;
-                        }
-                        // navigate to receipt detail
-                        setLocation(`/receipts/${receipt.id}`);
-                      }}
-                      data-testid={`card-receipt-${receipt.id}`}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            {selectionMode && (
-                              <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
-                                <Checkbox 
-                                  checked={selectedReceipts.has(receipt.id)}
-                                  data-testid={`checkbox-receipt-${receipt.id}`}
-                                />
+          <div className="space-y-4">
+            {groupedReceipts.map(({ monthKey, receipts: monthReceipts }) => {
+              const isExpanded = expandedMonths.has(monthKey);
+              const monthTotal = monthReceipts.reduce((sum, r) => sum + parseFloat(r.total || '0'), 0);
+              
+              return (
+                <Collapsible
+                  key={monthKey}
+                  open={isExpanded}
+                  onOpenChange={() => toggleMonth(monthKey)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <ChevronDown 
+                          className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} 
+                        />
+                        <div>
+                          <h2 className="text-sm font-semibold text-gray-900">{monthKey}</h2>
+                          <p className="text-xs text-gray-500">{monthReceipts.length} receipt{monthReceipts.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-900">{formatCurrency(monthTotal.toString())}</p>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 mt-2 pl-2">
+                      {monthReceipts.map((receipt: Receipt) => (
+                        <Card 
+                          key={receipt.id} 
+                          className={`hover:shadow-md transition-shadow cursor-pointer ${
+                            selectedReceipts.has(receipt.id) ? 'ring-2 ring-primary' : ''
+                          }`}
+                          onClick={(e) => {
+                            if (selectionMode) {
+                              handleReceiptSelect(receipt.id, e);
+                              return;
+                            }
+                            setLocation(`/receipts/${receipt.id}`);
+                          }}
+                          data-testid={`card-receipt-${receipt.id}`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                {selectionMode && (
+                                  <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
+                                    <Checkbox 
+                                      checked={selectedReceipts.has(receipt.id)}
+                                      data-testid={`checkbox-receipt-${receipt.id}`}
+                                    />
+                                  </div>
+                                )}
+                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
+                                  {getMerchantIcon(receipt.merchantName)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p
+                                      className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0"
+                                      title={receipt.merchantName}
+                                    >
+                                      {receipt.merchantName}
+                                    </p>
+                                    {receipt.category && (
+                                      <Badge
+                                        variant="secondary"
+                                        className={`text-xs flex-shrink-0 ${getCategoryColor(receipt.category)}`}
+                                      >
+                                        {receipt.category}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 truncate mt-1">
+                                    {format(new Date(receipt.date), 'MMM d, h:mm a')}
+                                    {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                                  </p>
+                                </div>
                               </div>
-                            )}
-                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
-                              {getMerchantIcon(receipt.merchantName)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p
-                                  className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0"
-                                  title={receipt.merchantName}
-                                >
-                                  {receipt.merchantName}
-                                </p>
-                                {receipt.category && (
-                                  <Badge
-                                    variant="secondary"
-                                    className={`text-xs flex-shrink-0 ${getCategoryColor(receipt.category)}`}
+                              <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                                <div className="text-right min-w-[10px] flex-shrink-0">
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {formatCurrency(receipt.total)}
+                                  </p>
+                                  {receipt.paymentMethod && (
+                                    <p className="text-xs text-gray-500">
+                                      {receipt.paymentMethod}
+                                    </p>
+                                  )}
+                                </div>
+                                {!selectionMode && (
+                                  <div className="flex items-center gap-1">
+                                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                )}
+                                {!selectionMode && (
+                                  <button
+                                    onClick={(e) => handleDeleteReceipt(receipt.id, e)}
+                                    className="text-red-500 hover:text-red-700 p-1 ml-2"
+                                    aria-label="Delete receipt"
+                                    title="Delete receipt"
                                   >
-                                    {receipt.category}
-                                  </Badge>
+                                    <Trash className="h-4 w-4" />
+                                  </button>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500 truncate mt-1">
-                                {format(new Date(receipt.date), 'h:mm a')}
-                                {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
-                              </p>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                            <div className="text-right min-w-[10px] flex-shrink-0">
-                              <p className="text-sm font-semibold text-gray-900">
-                                {formatCurrency(receipt.total)}
-                              </p>
-                              {receipt.paymentMethod && (
-                                <p className="text-xs text-gray-500">
-                                  {receipt.paymentMethod}
-                                </p>
-                              )}
-                            </div>
-                            {!selectionMode && (
-                              <div className="flex items-center gap-1">
-                                 <ChevronRight className="h-4 w-4 text-gray-400" />
-                               </div>
-                             )}
-                            {/* Delete action */}
-                            {!selectionMode && (
-                              <button
-                                onClick={(e) => handleDeleteReceipt(receipt.id, e)}
-                                className="text-red-500 hover:text-red-700 p-1 ml-2"
-                                aria-label="Delete receipt"
-                                title="Delete receipt"
-                              >
-                                <Trash className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            ))}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         )}
       </div>
