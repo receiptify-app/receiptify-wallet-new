@@ -195,6 +195,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Update lastLoginAt for tracking daily/weekly active users
+      await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
+      
       res.json({
         id: user.id,
         email: user.email,
