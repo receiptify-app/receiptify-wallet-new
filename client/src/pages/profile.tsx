@@ -352,7 +352,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Warranties */}
+        {/* Warranties - commented out for now
         <div>
           <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.warranties') || 'Warranties'}</h3>
           <div className="space-y-3">
@@ -372,6 +372,7 @@ export default function Profile() {
             </Card>
           </div>
         </div>
+        */}
 
         {/* Export (link to dedicated Export page) */}
         <div>
