@@ -14,7 +14,8 @@ import {
   LogOut,
   Languages,
   Camera,
-  Check
+  Check,
+  Shield
 } from "lucide-react";
 import {
   Select,
@@ -345,6 +346,27 @@ export default function Profile() {
                     <span className="text-sm text-gray-600">{t('common.on')}</span>
                     <ChevronRight className="w-5 h-5 text-gray-400" />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Warranties */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.warranties') || 'Warranties'}</h3>
+          <div className="space-y-3">
+            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/warranties')}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Shield className="w-6 h-6 text-emerald-600" />
+                    <div>
+                      <div className="text-lg font-medium text-gray-900">{t('profile.manageWarranties') || 'Manage Warranties'}</div>
+                      <div className="text-sm text-gray-500">{t('profile.manageWarrantiesDesc') || 'Track and manage your product warranties'}</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
               </CardContent>
             </Card>
