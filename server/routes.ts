@@ -241,6 +241,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Track user activity for analytics (no auth required for signup tracking)
+  app.post("/api/activity", async (req, res) => {
+    try {
+      const { activityType, metadata } = req.body;
+      
+      if (!activityType) {
+        return res.status(400).json({ error: "activityType is required" });
+      }
+      
+      // Generate a session ID for anonymous tracking
+      const sessionId = req.headers['x-session-id'] as string || `anon_${Date.now()}`;
+      
+      await storage.createUserActivity({
+        userId: sessionId,
+        activityType,
+        metadata: metadata || null,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking activity:", error);
+      res.status(500).json({ error: "Failed to track activity" });
+    }
+  });
+
   // Analytics routes
   app.get("/api/analytics/spending", async (req, res) => {
     try {

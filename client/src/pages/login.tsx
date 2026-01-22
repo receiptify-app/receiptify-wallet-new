@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,22 +16,59 @@ interface LoginForm {
   password: string;
 }
 
+// Generate or retrieve session ID for tracking
+const getSessionId = () => {
+  let sessionId = sessionStorage.getItem('signup_session_id');
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem('signup_session_id', sessionId);
+  }
+  return sessionId;
+};
+
+// Track activity to backend
+const trackActivity = async (activityType: string, metadata?: any) => {
+  try {
+    await fetch('/api/activity', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-session-id': getSessionId()
+      },
+      body: JSON.stringify({ activityType, metadata })
+    });
+  } catch (e) {
+    // Silent fail for tracking
+  }
+};
+
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
   const { login, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
+  const hasTrackedVisit = useRef(false);
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+
+  // Track when user visits login page (signup started)
+  useEffect(() => {
+    if (!hasTrackedVisit.current) {
+      hasTrackedVisit.current = true;
+      trackActivity('signup_started', { page: 'login' });
+    }
+  }, []);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
       await login(data.email, data.password);
+      trackActivity('signup_completed', { method: 'email' });
       navigate("/");
     } catch (error) {
       console.error("Login error:", error);
+      trackActivity('signup_dropped', { method: 'email', reason: 'login_failed' });
     } finally {
       setIsLoading(false);
     }
@@ -41,9 +78,11 @@ export default function Login() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
+      trackActivity('signup_completed', { method: 'google' });
       navigate("/");
     } catch (error) {
       console.error(`${provider} login error:`, error);
+      trackActivity('signup_dropped', { method: 'google', reason: 'cancelled_or_failed' });
     } finally {
       setIsLoading(false);
     }
