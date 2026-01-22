@@ -24,15 +24,9 @@ import EmailSettings from "@/pages/EmailSettings";
 import EmailImports from "@/pages/EmailImports";
 import BottomNavigation from "@/components/bottom-navigation";
 import ExportReceiptsPage from "@/pages/exports";
+import Warranties from "@/pages/warranties";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
-
-// TODO: Backend cleanup needed - remove these API endpoints:
-// - /api/loyalty-cards (loyalty cards management)
-// - /api/subscriptions (subscription tracking)
-// - /api/warranties (warranty management)
-// - /api/eco-metrics (eco points tracking)
-// - /api/receipt-designs (receipt customization)
 
 function AuthenticatedRouter() {
   const { currentUser, loading } = useAuth();
@@ -75,6 +69,7 @@ function AuthenticatedRouter() {
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
         <Route path="/exports" component={ExportReceiptsPage} />
+        <Route path="/warranties" component={Warranties} />
         <Route path="/test-auth" component={TestAuth} />
         <Route path="/login">{() => { window.location.href = "/"; return null; }}</Route>
         <Route path="/signup">{() => { window.location.href = "/"; return null; }}</Route>
