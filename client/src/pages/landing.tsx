@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import happyCustomerImg from "@assets/Screenshot_2026-02-01_at_18.17.33_1769970061396.png";
 import {
   Dialog,
   DialogContent,
@@ -216,7 +217,7 @@ export default function Landing() {
           <div className="grid md:grid-cols-3 gap-8"></div>
           <div className="mt-8">
             <img 
-              src="/assets/attached_assets/Screenshot_2026-02-01_at_18.17.33_1769970061396.png" 
+              src={happyCustomerImg} 
               alt="Happy customer using Receiptify" 
               className="rounded-xl shadow-lg mx-auto max-w-md w-full"
             />
