@@ -8,22 +8,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Leaf, QrCode, Smartphone, TrendingUp, Users, ShieldCheck, X } from "lucide-react";
+import {
+  Leaf,
+  QrCode,
+  Smartphone,
+  TrendingUp,
+  Users,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { Link } from "wouter";
-import { useTranslation } from 'react-i18next';
-import demoVideo from '@assets/generated_videos/receiptify_app_demo_explainer_video.mp4';
+import { useTranslation } from "react-i18next";
+import demoVideo from "@assets/generated_videos/receiptify_app_demo_explainer_video.mp4";
 
 export default function Landing() {
   const { t, i18n } = useTranslation();
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(i18n?.language || 'en');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(
+    i18n?.language || "en",
+  );
   const [showDemoModal, setShowDemoModal] = useState(false);
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
     i18n.changeLanguage(lang);
-    try { localStorage.setItem('language', lang); } catch {}
+    try {
+      localStorage.setItem("language", lang);
+    } catch {}
   };
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
       {/* Header */}
@@ -32,20 +44,25 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
-              <p className="text-sm text-gray-600">{t('app.tagline')}</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {t("app.title")}
+              </h1>
+              <p className="text-sm text-gray-600">{t("app.tagline")}</p>
             </div>
           </div>
-          
+
           <div className="flex gap-3">
             <Link href="/login">
-              <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
-                {t('landing.signIn')}
+              <Button
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-50"
+              >
+                {t("landing.signIn")}
               </Button>
             </Link>
             <Link href="/signup">
               <Button className="bg-green-600 hover:bg-green-700">
-                {t('landing.getStarted')}
+                {t("landing.getStarted")}
               </Button>
             </Link>
             <Link href="/test-auth">
@@ -59,7 +76,9 @@ export default function Landing() {
 
       {/* Language selector (above hero) */}
       <div className="px-6 mt-6 max-w-4xl mx-auto flex justify-center">
-        <label htmlFor="lang-select" className="sr-only">Language</label>
+        <label htmlFor="lang-select" className="sr-only">
+          Language
+        </label>
         <select
           id="lang-select"
           value={selectedLanguage}
@@ -78,25 +97,29 @@ export default function Landing() {
       <section className="px-6 py-16 text-center">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            {t('landing.heroTitle')} <span className="text-green-600">{t('landing.heroHighlight')}</span>
+            {t("landing.heroTitle")}{" "}
+            <span className="text-green-600">{t("landing.heroHighlight")}</span>
           </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            {t('landing.heroDescription')}
+            {t("landing.heroDescription")}
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/signup">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 px-8 py-4 text-lg">
-                {t('landing.startFreeTrial')}
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 px-8 py-4 text-lg"
+              >
+                {t("landing.startFreeTrial")}
               </Button>
             </Link>
-            <Button 
-              size="lg" 
-              variant="outline" 
+            <Button
+              size="lg"
+              variant="outline"
               className="px-8 py-4 text-lg"
               onClick={() => setShowDemoModal(true)}
               data-testid="button-watch-demo"
             >
-              {t('landing.watchDemo')}
+              {t("landing.watchDemo")}
             </Button>
           </div>
         </div>
@@ -189,20 +212,14 @@ export default function Landing() {
       {/* Stats Section */}
       <section className="px-6 py-16 bg-green-600 text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-3xl font-bold mb-12">{t('landing.statsTitle')}</h3>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div>
-              <div className="text-4xl font-bold mb-2">50K+</div>
-              <div className="text-green-100">{t('landing.papersSaved')}</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">2.5K</div>
-              <div className="text-green-100">{t('landing.treesProtected')}</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">15K</div>
-              <div className="text-green-100">{t('landing.happyUsers')}</div>
-            </div>
+          <h3 className="text-3xl font-bold mb-3">{t("landing.statsTitle")}</h3>
+          <div className="grid md:grid-cols-3 gap-8"></div>
+          <div className="mt-8">
+            <img 
+              src="/assets/attached_assets/Screenshot_2026-02-01_at_18.17.33_1769970061396.png" 
+              alt="Happy customer using Receiptify" 
+              className="rounded-xl shadow-lg mx-auto max-w-md w-full"
+            />
           </div>
         </div>
       </section>
@@ -211,14 +228,17 @@ export default function Landing() {
       <section className="px-6 py-16 text-center">
         <div className="max-w-3xl mx-auto">
           <h3 className="text-3xl font-bold text-gray-900 mb-6">
-            {t('landing.ctaTitle')}
+            {t("landing.ctaTitle")}
           </h3>
           <p className="text-xl text-gray-600 mb-8">
-            {t('landing.ctaDescription')}
+            {t("landing.ctaDescription")}
           </p>
           <Link href="/signup">
-            <Button size="lg" className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg">
-              {t('landing.startYourFreeTrial')}
+            <Button
+              size="lg"
+              className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg"
+            >
+              {t("landing.startYourFreeTrial")}
             </Button>
           </Link>
         </div>
@@ -229,9 +249,9 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Leaf className="w-6 h-6 text-green-400" />
-            <span className="text-xl font-bold">{t('app.title')}</span>
+            <span className="text-xl font-bold">{t("app.title")}</span>
           </div>
-          <p className="text-gray-400">{t('landing.footerTagline')} © 2025</p>
+          <p className="text-gray-400">{t("landing.footerTagline")} © 2025</p>
         </div>
       </footer>
 
@@ -241,31 +261,33 @@ export default function Landing() {
           <DialogHeader className="p-4 pb-0">
             <DialogTitle className="flex items-center gap-2">
               <Leaf className="w-5 h-5 text-green-600" />
-              {t('app.title')} - {t('landing.watchDemo')}
+              {t("app.title")} - {t("landing.watchDemo")}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              {t('landing.heroDescription')}
+              {t("landing.heroDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="p-4">
-            <video 
-              src={demoVideo} 
-              controls 
-              autoPlay 
+            <video
+              src={demoVideo}
+              controls
+              autoPlay
               className="w-full rounded-lg"
               data-testid="demo-video"
             >
               Your browser does not support the video tag.
             </video>
             <div className="mt-4 text-center">
-              <p className="text-gray-600 mb-4">{t('landing.heroDescription')}</p>
+              <p className="text-gray-600 mb-4">
+                {t("landing.heroDescription")}
+              </p>
               <Link href="/signup">
-                <Button 
+                <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={() => setShowDemoModal(false)}
                   data-testid="button-get-started-modal"
                 >
-                  {t('landing.getStarted')}
+                  {t("landing.getStarted")}
                 </Button>
               </Link>
             </div>
