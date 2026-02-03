@@ -149,11 +149,11 @@ export default function Landing() {
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="text-center">
                 <Smartphone className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Smart Organization</CardTitle>
+                <CardTitle className="text-xl">Smart Organisation</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
-                  Automatic categorization, expense tracking, and receipt splitting. Your receipts organized intelligently.
+                  Automatic categorization, expense tracking, and receipt splitting. Your receipts organised intelligently.
                 </p>
               </CardContent>
             </Card>
@@ -211,17 +211,16 @@ export default function Landing() {
       */}
 
       {/* Stats Section */}
+      <img
+        src={happyCustomerImg}
+        alt="Happy customer using Receiptify"
+        className="xl shadow-lg mx-auto max-w-md w-full"
+      />
       <section className="px-6 py-16 bg-green-600 text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-3xl font-bold mb-3">{t("landing.statsTitle")}</h3>
-          <div className="grid md:grid-cols-3 gap-8"></div>
-          <div className="mt-8">
-            <img 
-              src={happyCustomerImg} 
-              alt="Happy customer using Receiptify" 
-              className="rounded-xl shadow-lg mx-auto max-w-md w-full"
-            />
-          </div>
+          <h3 className="text-3xl font-bold mb">{t("landing.statsTitle")}</h3>
+          <div className="grid md:grid-cols-3 gap"></div>
+          <div className="mt"></div>
         </div>
       </section>
 
