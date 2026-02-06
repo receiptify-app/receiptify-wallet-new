@@ -353,7 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isFirstAuthCallback) {
         isFirstAuthCallback = false;
         setAuthTokenGetter(async () => {
-          if (auth.currentUser) {
+          if (auth?.currentUser) {
             try {
               return await auth.currentUser.getIdToken();
             } catch (e) {
