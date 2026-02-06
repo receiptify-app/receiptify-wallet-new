@@ -232,14 +232,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Successfully signed in with Google.",
       });
     } catch (error: any) {
-      console.error("Google sign in error:", error);
+      console.error("Google sign in error:", error.code, error.message, "Domain:", window.location.hostname);
       let errorMessage = "Failed to sign in with Google";
-      if (error.code === 'auth/network-request-failed') {
+      if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = `This domain (${window.location.hostname}) is not authorized for sign-in. Please add it to Firebase Console → Authentication → Settings → Authorized domains.`;
+      } else if (error.code === 'auth/network-request-failed') {
         errorMessage = "Network error. Please check your internet connection and try again.";
       } else if (error.code === 'auth/popup-blocked') {
         errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = "Sign in popup was closed. Please try again.";
       } else if (error.code === 'auth/cancelled-popup-request') {
         errorMessage = "Sign in was cancelled.";
+      } else if (error.code === 'auth/internal-error') {
+        errorMessage = "An internal error occurred. Please try again later.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       toast({
         title: "Google sign in failed",
