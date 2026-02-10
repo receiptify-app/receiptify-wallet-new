@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -27,6 +28,19 @@ import ExportReceiptsPage from "@/pages/exports";
 // import Warranties from "@/pages/warranties";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+
+function UserSync() {
+  const { currentUser } = useAuth();
+
+  useQuery({
+    queryKey: ["/api/user"],
+    enabled: !!currentUser,
+    staleTime: 1000 * 60 * 30,
+    retry: 1,
+  });
+
+  return null;
+}
 
 function AuthenticatedRouter() {
   const { currentUser, loading } = useAuth();
@@ -103,6 +117,7 @@ function MainRouter() {
   return (
     <AuthProvider>
       <ConfirmDialogProvider>
+        <UserSync />
         <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
           <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
             <div className="flex items-center space-x-1 text-xs">
