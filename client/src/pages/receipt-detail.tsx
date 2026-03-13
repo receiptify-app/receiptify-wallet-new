@@ -30,12 +30,13 @@ import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
 import { useCurrency } from "@/hooks/use-currency";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getExchangeRate, formatWithCurrencyCode } from "@/lib/currency-conversion";
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
   const params = useParams();
   const receiptId = params.id;
-  const { format: formatCurrency } = useCurrency();
+  const { format: formatCurrency, currency: userCurrency } = useCurrency();
   const { t } = useTranslation();
 
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
@@ -58,6 +59,16 @@ export default function ReceiptDetailPage() {
       queryKey: ["/api/warranties/receipt", receiptId],
       enabled: !!receiptId,
     });
+
+  const receiptCurrency = (receipt?.currency || 'GBP').toUpperCase();
+  const isForeignCurrency = receiptCurrency !== userCurrency.toUpperCase();
+
+  const { data: exchangeRate } = useQuery<number>({
+    queryKey: ["exchangeRate", receiptCurrency, userCurrency],
+    queryFn: () => getExchangeRate(receiptCurrency, userCurrency),
+    enabled: isForeignCurrency && !!receipt,
+    staleTime: 60 * 60 * 1000,
+  });
 
   const createWarrantyMutation = useMutation({
     mutationFn: async (data: typeof warrantyForm) => {
@@ -234,7 +245,9 @@ export default function ReceiptDetailPage() {
                   {item.name}
                 </span>
                 <span className="text-gray-900 font-semibold">
-                  {formatCurrency(parseFloat(item.price))}
+                  {isForeignCurrency
+                    ? formatWithCurrencyCode(parseFloat(item.price), receiptCurrency)
+                    : formatCurrency(parseFloat(item.price))}
                 </span>
               </div>
             ))}
@@ -243,7 +256,11 @@ export default function ReceiptDetailPage() {
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
                   <span>{t("receiptDetail.tax")}</span>
-                  <span>{formatCurrency(parseFloat(receipt.tax))}</span>
+                  <span>
+                    {isForeignCurrency
+                      ? formatWithCurrencyCode(parseFloat(receipt.tax), receiptCurrency)
+                      : formatCurrency(parseFloat(receipt.tax))}
+                  </span>
                 </div>
               </div>
             )}
@@ -253,7 +270,26 @@ export default function ReceiptDetailPage() {
             >
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>{t("receiptDetail.total")}</span>
-                <span>{formatCurrency(parseFloat(receipt.total))}</span>
+                <div className="text-right">
+                  {isForeignCurrency ? (
+                    <>
+                      <div>{formatWithCurrencyCode(parseFloat(receipt.total), receiptCurrency)}</div>
+                      {exchangeRate && (
+                        <div className="text-sm font-normal text-emerald-600 mt-0.5">
+                          ≈ {formatCurrency(parseFloat(receipt.total) * exchangeRate)}
+                          <span className="text-xs text-gray-400 ml-1">
+                            (1 {receiptCurrency} = {exchangeRate.toFixed(4)} {userCurrency})
+                          </span>
+                        </div>
+                      )}
+                      {!exchangeRate && (
+                        <div className="text-xs text-gray-400 font-normal mt-0.5">fetching rate…</div>
+                      )}
+                    </>
+                  ) : (
+                    <span>{formatCurrency(parseFloat(receipt.total))}</span>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>

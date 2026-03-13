@@ -39,7 +39,7 @@ export default function ReceiptsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { confirm } = useConfirmDialog();
-  const { format: formatCurrency } = useCurrency();
+  const { format: formatCurrency, currency: userCurrency } = useCurrency();
   const { t } = useTranslation();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
@@ -447,9 +447,16 @@ export default function ReceiptsPage() {
                                         {receipt.category}
                                       </Badge>
                                     )}
-                                    <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                                      {formatCurrency(receipt.total)}
-                                    </p>
+                                    <div className="text-right">
+                                      <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                                        {formatCurrency(receipt.total)}
+                                      </p>
+                                      {receipt.currency && receipt.currency.toUpperCase() !== userCurrency.toUpperCase() && (
+                                        <p className="text-xs text-amber-600 font-medium">
+                                          {receipt.currency.toUpperCase()}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                   {receipt.paymentMethod && receipt.paymentMethod !== "null" && (
                                     <p className="text-xs text-gray-500 truncate">
