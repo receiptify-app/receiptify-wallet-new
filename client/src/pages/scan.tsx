@@ -119,7 +119,7 @@ export default function Scan() {
     const file = event.target.files?.[0];
     if (file) {
       setActiveSource('camera');
-      toast({ title: t('scan.processing'), description: "Extracting receipt details with AI, please wait…" });
+      toast({ title: t('scan.processing'), description: "Extracting receipt details, please wait…" });
       uploadMutation.mutate(file);
     }
     event.target.value = '';
@@ -129,7 +129,7 @@ export default function Scan() {
     const file = event.target.files?.[0];
     if (file) {
       setActiveSource('gallery');
-      toast({ title: t('scan.processing'), description: "Extracting receipt details with AI, please wait…" });
+      toast({ title: t('scan.processing'), description: "Extracting receipt details, please wait…" });
       uploadMutation.mutate(file);
     }
     event.target.value = '';

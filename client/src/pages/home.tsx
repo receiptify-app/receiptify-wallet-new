@@ -35,7 +35,7 @@ export default function Home() {
       setSelectedMonthKey(options[0].key);
       setSelectedPeriod('custom');
     }
-  }, [selectedMonthKey]);
+  }, [receipts, selectedMonthKey]);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrency();
