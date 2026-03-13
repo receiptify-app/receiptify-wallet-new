@@ -271,20 +271,20 @@ export default function Scan() {
         </Card>
 
         {/* Manual Entry Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-green-200" data-testid="card-manual-entry">
+        <Card className="hover:shadow-md transition-shadow" data-testid="card-manual-entry">
           <CardContent className="p-0">
             <Button
               onClick={() => setShowManualForm(true)}
-              className="w-full h-full bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center justify-start p-6"
+              className="w-full h-full bg-white hover:bg-gray-50 text-gray-900 rounded-xl flex items-center justify-start p-6 shadow-none border-0"
               data-testid="button-manual-entry"
             >
               <div className="flex items-center justify-center space-x-4 w-full">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Edit className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <Edit className="w-6 h-6 text-gray-700" />
                 </div>
                 <div className="ml-4 text-left">
-                  <div className="font-semibold text-lg text-white">{t('scan.importReceipt')}</div>
-                  <div className="text-sm text-white/90">{t('scan.importReceiptDesc')}</div>
+                  <div className="font-semibold text-lg text-gray-900">{t('scan.importReceipt')}</div>
+                  <div className="text-sm text-gray-500">{t('scan.importReceiptDesc')}</div>
                 </div>
               </div>
             </Button>
