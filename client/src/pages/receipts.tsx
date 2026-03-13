@@ -229,7 +229,7 @@ export default function ReceiptsPage() {
     return Object.entries(groups)
       .sort(([, a], [, b]) => b.sortKey - a.sortKey)
       .map(([monthKey, { receipts }]) => ({ monthKey, receipts }));
-  }, [receipts]);
+  }, [receipts, searchQuery]);
 
   const displayMerchant = (name: string | null | undefined) =>
     !name || name === "null" || name.trim() === "" ? "Unspecified Merchant" : name;
