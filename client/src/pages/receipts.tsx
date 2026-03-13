@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronRight, ChevronDown, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash } from "lucide-react";
+import { ChevronRight, ChevronDown, Search, Filter, Calendar, Receipt, ShoppingBag, CheckSquare, Trash, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,9 @@ export default function ReceiptsPage() {
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(new Set());
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { confirm } = useConfirmDialog();
   const { format: formatCurrency } = useCurrency();
@@ -89,6 +93,19 @@ export default function ReceiptsPage() {
       });
     }
   });
+
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [searchOpen]);
+
+  const handleToggleSearch = () => {
+    setSearchOpen(prev => {
+      if (prev) setSearchQuery("");
+      return !prev;
+    });
+  };
 
   const handleToggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
@@ -172,9 +189,27 @@ export default function ReceiptsPage() {
 
   // Group receipts by month and sort by date descending
   const groupedReceipts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? receipts.filter((r: Receipt) => {
+          const merchant = (r.merchantName || "").toLowerCase();
+          const category = (r.category || "").toLowerCase();
+          const payment = (r.paymentMethod || "").toLowerCase();
+          const receiptNum = (r.receiptNumber || "").toLowerCase();
+          const total = (r.total || "").toLowerCase();
+          return (
+            merchant.includes(q) ||
+            category.includes(q) ||
+            payment.includes(q) ||
+            receiptNum.includes(q) ||
+            total.includes(q)
+          );
+        })
+      : receipts;
+
     const groups: Record<string, { receipts: Receipt[]; sortKey: number }> = {};
-    
-    receipts.forEach((receipt: Receipt) => {
+
+    filtered.forEach((receipt: Receipt) => {
       const receiptDate = new Date(receipt.date);
       const monthKey = format(receiptDate, 'MMMM yyyy');
       const sortKey = receiptDate.getFullYear() * 100 + receiptDate.getMonth();
@@ -262,8 +297,13 @@ export default function ReceiptsPage() {
               )}
               {!selectionMode && (
                 <>
-                  <Button variant="ghost" size="sm">
-                    <Search className="h-4 w-4" />
+                  <Button
+                    variant={searchOpen ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={handleToggleSearch}
+                    aria-label="Toggle search"
+                  >
+                    {searchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
                   </Button>
                   <Button variant="ghost" size="sm">
                     <Filter className="h-4 w-4" />
@@ -280,6 +320,27 @@ export default function ReceiptsPage() {
               </Button>
             </div>
           </div>
+          {searchOpen && (
+            <div className="mt-3 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search merchant, category, amount..."
+                className="pl-9 pr-9 h-9 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -297,10 +358,16 @@ export default function ReceiptsPage() {
               </Button>
             </Link>
           </div>
+        ) : groupedReceipts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Search className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
+            <p className="text-gray-500">Try a different search term</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {groupedReceipts.map(({ monthKey, receipts: monthReceipts }) => {
-              const isExpanded = expandedMonths.has(monthKey);
+              const isExpanded = searchQuery.trim() ? true : expandedMonths.has(monthKey);
               const monthTotal = monthReceipts.reduce((sum, r) => sum + parseFloat(r.total || '0'), 0);
               
               return (
