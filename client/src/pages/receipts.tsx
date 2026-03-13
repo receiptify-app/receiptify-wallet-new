@@ -196,6 +196,9 @@ export default function ReceiptsPage() {
       .map(([monthKey, { receipts }]) => ({ monthKey, receipts }));
   }, [receipts]);
 
+  const displayMerchant = (name: string | null | undefined) =>
+    !name || name === "null" || name.trim() === "" ? "Unspecified Merchant" : name;
+
   const getMerchantIcon = (merchantName: string) => {
     const name = merchantName.toLowerCase();
     if (name.includes('zara')) return '🏷️';
@@ -351,15 +354,15 @@ export default function ReceiptsPage() {
                                   </div>
                                 )}
                                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
-                                  {getMerchantIcon(receipt.merchantName)}
+                                  {getMerchantIcon(displayMerchant(receipt.merchantName))}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
                                     <p
                                       className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0"
-                                      title={receipt.merchantName}
+                                      title={displayMerchant(receipt.merchantName)}
                                     >
-                                      {receipt.merchantName}
+                                      {displayMerchant(receipt.merchantName)}
                                     </p>
                                     {receipt.category && (
                                       <Badge

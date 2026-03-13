@@ -206,7 +206,9 @@ export default function ReceiptDetailPage() {
         {/* Store Info */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {receipt.merchantName}
+            {!receipt.merchantName || receipt.merchantName === "null" || receipt.merchantName.trim() === ""
+              ? "Unspecified Merchant"
+              : receipt.merchantName}
           </h1>
           <p className="text-gray-600">
             {receiptDate} • {receipt.location}
