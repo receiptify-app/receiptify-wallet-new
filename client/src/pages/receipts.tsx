@@ -377,12 +377,12 @@ export default function ReceiptsPage() {
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                                <div className="text-right min-w-[10px] flex-shrink-0">
+                                <div className="text-right flex-shrink-0 max-w-[90px]">
                                   <p className="text-sm font-semibold text-gray-900">
                                     {formatCurrency(receipt.total)}
                                   </p>
-                                  {receipt.paymentMethod && (
-                                    <p className="text-xs text-gray-500">
+                                  {receipt.paymentMethod && receipt.paymentMethod !== "null" && (
+                                    <p className="text-xs text-gray-500 truncate">
                                       {receipt.paymentMethod}
                                     </p>
                                   )}
