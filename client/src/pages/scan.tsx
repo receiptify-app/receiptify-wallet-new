@@ -119,6 +119,7 @@ export default function Scan() {
     const file = event.target.files?.[0];
     if (file) {
       setActiveSource('camera');
+      toast({ title: t('scan.processing'), description: "Extracting receipt details with AI, please wait…" });
       uploadMutation.mutate(file);
     }
     event.target.value = '';
@@ -128,6 +129,7 @@ export default function Scan() {
     const file = event.target.files?.[0];
     if (file) {
       setActiveSource('gallery');
+      toast({ title: t('scan.processing'), description: "Extracting receipt details with AI, please wait…" });
       uploadMutation.mutate(file);
     }
     event.target.value = '';
@@ -318,20 +320,6 @@ export default function Scan() {
         onOpenChange={setShowManualForm}
       />
 
-      {/* Processing notification pop-up */}
-      {uploadMutation.isPending && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-sm">
-          <div className="bg-gray-900 text-white rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-white animate-spin" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold leading-tight">Processing your receipt…</p>
-              <p className="text-xs text-gray-400 mt-0.5">Extracting details with AI, please wait</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
