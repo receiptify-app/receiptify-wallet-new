@@ -44,12 +44,10 @@ export default function ExportReceiptsPage() {
   const downloadReceipt = async (r: any) => {
     if (!r?.imageUrl) return;
     try {
-      const res = await fetch(r.imageUrl);
-      if (!res.ok) throw new Error("Failed to fetch image");
-      const blob = await res.blob();
-      const ext = blob.type?.split("/")[1] || "png";
+      const { imageToPdfBlob } = await import("@/lib/image-to-pdf");
       const safeName = (r.merchantName || "receipt").replace(/[^\w-_]/g, "_");
-      downloadBlob(blob, `${safeName}_${r.id || ""}.${ext}`);
+      const pdfBlob = await imageToPdfBlob(r.imageUrl, safeName);
+      downloadBlob(pdfBlob, `${safeName}_${r.id || ""}.pdf`);
     } catch (e) {
       console.error("Download receipt failed:", e);
     }
@@ -58,19 +56,17 @@ export default function ExportReceiptsPage() {
   const downloadAllAsZip = async () => {
     if (!receiptsList.length) return;
     try {
+      const { imageToPdfBlob } = await import("@/lib/image-to-pdf");
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
       for (const r of receiptsList) {
         if (!r.imageUrl) continue;
         try {
-          const res = await fetch(r.imageUrl);
-          if (!res.ok) continue;
-          const blob = await res.blob();
-          const ext = blob.type?.split("/")[1] || "png";
           const safeName = (r.merchantName || "receipt").replace(/[^\w-_]/g, "_");
-          zip.file(`${safeName}_${r.id || ""}.${ext}`, blob);
+          const pdfBlob = await imageToPdfBlob(r.imageUrl, safeName);
+          zip.file(`${safeName}_${r.id || ""}.pdf`, pdfBlob);
         } catch (e) {
-          console.warn("Skipping receipt in ZIP due to fetch error:", r.id, e);
+          console.warn("Skipping receipt in ZIP due to error:", r.id, e);
         }
       }
       const content = await zip.generateAsync({ type: "blob" });

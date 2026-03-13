@@ -109,16 +109,13 @@ export default function ReceiptDetailPage() {
   const downloadReceipt = async () => {
     if (!receipt?.imageUrl) return;
     try {
-      const res = await fetch(receipt.imageUrl);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const { imageToPdfBlob } = await import("@/lib/image-to-pdf");
+      const safeName = (receipt.merchantName || "receipt").replace(/[^\w-_]/g, "_");
+      const pdfBlob = await imageToPdfBlob(receipt.imageUrl, safeName);
+      const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement("a");
-      const safeName = (receipt.merchantName || "receipt").replace(
-        /[^\w-_]/g,
-        "_",
-      );
       a.href = url;
-      a.download = `${safeName}_${receipt.id || ""}`;
+      a.download = `${safeName}_${receipt.id || ""}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

@@ -82,6 +82,7 @@
     "ioredis": "^5.7.0",
     "isomorphic-fetch": "^3.0.0",
     "jimp": "^1.6.0",
+    "jspdf": "^4.2.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.453.0",
     "mailparser": "^3.7.4",
