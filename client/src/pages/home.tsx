@@ -28,14 +28,6 @@ export default function Home() {
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
-  // default to current/latest month when monthOptions become available
-  useEffect(() => {
-    const options = getAvailableMonthRanges(receipts);
-    if (!selectedMonthKey && options.length > 0) {
-      setSelectedMonthKey(options[0].key);
-      setSelectedPeriod('custom');
-    }
-  }, [receipts, selectedMonthKey]);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrency();
@@ -45,6 +37,15 @@ export default function Home() {
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ["/api/receipts"],
   });
+
+  // default to current/latest month when monthOptions become available
+  useEffect(() => {
+    const options = getAvailableMonthRanges(receipts);
+    if (!selectedMonthKey && options.length > 0) {
+      setSelectedMonthKey(options[0].key);
+      setSelectedPeriod('custom');
+    }
+  }, [receipts, selectedMonthKey]);
 
   // Create category color map
   const categoryColorMap = useMemo(() => {
