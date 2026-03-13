@@ -17,6 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import CategoryPickerModal from "@/components/category-picker-modal";
 import { useCurrency } from "@/hooks/use-currency";
+import { getRatesFromBase } from "@/lib/currency-conversion";
 
 interface Receipt {
   id: string;
@@ -24,6 +25,7 @@ interface Receipt {
   total: string;
   date: string;
   category: string;
+  currency?: string;
   receiptNumber?: string;
   paymentMethod?: string;
 }
@@ -45,6 +47,24 @@ export default function ReceiptsPage() {
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ['/api/receipts'],
   });
+
+  // Fetch all exchange rates from the user's currency in one call
+  const { data: fxRates } = useQuery<Record<string, number>>({
+    queryKey: ['fxRates', userCurrency],
+    queryFn: () => getRatesFromBase(userCurrency),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Convert a receipt total to the user's currency
+  const convertedTotal = (receipt: Receipt): string => {
+    const rCurrency = (receipt.currency || userCurrency).toUpperCase();
+    const uCurrency = userCurrency.toUpperCase();
+    if (rCurrency === uCurrency || !fxRates) return formatCurrency(receipt.total);
+    const rate = fxRates[rCurrency];
+    if (!rate) return formatCurrency(receipt.total);
+    const converted = parseFloat(receipt.total) / rate;
+    return formatCurrency(converted);
+  };
 
   // Bulk move mutation
   const bulkMoveMutation = useMutation({
@@ -368,7 +388,13 @@ export default function ReceiptsPage() {
           <div className="space-y-4">
             {groupedReceipts.map(({ monthKey, receipts: monthReceipts }) => {
               const isExpanded = searchQuery.trim() ? true : expandedMonths.has(monthKey);
-              const monthTotal = monthReceipts.reduce((sum, r) => sum + parseFloat(r.total || '0'), 0);
+              const monthTotal = monthReceipts.reduce((sum, r) => {
+                const rCur = (r.currency || userCurrency).toUpperCase();
+                const raw = parseFloat(r.total || '0');
+                if (rCur === userCurrency.toUpperCase() || !fxRates) return sum + raw;
+                const rate = fxRates[rCur];
+                return sum + (rate ? raw / rate : raw);
+              }, 0);
               
               return (
                 <Collapsible
@@ -449,7 +475,7 @@ export default function ReceiptsPage() {
                                     )}
                                     <div className="text-right">
                                       <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                                        {formatCurrency(receipt.total)}
+                                        {convertedTotal(receipt)}
                                       </p>
                                       {receipt.currency && receipt.currency.toUpperCase() !== userCurrency.toUpperCase() && (
                                         <p className="text-xs text-amber-600 font-medium">
