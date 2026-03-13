@@ -214,6 +214,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user avatar
+  app.patch("/api/user/display-name", async (req, res) => {
+    try {
+      const firebaseUid = req.user?.id;
+      if (!firebaseUid) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { displayName } = req.body;
+      if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
+        return res.status(400).json({ error: 'Display name is required' });
+      }
+
+      const user = await storage.getUserByProviderId('firebase', firebaseUid);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      await storage.updateUser(user.id, { firstName: displayName.trim() });
+
+      res.json({ success: true, displayName: displayName.trim() });
+    } catch (error) {
+      console.error("Error updating display name:", error);
+      res.status(500).json({ error: "Failed to update display name" });
+    }
+  });
+
   app.patch("/api/user/avatar", async (req, res) => {
     try {
       const firebaseUid = req.user?.id;

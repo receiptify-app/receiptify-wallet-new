@@ -15,8 +15,10 @@ import {
   Languages,
   Camera,
   Check,
-  Shield
+  Shield,
+  Pencil
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -67,6 +69,8 @@ export default function Profile() {
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const { currency, symbol, updateCurrency } = useCurrency();
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showEditName, setShowEditName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState("");
   const { toast } = useToast();
   
   const handleLanguageChange = (lang: string) => {
@@ -104,6 +108,21 @@ export default function Profile() {
   const handleAvatarSelect = (avatarUrl: string) => {
     updateAvatarMutation.mutate(avatarUrl);
   };
+
+  const updateDisplayNameMutation = useMutation({
+    mutationFn: async (displayName: string) => {
+      const res = await apiRequest("PATCH", "/api/user/display-name", { displayName });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setShowEditName(false);
+      toast({ title: "Display name updated", description: "Your display name has been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update display name.", variant: "destructive" });
+    },
+  });
 
   const { data: apiUser } = useQuery<{ id: string; email: string; name: string; avatar: string | null }>({
     queryKey: ["/api/user"],
@@ -196,11 +215,12 @@ export default function Profile() {
 
       <div className="px-6 py-6 space-y-8">
         {/* User Profile Section */}
-        <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
+        <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                {/* Avatar — tap to change */}
+                <div className="relative flex-shrink-0 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
                   <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
                     <img 
                       src={displayUser.avatar} 
@@ -212,16 +232,57 @@ export default function Profile() {
                     <Camera className="w-3 h-3 text-white" />
                   </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{displayUser.name}</h2>
-                  <p className="text-gray-600">{displayUser.email}</p>
-                  <p className="text-sm text-emerald-600">{t('profile.tapToChangeAvatar') || 'Tap to change avatar'}</p>
+                {/* Name + email */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className={`font-bold text-gray-900 truncate ${
+                      displayUser.name.length > 20 ? 'text-sm' :
+                      displayUser.name.length > 14 ? 'text-base' : 'text-xl'
+                    }`}>{displayUser.name}</h2>
+                    <button
+                      onClick={() => { setEditNameValue(displayUser.name); setShowEditName(true); }}
+                      className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                    </button>
+                  </div>
+                  <p className="text-gray-600 text-sm truncate">{displayUser.email}</p>
+                  <p className="text-xs text-emerald-600 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>{t('profile.tapToChangeAvatar') || 'Tap to change avatar'}</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
+              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2 cursor-pointer" onClick={() => setShowAvatarPicker(true)} />
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Display Name Dialog */}
+        <Dialog open={showEditName} onOpenChange={setShowEditName}>
+          <DialogContent className="mx-4 rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Display Name</DialogTitle>
+              <DialogDescription>Enter the name you want to show on your profile.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <Input
+                value={editNameValue}
+                onChange={(e) => setEditNameValue(e.target.value)}
+                placeholder="Your display name"
+                maxLength={40}
+                onKeyDown={(e) => { if (e.key === 'Enter' && editNameValue.trim()) updateDisplayNameMutation.mutate(editNameValue); }}
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setShowEditName(false)}>Cancel</Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={!editNameValue.trim() || updateDisplayNameMutation.isPending}
+                  onClick={() => updateDisplayNameMutation.mutate(editNameValue)}
+                >
+                  {updateDisplayNameMutation.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* My Data Section */}
         <div>

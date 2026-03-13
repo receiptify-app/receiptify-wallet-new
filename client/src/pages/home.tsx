@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -38,14 +38,17 @@ export default function Home() {
     queryKey: ["/api/receipts"],
   });
 
-  // default to current/latest month when monthOptions become available
+  // default to current/latest month — only once, after receipts first load
+  const monthInitialisedRef = useRef(false);
   useEffect(() => {
+    if (monthInitialisedRef.current) return;
     const options = getAvailableMonthRanges(receipts);
-    if (!selectedMonthKey && options.length > 0) {
+    if (options.length > 0) {
+      monthInitialisedRef.current = true;
       setSelectedMonthKey(options[0].key);
       setSelectedPeriod('custom');
     }
-  }, [receipts, selectedMonthKey]);
+  }, [receipts]);
 
   // Create category color map
   const categoryColorMap = useMemo(() => {
