@@ -17,6 +17,7 @@ import { CATEGORIES, getCategoryColor } from "@shared/categories";
 import { computeAnalytics, getAvailableMonthRanges, getMonthBoundsFromKey } from "@/utils/analytics";
 import type { Receipt } from "@shared/schema";
 import { useCurrency } from "@/hooks/use-currency";
+import { getRatesFromBase } from "@/lib/currency-conversion";
 
 type DateRange = 'week' | 'month' | 'custom';
 
@@ -30,13 +31,33 @@ export default function Home() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { format: formatCurrency } = useCurrency();
+  const { format: formatCurrency, currency: userCurrency } = useCurrency();
   const { t } = useTranslation();
 
   // Fetch all receipts
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ["/api/receipts"],
   });
+
+  // Fetch exchange rates for currency conversion (single call, cached 1hr)
+  const { data: fxRates } = useQuery<Record<string, number>>({
+    queryKey: ['fxRates', userCurrency],
+    queryFn: () => getRatesFromBase(userCurrency),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Return receipts with totals converted to the user's currency
+  const convertedReceipts = useMemo(() => {
+    if (!fxRates) return receipts;
+    return receipts.map(r => {
+      const rCur = ((r as any).currency || userCurrency).toUpperCase();
+      if (rCur === userCurrency.toUpperCase()) return r;
+      const rate = fxRates[rCur];
+      if (!rate) return r;
+      const convertedTotal = (parseFloat(String(r.total)) / rate).toFixed(2);
+      return { ...r, total: convertedTotal };
+    });
+  }, [receipts, fxRates, userCurrency]);
 
   // default to current/latest month — only once, after receipts first load
   const monthInitialisedRef = useRef(false);
@@ -60,34 +81,27 @@ export default function Home() {
     return map;
   }, []);
 
-  // Compute analytics data (use state so we can update from the month selector)
-  const [analytics, setAnalytics] = useState(() => computeAnalytics(receipts, selectedPeriod, categoryColorMap));
-
-  // keep analytics in sync when receipts / selectedPeriod / categoryColorMap change,
-  // or when selectedMonthKey switches
-  useEffect(() => {
+  // Compute analytics — pure derivation, no setState needed
+  const analytics = useMemo(() => {
     if (selectedMonthKey === 'thisMonth') {
-      setAnalytics(computeAnalytics(receipts, selectedPeriod, categoryColorMap));
-      return;
+      return computeAnalytics(convertedReceipts, selectedPeriod, categoryColorMap);
     }
     const bounds = getMonthBoundsFromKey(selectedMonthKey ?? '');
     if (bounds) {
-      setAnalytics(computeAnalytics(receipts, 'custom', categoryColorMap, bounds.start, bounds.end));
-    } else {
-      // fallback to selectedPeriod if key is invalid
-      setAnalytics(computeAnalytics(receipts, selectedPeriod, categoryColorMap));
+      return computeAnalytics(convertedReceipts, 'custom', categoryColorMap, bounds.start, bounds.end);
     }
-  }, [receipts, selectedPeriod, categoryColorMap, selectedMonthKey]);
+    return computeAnalytics(convertedReceipts, selectedPeriod, categoryColorMap);
+  }, [convertedReceipts, selectedPeriod, categoryColorMap, selectedMonthKey]);
 
   // Filter receipts by selected category
   const filteredReceipts = useMemo(() => {
     // prefer analytics.receipts (period filtered) but fall back to raw receipts so Recent Activity shows uploads
-    const source = (analytics?.receipts && analytics.receipts.length > 0) ? analytics.receipts : receipts;
+    const source = (analytics?.receipts && analytics.receipts.length > 0) ? analytics.receipts : convertedReceipts;
     if (!selectedCategory) return source;
     return source.filter(r =>
       r.category?.toLowerCase() === selectedCategory.toLowerCase()
     );
-  }, [analytics.receipts, selectedCategory, receipts]);
+  }, [analytics.receipts, selectedCategory, convertedReceipts]);
 
   // Move receipt mutation
   const moveMutation = useMutation({
