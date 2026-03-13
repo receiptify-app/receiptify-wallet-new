@@ -357,13 +357,21 @@ export default function ReceiptsPage() {
                                   {getMerchantIcon(displayMerchant(receipt.merchantName))}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p
-                                      className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0"
-                                      title={displayMerchant(receipt.merchantName)}
-                                    >
-                                      {displayMerchant(receipt.merchantName)}
-                                    </p>
+                                  <p
+                                    className="text-sm font-medium text-gray-900 truncate"
+                                    title={displayMerchant(receipt.merchantName)}
+                                  >
+                                    {displayMerchant(receipt.merchantName)}
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate mt-1">
+                                    {format(new Date(receipt.date), 'MMM d, h:mm a')}
+                                    {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                                <div className="text-right flex-shrink-0 max-w-[100px]">
+                                  <div className="flex items-center justify-end gap-1 mb-0.5">
                                     {receipt.category && (
                                       <Badge
                                         variant="secondary"
@@ -372,18 +380,10 @@ export default function ReceiptsPage() {
                                         {receipt.category}
                                       </Badge>
                                     )}
+                                    <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                                      {formatCurrency(receipt.total)}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-gray-500 truncate mt-1">
-                                    {format(new Date(receipt.date), 'MMM d, h:mm a')}
-                                    {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                                <div className="text-right flex-shrink-0 max-w-[90px]">
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    {formatCurrency(receipt.total)}
-                                  </p>
                                   {receipt.paymentMethod && receipt.paymentMethod !== "null" && (
                                     <p className="text-xs text-gray-500 truncate">
                                       {receipt.paymentMethod}
