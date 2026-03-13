@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Edit, Camera, Upload, Languages } from "lucide-react";
+import { FileText, Edit, Camera, Upload, Languages, Loader2 } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import {
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
+  const [activeSource, setActiveSource] = useState<'camera' | 'gallery' | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
@@ -110,15 +111,26 @@ export default function Scan() {
           variant: "destructive",
         });
       }
-    }
+    },
+    onSettled: () => setActiveSource(null),
   });
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    console.log('File selected:', file?.name, file?.size);
     if (file) {
+      setActiveSource('camera');
       uploadMutation.mutate(file);
     }
+    event.target.value = '';
+  };
+
+  const handleGalleryUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setActiveSource('gallery');
+      uploadMutation.mutate(file);
+    }
+    event.target.value = '';
   };
 
   return (
@@ -182,7 +194,10 @@ export default function Scan() {
       {/* Scan Options */}
       <div className="space-y-4 mb-8">
         {/* Camera Capture Option */}
-        <Card className="hover:shadow-md transition-shadow border-2 border-primary" data-testid="card-camera-capture">
+        <Card
+          className={`hover:shadow-md transition-shadow border-2 ${activeSource === 'camera' ? 'border-primary bg-primary/5' : 'border-primary'}`}
+          data-testid="card-camera-capture"
+        >
           <CardContent className="p-0">
             <label className="block w-full cursor-pointer">
               <input
@@ -190,18 +205,22 @@ export default function Scan() {
                 type="file"
                 accept="image/*"
                 capture="environment"
-                onChange={handleFileUpload}
+                onChange={handleCameraUpload}
                 className="hidden"
                 disabled={uploadMutation.isPending}
                 data-testid="input-camera-capture"
               />
               <div className="flex items-center space-x-4 py-6 px-6 hover:bg-primary/5 rounded-lg transition-colors">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-primary" />
+                  {activeSource === 'camera' && uploadMutation.isPending
+                    ? <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                    : <Camera className="w-6 h-6 text-primary" />}
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-lg text-gray-900" data-testid="text-camera-title">
-                    {uploadMutation.isPending ? t('scan.processing') : t('scan.takePhoto')}
+                    {activeSource === 'camera' && uploadMutation.isPending
+                      ? t('scan.processing')
+                      : t('scan.takePhoto')}
                   </div>
                   <div className="text-sm text-gray-600">
                     {t('scan.takePhotoDesc')}
@@ -213,25 +232,32 @@ export default function Scan() {
         </Card>
 
         {/* Gallery Upload Option */}
-        <Card className="hover:shadow-md transition-shadow" data-testid="card-gallery-upload">
+        <Card
+          className={`hover:shadow-md transition-shadow ${activeSource === 'gallery' ? 'border-2 border-green-400 bg-green-50' : ''}`}
+          data-testid="card-gallery-upload"
+        >
           <CardContent className="p-0">
             <label className="block w-full cursor-pointer">
               <input
                 ref={galleryInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleFileUpload}
+                onChange={handleGalleryUpload}
                 className="hidden"
                 disabled={uploadMutation.isPending}
                 data-testid="input-gallery-upload"
               />
               <div className="flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors">
                 <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-gray-700" />
+                  {activeSource === 'gallery' && uploadMutation.isPending
+                    ? <Loader2 className="w-6 h-6 text-gray-700 animate-spin" />
+                    : <Upload className="w-6 h-6 text-gray-700" />}
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-lg text-gray-900" data-testid="text-upload-title">
-                    {uploadMutation.isPending ? t('scan.processing') : t('scan.uploadFromGallery')}
+                    {activeSource === 'gallery' && uploadMutation.isPending
+                      ? t('scan.processing')
+                      : t('scan.uploadFromGallery')}
                   </div>
                   <div className="text-sm text-gray-600">
                     {t('scan.uploadFromGalleryDesc')}
@@ -291,6 +317,21 @@ export default function Scan() {
         open={showManualForm} 
         onOpenChange={setShowManualForm}
       />
+
+      {/* Processing notification pop-up */}
+      {uploadMutation.isPending && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-sm">
+          <div className="bg-gray-900 text-white rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-4">
+            <div className="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold leading-tight">Processing your receipt…</p>
+              <p className="text-xs text-gray-400 mt-0.5">Extracting details with AI, please wait</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

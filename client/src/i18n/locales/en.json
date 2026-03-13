@@ -42,7 +42,7 @@
     "imageRejectedDesc": "Upload rejected — the image does not appear to contain a receipt.",
     "processing": "Processing...",
     "scanQR": "Scan QR Code",
-    "takePhoto": "Take Photo",
+    "takePhoto": "Scan Receipt",
     "takePhotoDesc": "Capture receipt with camera",
     "uploadFromGallery": "Upload from Gallery",
     "uploadFromGalleryDesc": "Choose existing photo from device",
