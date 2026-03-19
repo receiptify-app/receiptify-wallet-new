@@ -201,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         email: user.email,
-        name: user.username || user.firstName || 'User',
+        name: user.firstName || user.username || 'User',
         firstName: user.firstName,
         lastName: user.lastName,
         avatar: user.profileImageUrl,
