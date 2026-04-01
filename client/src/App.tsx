@@ -28,6 +28,7 @@ import ExportReceiptsPage from "@/pages/exports";
 // import Warranties from "@/pages/warranties";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import VerifyEmail from "@/pages/verify-email";
 
 function UserSync() {
   const { currentUser } = useAuth();
@@ -66,6 +67,11 @@ function AuthenticatedRouter() {
         <Route component={Landing} />
       </Switch>
     );
+  }
+
+  // Email/password users must verify their email before accessing the app
+  if (!currentUser.emailVerified) {
+    return <VerifyEmail />;
   }
 
   return (

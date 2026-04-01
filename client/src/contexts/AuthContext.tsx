@@ -11,7 +11,8 @@ import {
   OAuthProvider,
   signInWithPopup,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithFacebook: () => Promise<void>;
   signInWithApple: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -91,9 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('User registration in database (may already exist):', regError);
       }
       
+      // Send verification email so we know the address is real
+      await sendEmailVerification(result.user);
+
       toast({
         title: "Account created!",
-        description: "Welcome to Receiptify! You can now start managing your receipts.",
+        description: "We've sent a verification link to your email. Please check your inbox.",
       });
     } catch (error: any) {
       console.error("Signup error:", error);
@@ -386,6 +391,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  async function resendVerificationEmail() {
+    const _auth = ensureAuth();
+    if (!_auth.currentUser) throw new Error("No user logged in");
+    await sendEmailVerification(_auth.currentUser);
+    toast({
+      title: "Verification email sent",
+      description: "Please check your inbox and click the link.",
+    });
+  }
+
   const value: AuthContextType = {
     currentUser,
     loading,
@@ -396,6 +411,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     signInWithFacebook,
     signInWithApple,
+    resendVerificationEmail,
   };
 
   return (
