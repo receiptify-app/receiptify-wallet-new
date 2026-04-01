@@ -1188,7 +1188,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingUser = await storage.getUserByEmail(email);
       
       if (existingUser) {
-        return res.status(409).json({ error: "User already exists" });
+        // User already exists (created by the /api/user auto-registration race).
+        // Update their username with the one they explicitly chose during signup,
+        // but only if the chosen username isn't already taken by someone else.
+        const chosenUsername = validatedData.username;
+        if (chosenUsername && chosenUsername !== existingUser.username) {
+          const usernameOwner = await storage.getUserByUsername(chosenUsername);
+          if (!usernameOwner || usernameOwner.id === existingUser.id) {
+            await storage.updateUser(existingUser.id, { username: chosenUsername } as any);
+          }
+        }
+        // Also update authProvider to 'local' so the account page shows the username
+        await storage.updateUser(existingUser.id, { authProvider: 'local', providerId: validatedData.providerId } as any);
+        return res.status(200).json({ user: { id: existingUser.id, email: existingUser.email, username: chosenUsername || existingUser.username } });
       }
       
       const user = await storage.createUser(validatedData);
