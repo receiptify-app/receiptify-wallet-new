@@ -239,14 +239,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Display name is required' });
       }
 
-      const user = await storage.getUserByProviderId('firebase', firebaseUid);
+      let user = await storage.getUserByProviderId('firebase', firebaseUid);
+      if (!user) {
+        // email/password users are stored with authProvider='local'
+        const email = req.user?.email;
+        if (email) user = await storage.getUserByEmail(email);
+      }
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      await storage.updateUser(user.id, { firstName: displayName.trim() });
+      const trimmed = displayName.trim();
+      const spaceIdx = trimmed.indexOf(' ');
+      const firstName = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+      const lastName  = spaceIdx === -1 ? null     : trimmed.slice(spaceIdx + 1).trim() || null;
 
-      res.json({ success: true, displayName: displayName.trim() });
+      await storage.updateUser(user.id, { firstName, lastName } as any);
+
+      res.json({ success: true, displayName: trimmed });
     } catch (error) {
       console.error("Error updating display name:", error);
       res.status(500).json({ error: "Failed to update display name" });

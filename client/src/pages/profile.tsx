@@ -65,8 +65,9 @@ export default function Profile() {
       const res = await apiRequest("PATCH", "/api/user/display-name", { displayName });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, displayName) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.refetchQueries({ queryKey: ["/api/user"] });
       setShowEditName(false);
       toast({ title: "Display name updated", description: "Your display name has been saved." });
     },
