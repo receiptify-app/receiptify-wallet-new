@@ -13,8 +13,6 @@ import {
   Receipt,
   LogOut,
   Languages,
-  Camera,
-  Check,
   Shield,
   Pencil
 } from "lucide-react";
@@ -41,26 +39,6 @@ import { CURRENCIES } from "@/lib/currency";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-// Default avatar fallback
-const defaultAvatar = "/assets/generated_images/friendly_monkey_avatar.png";
-
-// Avatar options matching the pre-assigned avatars from signup
-const AVATAR_OPTIONS = [
-  { id: 'einstein', url: '/assets/generated_images/einstein-style_scientist_avatar.png', label: 'Einstein' },
-  { id: 'tech_founder', url: '/assets/generated_images/tech_founder_turtleneck_avatar.png', label: 'Tech Founder' },
-  { id: 'renaissance', url: '/assets/generated_images/renaissance_inventor_avatar.png', label: 'Renaissance' },
-  { id: 'startup', url: '/assets/generated_images/startup_founder_hoodie_avatar.png', label: 'Startup' },
-  { id: 'edison', url: '/assets/generated_images/edison_lightbulb_inventor_avatar.png', label: 'Edison' },
-  { id: 'space', url: '/assets/generated_images/space_entrepreneur_avatar.png', label: 'Space' },
-  { id: 'engineer', url: '/assets/generated_images/engineer_inventor_avatar.png', label: 'Engineer' },
-  { id: 'robotics', url: '/assets/generated_images/robotics_inventor_avatar.png', label: 'Robotics' },
-  { id: 'scientist', url: '/assets/generated_images/female_scientist_avatar.png', label: 'Scientist' },
-  { id: 'tech_ceo', url: '/assets/generated_images/female_tech_ceo_avatar.png', label: 'Tech CEO' },
-  { id: 'aerospace', url: '/assets/generated_images/female_aerospace_engineer_avatar.png', label: 'Aerospace' },
-  { id: 'robotics_sci', url: '/assets/generated_images/female_robotics_scientist_avatar.png', label: 'Robotics Sci' },
-  { id: 'founder', url: '/assets/generated_images/female_startup_founder_avatar.png', label: 'Founder' },
-  { id: 'monkey', url: '/assets/generated_images/friendly_monkey_avatar.png', label: 'Monkey' },
-];
 
 export default function Profile() {
   const [, navigate] = useLocation();
@@ -68,7 +46,6 @@ export default function Profile() {
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const { currency, symbol, updateCurrency } = useCurrency();
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showEditName, setShowEditName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
   const { toast } = useToast();
@@ -81,32 +58,6 @@ export default function Profile() {
 
   const handleCurrencyChange = (currencyCode: string) => {
     updateCurrency(currencyCode);
-  };
-
-  const updateAvatarMutation = useMutation({
-    mutationFn: async (avatarUrl: string) => {
-      const res = await apiRequest("PATCH", "/api/user/avatar", { avatar: avatarUrl });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setShowAvatarPicker(false);
-      toast({
-        title: t('profile.avatarUpdated') || "Avatar updated",
-        description: t('profile.avatarUpdatedDesc') || "Your profile picture has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error') || "Error",
-        description: t('profile.avatarUpdateFailed') || "Failed to update avatar. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAvatarSelect = (avatarUrl: string) => {
-    updateAvatarMutation.mutate(avatarUrl);
   };
 
   const updateDisplayNameMutation = useMutation({
@@ -202,7 +153,6 @@ export default function Profile() {
   const displayUser = {
     name: apiUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || "User",
     email: apiUser?.email || currentUser?.email || "user@example.com",
-    avatar: apiUser?.avatar || currentUser?.photoURL || defaultAvatar
   };
 
   return (
@@ -217,40 +167,23 @@ export default function Profile() {
         {/* User Profile Section */}
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                {/* Avatar — tap to change */}
-                <div className="relative flex-shrink-0 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
-                    <img 
-                      src={displayUser.avatar} 
-                      alt={displayUser.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
-                    <Camera className="w-3 h-3 text-white" />
-                  </div>
+            <div className="flex items-center gap-3">
+              {/* Name + email */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className={`font-bold text-gray-900 truncate ${
+                    displayUser.name.length > 20 ? 'text-sm' :
+                    displayUser.name.length > 14 ? 'text-base' : 'text-xl'
+                  }`}>{displayUser.name}</h2>
+                  <button
+                    onClick={() => { setEditNameValue(displayUser.name); setShowEditName(true); }}
+                    className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                  </button>
                 </div>
-                {/* Name + email */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className={`font-bold text-gray-900 truncate ${
-                      displayUser.name.length > 20 ? 'text-sm' :
-                      displayUser.name.length > 14 ? 'text-base' : 'text-xl'
-                    }`}>{displayUser.name}</h2>
-                    <button
-                      onClick={() => { setEditNameValue(displayUser.name); setShowEditName(true); }}
-                      className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-gray-500" />
-                    </button>
-                  </div>
-                  <p className="text-gray-600 text-sm truncate">{displayUser.email}</p>
-                  <p className="text-xs text-emerald-600 cursor-pointer" onClick={() => setShowAvatarPicker(true)}>{t('profile.tapToChangeAvatar') || 'Tap to change avatar'}</p>
-                </div>
+                <p className="text-gray-600 text-sm truncate">{displayUser.email}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2 cursor-pointer" onClick={() => setShowAvatarPicker(true)} />
             </div>
           </CardContent>
         </Card>
@@ -470,48 +403,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Avatar Picker Dialog */}
-      <Dialog open={showAvatarPicker} onOpenChange={setShowAvatarPicker}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t('profile.chooseAvatar') || 'Choose Your Avatar'}</DialogTitle>
-            <DialogDescription>
-              {t('profile.chooseAvatarDesc') || 'Select an avatar to personalize your profile'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-3 gap-4 py-4">
-            {AVATAR_OPTIONS.map((avatar) => (
-              <button
-                key={avatar.id}
-                onClick={() => handleAvatarSelect(avatar.url)}
-                disabled={updateAvatarMutation.isPending}
-                className={`relative p-2 rounded-xl border-2 transition-all hover:scale-105 hover:shadow-md ${
-                  displayUser.avatar === avatar.url 
-                    ? 'border-emerald-500 bg-emerald-50' 
-                    : 'border-gray-200 hover:border-emerald-300'
-                } ${updateAvatarMutation.isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                <img 
-                  src={avatar.url} 
-                  alt={avatar.label}
-                  className="w-full aspect-square rounded-lg object-cover"
-                />
-                {displayUser.avatar === avatar.url && (
-                  <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
-                  </div>
-                )}
-                <p className="text-xs text-center mt-1 text-gray-600">{avatar.label}</p>
-              </button>
-            ))}
-          </div>
-          {updateAvatarMutation.isPending && (
-            <div className="text-center text-sm text-gray-500">
-              {t('common.updating') || 'Updating...'}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
