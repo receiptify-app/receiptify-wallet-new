@@ -1192,15 +1192,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update their username with the one they explicitly chose during signup,
         // but only if the chosen username isn't already taken by someone else.
         const chosenUsername = validatedData.username;
+        const updates: any = {
+          authProvider: 'local',
+          providerId: validatedData.providerId,
+        };
+        if (validatedData.firstName) updates.firstName = validatedData.firstName;
+        if (validatedData.lastName) updates.lastName = validatedData.lastName;
         if (chosenUsername && chosenUsername !== existingUser.username) {
           const usernameOwner = await storage.getUserByUsername(chosenUsername);
           if (!usernameOwner || usernameOwner.id === existingUser.id) {
-            await storage.updateUser(existingUser.id, { username: chosenUsername } as any);
+            updates.username = chosenUsername;
           }
         }
-        // Also update authProvider to 'local' so the account page shows the username
-        await storage.updateUser(existingUser.id, { authProvider: 'local', providerId: validatedData.providerId } as any);
-        return res.status(200).json({ user: { id: existingUser.id, email: existingUser.email, username: chosenUsername || existingUser.username } });
+        await storage.updateUser(existingUser.id, updates);
+        return res.status(200).json({ user: { id: existingUser.id, email: existingUser.email, username: updates.username || existingUser.username } });
       }
       
       const user = await storage.createUser(validatedData);
