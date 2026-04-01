@@ -75,7 +75,7 @@ export default function Profile() {
     },
   });
 
-  const { data: apiUser } = useQuery<{ id: string; email: string; name: string; avatar: string | null }>({
+  const { data: apiUser } = useQuery<{ id: string; email: string; name: string; username: string | null; avatar: string | null }>({
     queryKey: ["/api/user"],
     retry: false,
   });
@@ -153,6 +153,7 @@ export default function Profile() {
   const displayUser = {
     name: apiUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || "User",
     email: apiUser?.email || currentUser?.email || "user@example.com",
+    username: apiUser?.username || null,
   };
 
   return (
@@ -183,6 +184,9 @@ export default function Profile() {
                   </button>
                 </div>
                 <p className="text-gray-600 text-sm truncate">{displayUser.email}</p>
+                {displayUser.username && (
+                  <p className="text-gray-400 text-xs mt-0.5">@{displayUser.username}</p>
+                )}
               </div>
             </div>
           </CardContent>

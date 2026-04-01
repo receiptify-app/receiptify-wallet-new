@@ -20,7 +20,7 @@ import { queryClient, setAuthTokenGetter } from "@/lib/queryClient";
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  signup: (email: string, password: string, displayName: string, gender?: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string, username?: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return auth;
   }
 
-  async function signup(email: string, password: string, displayName: string, gender?: string) {
+  async function signup(email: string, password: string, displayName: string, username?: string) {
     if (!auth) {
       toast({
         title: "Authentication unavailable",
@@ -73,17 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await createUserWithEmailAndPassword(_auth, email, password);
       await updateProfile(result.user, { displayName });
       
-      // Register user in our database with gender for avatar selection
+      // Register user in our database
       try {
         await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email,
-            username: displayName,
+            username: username || displayName.toLowerCase().replace(/\s+/g, '_'),
             firstName: displayName.split(' ')[0],
             lastName: displayName.split(' ').slice(1).join(' ') || null,
-            gender: gender || null,
             authProvider: 'local',
             providerId: result.user.uid,
           }),

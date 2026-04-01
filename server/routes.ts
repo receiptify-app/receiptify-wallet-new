@@ -202,10 +202,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: user.id,
         email: user.email,
         name: user.firstName || user.username || 'User',
+        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         avatar: user.profileImageUrl,
-        gender: user.gender,
       });
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -1140,6 +1140,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create split: " + error.message });
     }
+  });
+
+  // Username availability check (public, no auth needed)
+  app.get("/api/check-username", async (req, res) => {
+    const username = (req.query.username as string || "").trim().toLowerCase();
+    if (!username || username.length < 3) {
+      return res.json({ available: false, reason: "Username must be at least 3 characters" });
+    }
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      return res.json({ available: false, reason: "Username can only contain letters, numbers, and underscores" });
+    }
+    const existing = await storage.getUserByUsername(username);
+    return res.json({ available: !existing });
+  });
+
+  // Email availability check (public, no auth needed)
+  app.get("/api/check-email", async (req, res) => {
+    const email = (req.query.email as string || "").trim().toLowerCase();
+    if (!email) return res.json({ available: false });
+    const existing = await storage.getUserByEmail(email);
+    return res.json({ available: !existing });
   });
 
   // Authentication routes
