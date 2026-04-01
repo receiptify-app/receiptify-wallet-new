@@ -63,12 +63,35 @@ export default function ReceiptDetailPage() {
   const receiptCurrency = (receipt?.currency || 'GBP').toUpperCase();
   const isForeignCurrency = receiptCurrency !== userCurrency.toUpperCase();
 
-  const { data: exchangeRate } = useQuery<number>({
-    queryKey: ["exchangeRate", receiptCurrency, userCurrency],
-    queryFn: () => getExchangeRate(receiptCurrency, userCurrency),
-    enabled: isForeignCurrency && !!receipt,
+  // Use rate snapshotted at purchase time when available (locked, never changes).
+  // Fall back to a live query only for older receipts that predate this feature.
+  const storedRateToGBP = receipt?.exchangeRateToGBP ? parseFloat(receipt.exchangeRateToGBP as string) : null;
+
+  const { data: fxRatesFromGBP } = useQuery<Record<string, number>>({
+    queryKey: ['fxRates', 'GBP'],
+    queryFn: () => import('@/lib/currency-conversion').then(m => m.getRatesFromBase('GBP')),
+    enabled: isForeignCurrency && !!storedRateToGBP && userCurrency !== 'GBP',
     staleTime: 60 * 60 * 1000,
   });
+
+  const { data: liveExchangeRate } = useQuery<number>({
+    queryKey: ["exchangeRate", receiptCurrency, userCurrency],
+    queryFn: () => getExchangeRate(receiptCurrency, userCurrency),
+    enabled: isForeignCurrency && !!receipt && storedRateToGBP === null,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Effective rate: receipt currency → user currency
+  const exchangeRate: number | null = (() => {
+    if (!isForeignCurrency) return null;
+    if (storedRateToGBP !== null) {
+      if (userCurrency === 'GBP') return storedRateToGBP;
+      const gbpToUser = fxRatesFromGBP?.[userCurrency];
+      if (gbpToUser) return storedRateToGBP * gbpToUser;
+      return null;
+    }
+    return liveExchangeRate ?? null;
+  })();
 
   const createWarrantyMutation = useMutation({
     mutationFn: async (data: typeof warrantyForm) => {

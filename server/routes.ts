@@ -30,6 +30,20 @@ const execFileP = promisify(execFile);
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 
+// helper: fetch GBP exchange rate for a currency and snapshot it on the receipt
+async function snapshotExchangeRateToGBP(currency: string): Promise<string | null> {
+  if (!currency || currency === 'GBP') return '1.00000000';
+  try {
+    const res = await fetch(`https://api.frankfurter.app/latest?from=${currency}&to=GBP`);
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const rate: number = data.rates?.GBP;
+    return rate ? String(rate) : null;
+  } catch {
+    return null;
+  }
+}
+
 // helper: safely parse date, returns valid Date or null
 function safeParseDate(value: any): Date | null {
   if (!value || value === 'null' || value === 'undefined') return null;
@@ -443,6 +457,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      if (!receiptData.exchangeRateToGBP) {
+        receiptData.exchangeRateToGBP = await snapshotExchangeRateToGBP(receiptData.currency || 'GBP');
+      }
+
       const validatedData = insertReceiptSchema.parse(receiptData);
       
       const receipt = await storage.createReceipt(validatedData);
@@ -638,7 +656,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptNumber: sanitized.receiptNumber || `OCR${Date.now()}`,
           imageUrl: persistentImageUrl,
           ecoPoints: 1,
-          currency: sanitized.currency || 'GBP'
+          currency: sanitized.currency || 'GBP',
+          exchangeRateToGBP: await snapshotExchangeRateToGBP(sanitized.currency || 'GBP'),
         };
 
         const receipt = await storage.createReceipt(receiptData);

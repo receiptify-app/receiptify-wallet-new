@@ -46,12 +46,19 @@ export default function Home() {
     staleTime: 60 * 60 * 1000,
   });
 
-  // Return receipts with totals converted to the user's currency
+  // Return receipts with totals converted to the user's currency.
+  // Prefers the rate snapshotted at purchase time (exchangeRateToGBP) so the
+  // converted amount never changes after the receipt is saved.
   const convertedReceipts = useMemo(() => {
     if (!fxRates) return receipts;
     return receipts.map(r => {
       const rCur = ((r as any).currency || userCurrency).toUpperCase();
       if (rCur === userCurrency.toUpperCase()) return r;
+      const storedRate = (r as any).exchangeRateToGBP ? parseFloat((r as any).exchangeRateToGBP) : null;
+      if (storedRate !== null && fxRates['GBP']) {
+        const convertedTotal = (parseFloat(String(r.total)) * storedRate / fxRates['GBP']).toFixed(2);
+        return { ...r, total: convertedTotal };
+      }
       const rate = fxRates[rCur];
       if (!rate) return r;
       const convertedTotal = (parseFloat(String(r.total)) / rate).toFixed(2);

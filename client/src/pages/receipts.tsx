@@ -55,15 +55,20 @@ export default function ReceiptsPage() {
     staleTime: 60 * 60 * 1000,
   });
 
-  // Convert a receipt total to the user's currency
+  // Convert a receipt total to the user's currency.
+  // Uses the rate snapshotted at purchase time (exchangeRateToGBP) when available
+  // so the amount is locked and never drifts with market rates.
   const convertedTotal = (receipt: Receipt): string => {
-    const rCurrency = (receipt.currency || userCurrency).toUpperCase();
+    const rCurrency = ((receipt as any).currency || userCurrency).toUpperCase();
     const uCurrency = userCurrency.toUpperCase();
     if (rCurrency === uCurrency || !fxRates) return formatCurrency(receipt.total);
+    const storedRate = (receipt as any).exchangeRateToGBP ? parseFloat((receipt as any).exchangeRateToGBP) : null;
+    if (storedRate !== null && fxRates['GBP']) {
+      return formatCurrency(parseFloat(receipt.total) * storedRate / fxRates['GBP']);
+    }
     const rate = fxRates[rCurrency];
     if (!rate) return formatCurrency(receipt.total);
-    const converted = parseFloat(receipt.total) / rate;
-    return formatCurrency(converted);
+    return formatCurrency(parseFloat(receipt.total) / rate);
   };
 
   // Bulk move mutation

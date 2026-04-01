@@ -40,6 +40,7 @@ export const receipts = pgTable("receipts", {
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
   tax: decimal("tax", { precision: 10, scale: 2 }),
   currency: text("currency").default("GBP"),
+  exchangeRateToGBP: decimal("exchangeRateToGBP", { precision: 18, scale: 8 }),
   date: timestamp("date").notNull(),
   receiptNumber: text("receiptNumber"),
   paymentMethod: text("paymentMethod"),
