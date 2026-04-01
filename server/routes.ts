@@ -179,15 +179,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // If user doesn't exist in our DB, create them (auto-registration from Firebase)
+      // If user doesn't exist in our DB, create them (auto-registration from Firebase / Google sign-in)
       if (!user) {
-        // Generate unique username to avoid conflicts
-        const baseUsername = userName || userEmail?.split('@')[0] || 'User';
-        const uniqueUsername = `${baseUsername}_${Date.now().toString(36)}`;
-        
+        // Build a clean base username from email prefix or display name
+        const rawBase = (userEmail?.split('@')[0] || userName || 'user')
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_|_$/g, '')
+          .slice(0, 20) || 'user';
+
+        // Find a unique username by trying base, base_2, base_3 ...
+        let candidateUsername = rawBase;
+        let suffix = 2;
+        while (await storage.getUserByUsername(candidateUsername)) {
+          candidateUsername = `${rawBase}_${suffix}`;
+          suffix++;
+        }
+
         user = await storage.createUser({
           email: userEmail || null,
-          username: uniqueUsername,
+          username: candidateUsername,
           firstName: userName?.split(' ')[0] || null,
           lastName: userName?.split(' ').slice(1).join(' ') || null,
           authProvider: 'firebase',
@@ -203,6 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email,
         name: user.firstName || user.username || 'User',
         username: user.username,
+        authProvider: user.authProvider,
         firstName: user.firstName,
         lastName: user.lastName,
         avatar: user.profileImageUrl,

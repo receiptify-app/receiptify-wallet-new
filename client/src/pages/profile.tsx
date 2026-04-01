@@ -75,7 +75,7 @@ export default function Profile() {
     },
   });
 
-  const { data: apiUser } = useQuery<{ id: string; email: string; name: string; username: string | null; avatar: string | null }>({
+  const { data: apiUser } = useQuery<{ id: string; email: string; name: string; username: string | null; authProvider: string | null; avatar: string | null }>({
     queryKey: ["/api/user"],
     retry: false,
   });
@@ -153,7 +153,7 @@ export default function Profile() {
   const displayUser = {
     name: apiUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || "User",
     email: apiUser?.email || currentUser?.email || "user@example.com",
-    username: apiUser?.username || null,
+    username: apiUser?.authProvider === 'local' ? (apiUser?.username || null) : null,
   };
 
   return (
