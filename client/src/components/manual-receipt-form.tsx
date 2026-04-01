@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
+import { useCurrency } from "@/hooks/use-currency";
 
 interface ReceiptItem {
   name: string;
@@ -46,6 +47,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { currency: userCurrency, symbol: currencySymbol } = useCurrency();
 
   const paymentMethodOptions = [
     { key: 'cash', label: t('paymentMethods.cash') },
@@ -123,7 +125,8 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
         items: data.items,
         latitude,
         longitude,
-        ecoPoints: 1
+        ecoPoints: 1,
+        currency: userCurrency,
       };
       
       return await apiRequest("POST", "/api/receipts", receiptData);
@@ -360,7 +363,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                     </div>
                     
                     <div>
-                      <Label>{t('manual.price')} (£) *</Label>
+                      <Label>{t('manual.price')} ({currencySymbol}) *</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -411,7 +414,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="totalAmount">{t('manual.total')} (£) *</Label>
+                  <Label htmlFor="totalAmount">{t('manual.total')} ({currencySymbol}) *</Label>
                   <Input
                     id="totalAmount"
                     type="number"
@@ -425,7 +428,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
                   />
                   {calculatedTotal > 0 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      {t('manual.itemsTotal')}: £{calculatedTotal.toFixed(2)}
+                      {t('manual.itemsTotal')}: {currencySymbol}{calculatedTotal.toFixed(2)}
                     </p>
                   )}
                   {errors.totalAmount && (

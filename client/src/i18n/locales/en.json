@@ -312,7 +312,7 @@
   "exports": {
     "title": "Exports",
     "exportReceipts": "Export Receipts",
-    "exportDesc": "Download individual receipts or all as a ZIP",
+    "exportDesc": "Download individual receipts or all as a PDF",
     "downloadAll": "Download All",
     "download": "Download",
     "loading": "Loading receipts...",

@@ -306,7 +306,7 @@
   "exports": {
     "title": "Exporte",
     "exportReceipts": "Belege Exportieren",
-    "exportDesc": "Einzelne Belege oder alle als ZIP herunterladen",
+    "exportDesc": "Einzelne Belege oder alle als PDF herunterladen",
     "downloadAll": "Alle Herunterladen",
     "download": "Herunterladen",
     "loading": "Belege werden geladen...",

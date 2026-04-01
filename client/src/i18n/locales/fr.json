@@ -306,7 +306,7 @@
   "exports": {
     "title": "Exportations",
     "exportReceipts": "Exporter les Reçus",
-    "exportDesc": "Téléchargez les reçus individuellement ou tous en ZIP",
+    "exportDesc": "Téléchargez les reçus individuellement ou tous en PDF",
     "downloadAll": "Tout Télécharger",
     "download": "Télécharger",
     "loading": "Chargement des reçus...",

@@ -306,7 +306,7 @@
   "exports": {
     "title": "Exportar",
     "exportReceipts": "Exportar Recibos",
-    "exportDesc": "Descarga recibos individuales o todos como ZIP",
+    "exportDesc": "Descarga recibos individuales o todos como PDF",
     "downloadAll": "Descargar Todo",
     "download": "Descargar",
     "loading": "Cargando recibos...",
