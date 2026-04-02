@@ -18,6 +18,10 @@ import BulkSelectToolbar from "@/components/bulk-select-toolbar";
 import CategoryPickerModal from "@/components/category-picker-modal";
 import { useCurrency } from "@/hooks/use-currency";
 import { getRatesFromBase } from "@/lib/currency-conversion";
+import { getCategoryByName, getCategoryById } from "@shared/categories";
+
+const normCat = (raw?: string | null) =>
+  (getCategoryByName(raw ?? '') || getCategoryById(raw ?? ''))?.name ?? raw ?? '';
 
 interface Receipt {
   id: string;
@@ -475,7 +479,7 @@ export default function ReceiptsPage() {
                                         variant="secondary"
                                         className={`text-xs flex-shrink-0 ${getCategoryColor(receipt.category)}`}
                                       >
-                                        {receipt.category}
+                                        {normCat(receipt.category)}
                                       </Badge>
                                     )}
                                     <div className="text-right">
