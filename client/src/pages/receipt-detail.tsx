@@ -28,9 +28,14 @@ import {
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
+import { getCategoryByName, getCategoryById } from "@shared/categories";
 import { useCurrency } from "@/hooks/use-currency";
+
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getExchangeRate, formatWithCurrencyCode } from "@/lib/currency-conversion";
+
+const normCat = (raw?: string | null) =>
+  (getCategoryByName(raw ?? '') || getCategoryById(raw ?? ''))?.name ?? raw ?? 'Other';
 
 export default function ReceiptDetailPage() {
   const [, navigate] = useLocation();
@@ -528,7 +533,7 @@ export default function ReceiptDetailPage() {
                 <Utensils className="h-4 w-4 text-green-600" />
               </div>
               <span className="text-gray-900 font-medium">
-                {receipt.category || "Other"}
+                {normCat(receipt.category)}
               </span>
             </div>
           </CardContent>

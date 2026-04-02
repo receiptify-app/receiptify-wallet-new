@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreVertical, MoveRight, Share2 } from "lucide-react";
 import { format } from "date-fns";
-import { getCategoryColor, getCategoryIcon } from "@shared/categories";
+import { getCategoryColor, getCategoryIcon, getCategoryByName, getCategoryById } from "@shared/categories";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCurrency } from "@/hooks/use-currency";
+
+const normCat = (raw?: string | null) =>
+  (getCategoryByName(raw ?? '') || getCategoryById(raw ?? ''))?.name ?? raw ?? '';
 
 interface AnalyticsReceiptCardProps {
   receipt: {
@@ -141,7 +144,7 @@ export default function AnalyticsReceiptCard({
                 }}
                 data-testid={`badge-category-${receipt.id}`}
               >
-                {categoryIcon} {receipt.category}
+                {categoryIcon} {normCat(receipt.category)}
               </Badge>
             )}
           </div>

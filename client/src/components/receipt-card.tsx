@@ -6,6 +6,12 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery } from "@tanstack/react-query";
 import { Split, Eye, Star } from "lucide-react";
 import type { Receipt, ReceiptItem } from "@shared/schema";
+import { getCategoryByName, getCategoryById } from "@shared/categories";
+
+const normCat = (raw?: string | null) => {
+  if (!raw) return null;
+  return (getCategoryByName(raw) || getCategoryById(raw))?.name ?? raw;
+};
 
 interface ReceiptCardProps {
   receipt: Receipt & { items?: ReceiptItem[] };
@@ -103,10 +109,10 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
           </div>
         </div>
 
-        {receipt.category && (
+        {normCat(receipt.category) && (
           <div className="mt-3">
             <Badge variant="secondary" className="text-xs">
-              {receipt.category}
+              {normCat(receipt.category)}
             </Badge>
           </div>
         )}
