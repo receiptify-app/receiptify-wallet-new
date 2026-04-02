@@ -1,4 +1,11 @@
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { getCategoryByName, getCategoryById } from '@shared/categories';
+
+function normaliseCategoryName(raw: string | null | undefined): string {
+  if (!raw) return 'Other';
+  const match = getCategoryByName(raw) || getCategoryById(raw);
+  return match ? match.name : raw;
+}
 
 export type DateRange = 'month' | 'week' | 'custom';
 
@@ -122,7 +129,7 @@ export function calculateCategoryTotals(receipts: Receipt[], categoryColors: Map
     const amount = typeof receipt.total === 'string' ? parseFloat(receipt.total) : receipt.total;
     total += amount;
 
-    const category = receipt.category || 'Other';
+    const category = normaliseCategoryName(receipt.category);
     const existing = categoryMap.get(category) || { amount: 0, count: 0 };
     categoryMap.set(category, {
       amount: existing.amount + amount,
