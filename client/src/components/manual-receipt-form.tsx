@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from "@/hooks/use-currency";
+import { CATEGORIES } from "@shared/categories";
 
 interface ReceiptItem {
   name: string;
@@ -31,6 +32,7 @@ interface ManualReceiptForm {
   receiptNumber: string;
   totalAmount: number;
   paymentMethod: string;
+  category: string;
   notes?: string;
   items: ReceiptItem[];
 }
@@ -81,6 +83,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
       receiptNumber: "",
       totalAmount: 0,
       paymentMethod: "",
+      category: "other",
       notes: "",
       items: [{ name: "", price: 0, quantity: 1, category: "" }],
       ...initialData
@@ -119,7 +122,7 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
         location: data.merchantAddress || t('manual.title'),
         total: data.totalAmount.toString(),
         date: `${data.date}T${data.time}:00`,
-        category: "Other",
+        category: data.category || "other",
         paymentMethod: data.paymentMethod,
         receiptNumber: data.receiptNumber,
         items: data.items,
@@ -275,6 +278,25 @@ export default function ManualReceiptForm({ open, onOpenChange, initialData }: M
               <CardTitle className="text-lg">{t('manual.transactionDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="mb-4">
+                <Label htmlFor="category">{t('manual.category')}</Label>
+                <Select
+                  defaultValue="other"
+                  onValueChange={(value) => setValue("category", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('manual.selectCategory')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="date">{t('manual.date')} *</Label>
