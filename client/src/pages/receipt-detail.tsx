@@ -32,7 +32,7 @@ import { getCategoryByName, getCategoryById } from "@shared/categories";
 import { useCurrency } from "@/hooks/use-currency";
 
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getExchangeRate, formatWithCurrencyCode } from "@/lib/currency-conversion";
+import { getExchangeRate, getRatesFromBase, formatWithCurrencyCode } from "@/lib/currency-conversion";
 
 const normCat = (raw?: string | null) =>
   (getCategoryByName(raw ?? '') || getCategoryById(raw ?? ''))?.name ?? raw ?? 'Other';
@@ -74,7 +74,7 @@ export default function ReceiptDetailPage() {
 
   const { data: fxRatesFromGBP } = useQuery<Record<string, number>>({
     queryKey: ['fxRates', 'GBP'],
-    queryFn: () => import('@/lib/currency-conversion').then(m => m.getRatesFromBase('GBP')),
+    queryFn: () => getRatesFromBase('GBP'),
     enabled: isForeignCurrency && !!storedRateToGBP && userCurrency !== 'GBP',
     staleTime: 60 * 60 * 1000,
   });

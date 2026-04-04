@@ -170,6 +170,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin routes
   app.use("/api/admin", adminRouter);
 
+  // Exchange rate proxy (server-to-server so no browser CORS/network issues)
+  // Cache: 1 hour per base currency
+  const fxBulkCache: Record<string, { rates: Record<string, number>; at: number }> = {};
+  const FX_TTL = 60 * 60 * 1000;
+
+  app.get("/api/exchange-rates", async (req, res) => {
+    const base = String(req.query.base || 'GBP').toUpperCase();
+    const now = Date.now();
+    if (fxBulkCache[base] && now - fxBulkCache[base].at < FX_TTL) {
+      return res.json(fxBulkCache[base].rates);
+    }
+    try {
+      const upstream = await fetch(`https://api.frankfurter.app/latest?from=${base}`);
+      if (!upstream.ok) return res.status(502).json({ error: 'upstream failed' });
+      const data: any = await upstream.json();
+      const rates: Record<string, number> = { ...data.rates, [base]: 1 };
+      fxBulkCache[base] = { rates, at: now };
+      return res.json(rates);
+    } catch (e) {
+      return res.status(502).json({ error: 'exchange rate fetch failed' });
+    }
+  });
+
   // Get current user profile
   app.get("/api/user", async (req, res) => {
     try {
