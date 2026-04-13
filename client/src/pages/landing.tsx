@@ -113,15 +113,6 @@ export default function Landing() {
                 {t("landing.startFreeTrial")}
               </Button>
             </Link>
-            <Button
-              size="lg"
-              variant="outline"
-              className="px-8 py-4 text-lg"
-              onClick={() => setShowDemoModal(true)}
-              data-testid="button-watch-demo"
-            >
-              {t("landing.watchDemo")}
-            </Button>
           </div>
         </div>
       </section>
