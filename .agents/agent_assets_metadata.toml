@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "l0Va7dWP1gmx357qn_FqI"
+uri = "file://artifacts/mockup-sandbox/public/images/eco-hero-bg.png"
+type = "image"
+title = "Deep green forest leaf motifs"
+
+[[generated]]
+id = "3-yHPWaSOFyZhbxNeUFoe"
+uri = "file://artifacts/mockup-sandbox/public/images/eco-impact-feature.png"
+type = "image"
+title = "Editorial eco impact illustration"
