@@ -65,7 +65,7 @@ function HeroPhone() {
                 28 receipts
               </span>
               <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[9px] font-semibold">
-                ↑ saved 28 papers
+                ↓ £42 vs last month
               </span>
             </div>
           </div>
