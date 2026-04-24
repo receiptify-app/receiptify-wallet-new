@@ -121,12 +121,35 @@
     </script>
   </head>
   <body>
-    <a
-      href="#main-content"
-      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[1000] focus:rounded-md focus:bg-emerald-700 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
-    >
-      Skip to main content
-    </a>
+    <style>
+      /* Inlined so the skip link is always hidden, even before the
+         Tailwind CSS bundle has loaded. Becomes visible only when a
+         keyboard user tabs to it. */
+      .skip-to-content {
+        position: absolute;
+        left: -9999px;
+        top: auto;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+      }
+      .skip-to-content:focus {
+        position: fixed;
+        left: 0.5rem;
+        top: 0.5rem;
+        width: auto;
+        height: auto;
+        padding: 0.5rem 1rem;
+        background: #047857;
+        color: #fff;
+        border-radius: 0.375rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        text-decoration: none;
+        font: 500 14px/1.2 system-ui, sans-serif;
+      }
+    </style>
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
     <div id="root"></div>
     <noscript>
       <div style="padding:24px;font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;color:#111">
