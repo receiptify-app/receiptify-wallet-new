@@ -75,7 +75,14 @@ function AuthenticatedRouter() {
   }
 
   return (
-    <>
+    <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
+      <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
+        <div className="flex items-center space-x-1 text-xs">
+          <i className="fas fa-signal"></i>
+          <i className="fas fa-wifi"></i>
+          <i className="fas fa-battery-three-quarters"></i>
+        </div>
+      </div>
       <Switch>
         <Route path="/" component={Scan} />
         <Route path="/scan" component={Scan} />
@@ -97,7 +104,7 @@ function AuthenticatedRouter() {
         <Route component={NotFound} />
       </Switch>
       <BottomNavigation />
-    </>
+    </div>
   );
 }
 
@@ -124,16 +131,7 @@ function MainRouter() {
     <AuthProvider>
       <ConfirmDialogProvider>
         <UserSync />
-        <div className="max-w-sm mx-auto bg-white shadow-2xl min-h-screen relative overflow-hidden mobile-app">
-          <div className="bg-white px-6 py-2 flex justify-between items-center text-sm font-medium">
-            <div className="flex items-center space-x-1 text-xs">
-              <i className="fas fa-signal"></i>
-              <i className="fas fa-wifi"></i>
-              <i className="fas fa-battery-three-quarters"></i>
-            </div>
-          </div>
-          <AuthenticatedRouter />
-        </div>
+        <AuthenticatedRouter />
       </ConfirmDialogProvider>
     </AuthProvider>
   );
