@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Leaf, Mail, Lock, Eye, EyeOff, User, AtSign, ArrowLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, AtSign, ArrowLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import logoPath from "@assets/R_logo_1777038726271.png";
 import { FaGoogle } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -165,9 +166,14 @@ export default function Signup() {
         </Link>
         <Card className="w-full shadow-xl border-0">
           <CardHeader className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Leaf className="w-8 h-8 text-green-600" />
-              <div>
+            <div className="flex flex-col items-center gap-2 mb-4">
+              <img
+                src={logoPath}
+                alt={t('app.title')}
+                className="h-20 w-auto select-none"
+                draggable={false}
+              />
+              <div className="hidden">
                 <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
                 <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
               </div>

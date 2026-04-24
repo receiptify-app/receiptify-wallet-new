@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Leaf, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import logoPath from "@assets/R_logo_1777038726271.png";
 import { FaGoogle } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -92,12 +93,14 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Leaf className="w-8 h-8 text-green-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
-              <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
-            </div>
+          <div className="flex flex-col items-center gap-2 mb-4">
+            <img
+              src={logoPath}
+              alt={t('app.title')}
+              className="h-20 w-auto select-none"
+              draggable={false}
+            />
+            <p className="text-sm text-gray-600">{t('landing.footerTagline')}</p>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
             {t('auth.welcomeBack')}

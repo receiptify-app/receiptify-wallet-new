@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Leaf,
   Check,
   Camera,
   Wallet,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
+import logoPath from "@assets/R_logo_1777038726271.png";
 
 /* ----------------------------- Helper components --------------------------- */
 
@@ -48,11 +48,13 @@ function HeroPhone() {
           </div>
           {/* App header */}
           <div className="px-4 pt-3 pb-4 bg-gradient-to-b from-emerald-50 to-white">
-            <div className="flex items-center gap-1.5 mb-3">
-              <Leaf className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-[11px] font-semibold text-gray-800 tracking-tight">
-                Receiptify
-              </span>
+            <div className="mb-3">
+              <img
+                src={logoPath}
+                alt="Receiptify"
+                className="h-7 w-auto select-none -my-1"
+                draggable={false}
+              />
             </div>
             <p className="text-[10px] text-gray-500">This month</p>
             <p className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -271,13 +273,16 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl rounded-full bg-white/95 backdrop-blur shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-gray-100 px-4 sm:px-6 py-2.5 flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2"
+            className="flex items-center"
+            aria-label={t("app.title")}
             data-testid="brand-link"
           >
-            <Leaf className="w-5 h-5 text-emerald-600" />
-            <span className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight">
-              {t("app.title")}
-            </span>
+            <img
+              src={logoPath}
+              alt={t("app.title")}
+              className="h-12 sm:h-14 w-auto select-none -my-2"
+              draggable={false}
+            />
           </Link>
           <div className="hidden md:flex items-center gap-7 text-sm text-gray-700">
             <a
@@ -565,16 +570,15 @@ export default function Landing() {
         {/* FINAL CTA */}
         <section className="py-14 sm:py-20">
           <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-500 to-emerald-700 px-8 py-14 sm:px-14 sm:py-20 text-center text-white shadow-[0_30px_60px_-20px_rgba(16,185,129,0.55)]">
-            <Leaf
+            <div
               aria-hidden
-              className="absolute -top-6 -left-6 w-32 h-32 text-emerald-400/30"
+              className="absolute inset-0 pointer-events-none opacity-15"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0, transparent 40%), radial-gradient(circle at 85% 80%, rgba(255,255,255,0.35) 0, transparent 45%)",
+              }}
             />
-            <Leaf
-              aria-hidden
-              className="absolute -bottom-8 -right-4 w-40 h-40 text-emerald-400/30"
-              style={{ transform: "scaleX(-1)" }}
-            />
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight max-w-xl mx-auto leading-tight">
+            <h2 className="relative text-3xl sm:text-4xl font-bold tracking-tight max-w-xl mx-auto leading-tight">
               {t("landing.finalCtaTitle")}
             </h2>
             <p className="mt-4 text-base sm:text-lg text-emerald-50 max-w-md mx-auto">
@@ -594,13 +598,13 @@ export default function Landing() {
         </section>
 
         {/* Footer */}
-        <footer className="py-10 flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Leaf className="w-4 h-4 text-emerald-600" />
-            <span className="text-sm font-semibold text-gray-800">
-              {t("app.title")}
-            </span>
-          </div>
+        <footer className="py-10 flex flex-col items-center gap-4">
+          <img
+            src={logoPath}
+            alt={t("app.title")}
+            className="h-8 w-auto select-none opacity-90"
+            draggable={false}
+          />
           <select
             id="lang-select"
             value={selectedLanguage}

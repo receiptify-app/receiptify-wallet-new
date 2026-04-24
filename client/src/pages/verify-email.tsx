@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Leaf, Mail, RefreshCw, LogOut } from "lucide-react";
+import { Mail, RefreshCw, LogOut } from "lucide-react";
+import logoPath from "@assets/R_logo_1777038726271.png";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function VerifyEmail() {
@@ -54,9 +55,13 @@ export default function VerifyEmail() {
             </div>
 
             {/* Logo */}
-            <div className="flex items-center justify-center gap-2">
-              <Leaf className="w-5 h-5 text-green-600" />
-              <span className="font-bold text-gray-900">Receiptify</span>
+            <div className="flex items-center justify-center">
+              <img
+                src={logoPath}
+                alt="Receiptify"
+                className="h-9 w-auto select-none"
+                draggable={false}
+              />
             </div>
 
             {/* Heading */}
