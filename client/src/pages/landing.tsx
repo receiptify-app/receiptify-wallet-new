@@ -1,33 +1,73 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import happyCustomerImg from "@assets/Screenshot_2026-02-01_at_18.17.33_1769970061396.png";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Leaf,
-  QrCode,
-  Smartphone,
-  TrendingUp,
-  Users,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { Leaf, Check } from "lucide-react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import demoVideo from "@assets/generated_videos/receiptify_app_demo_explainer_video.mp4";
+
+function PhoneMockup({ variant }: { variant: 1 | 2 | 3 }) {
+  return (
+    <div className="relative mt-5 h-40 flex items-end justify-center overflow-hidden">
+      {/* Leaf decorations */}
+      <Leaf className="absolute left-2 bottom-2 w-7 h-7 text-emerald-100" />
+      <Leaf
+        className="absolute right-2 bottom-2 w-7 h-7 text-emerald-100"
+        style={{ transform: "scaleX(-1)" }}
+      />
+
+      {/* Phone frame */}
+      <div className="relative w-28 h-40 rounded-[1.4rem] bg-gray-900 p-1 shadow-md">
+        <div className="w-full h-full rounded-[1.1rem] bg-white overflow-hidden p-2 flex flex-col gap-1.5">
+          {/* status bar dot */}
+          <div className="flex justify-center mb-0.5">
+            <div className="w-6 h-1 bg-gray-200 rounded-full" />
+          </div>
+          {variant === 1 && (
+            <>
+              <div className="h-1.5 w-3/4 bg-gray-300 rounded" />
+              <div className="h-1.5 w-1/2 bg-gray-200 rounded" />
+              <div className="mt-1 space-y-1">
+                <div className="h-1 w-full bg-gray-100 rounded" />
+                <div className="h-1 w-5/6 bg-gray-100 rounded" />
+                <div className="h-1 w-full bg-gray-100 rounded" />
+                <div className="h-1 w-2/3 bg-gray-100 rounded" />
+              </div>
+            </>
+          )}
+          {variant === 2 && (
+            <>
+              <div className="h-1.5 w-2/3 bg-gray-300 rounded" />
+              <div className="mt-1 space-y-1.5">
+                <div className="h-3 w-full bg-emerald-50 rounded border border-emerald-100" />
+                <div className="h-3 w-full bg-gray-50 rounded border border-gray-100" />
+                <div className="h-3 w-full bg-emerald-50 rounded border border-emerald-100" />
+              </div>
+            </>
+          )}
+          {variant === 3 && (
+            <>
+              <div className="h-2 w-full bg-gray-100 rounded-full flex items-center px-1">
+                <div className="w-1 h-1 rounded-full bg-gray-400" />
+              </div>
+              <div className="mt-1 space-y-1">
+                <div className="h-1 w-full bg-gray-100 rounded" />
+                <div className="h-1 w-3/4 bg-gray-100 rounded" />
+                <div className="h-1 w-5/6 bg-gray-100 rounded" />
+                <div className="h-1 w-2/3 bg-gray-100 rounded" />
+                <div className="h-1 w-full bg-gray-100 rounded" />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState<string>(
-    i18n?.language || "en",
+    (i18n?.language || "en").split("-")[0],
   );
-  const [showDemoModal, setShowDemoModal] = useState(false);
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
@@ -37,254 +77,164 @@ export default function Landing() {
     } catch {}
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
-      {/* Header */}
-      <header className="px-6 py-4 bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Leaf className="w-8 h-8 text-green-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {t("app.title")}
-              </h1>
-              <p className="text-sm text-gray-600">{t("app.tagline")}</p>
-            </div>
-          </div>
+  const benefits = [
+    t("landing.whyBenefit1"),
+    t("landing.whyBenefit2"),
+    t("landing.whyBenefit3"),
+    t("landing.whyBenefit4"),
+  ];
 
-          <div className="flex gap-3">
+  const steps = [
+    t("landing.howStep1"),
+    t("landing.howStep2"),
+    t("landing.howStep3"),
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-green-50/40 to-white font-sans antialiased">
+      <div className="mx-auto max-w-md px-6 pt-10 pb-16">
+        {/* Brand */}
+        <div className="flex items-center justify-center gap-2 mb-16">
+          <Leaf className="w-6 h-6 text-emerald-600" />
+          <span
+            className="text-2xl font-semibold text-gray-900 tracking-tight"
+            data-testid="brand-name"
+          >
+            {t("app.title")}
+          </span>
+        </div>
+
+        {/* Hero */}
+        <section className="text-center">
+          <h1 className="text-[2.75rem] leading-[1.05] font-bold tracking-tight text-gray-900">
+            <span className="block">{t("landing.heroTitlePart1")}</span>
+            <span
+              className="block text-emerald-600 mt-1"
+              data-testid="hero-highlight"
+            >
+              {t("landing.heroTitlePart2")}
+            </span>
+          </h1>
+
+          <p className="mt-7 text-base text-gray-600 leading-relaxed max-w-xs mx-auto">
+            {t("landing.heroSubtitle")}
+          </p>
+
+          <div className="mt-9 flex items-center justify-center gap-3">
+            <Link href="/signup">
+              <Button
+                className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-12 text-base font-medium shadow-sm"
+                data-testid="button-get-started"
+              >
+                {t("landing.getStarted")}
+              </Button>
+            </Link>
             <Link href="/login">
               <Button
                 variant="outline"
-                className="border-green-600 text-green-600 hover:bg-green-50"
+                className="rounded-full bg-white border-gray-200 text-gray-900 hover:bg-gray-50 px-8 h-12 text-base font-medium shadow-sm"
+                data-testid="button-sign-in"
               >
                 {t("landing.signIn")}
               </Button>
             </Link>
+          </div>
+
+          <p className="mt-6 text-sm text-gray-500">
+            {t("landing.heroCaption")}
+          </p>
+        </section>
+
+        {/* Why people use Receiptify */}
+        <section className="mt-20">
+          <h2 className="text-3xl font-bold text-center text-gray-900 leading-tight tracking-tight">
+            {t("landing.whyTitle")}
+          </h2>
+          <div className="mt-7 bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-gray-100 p-7 space-y-5">
+            {benefits.map((benefit, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3"
+                data-testid={`benefit-${i + 1}`}
+              >
+                <div className="shrink-0 w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center mt-0.5">
+                  <Check
+                    className="w-4 h-4 text-emerald-600"
+                    strokeWidth={3}
+                  />
+                </div>
+                <span className="text-[15px] text-gray-800 leading-snug pt-0.5">
+                  {benefit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section className="mt-20">
+          <h2 className="text-3xl font-bold text-center text-gray-900 tracking-tight">
+            {t("landing.howTitle")}
+          </h2>
+
+          <div className="mt-7 space-y-4">
+            {steps.map((step, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-gray-100 p-6"
+                data-testid={`step-${i + 1}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-emerald-200 text-emerald-700 flex items-center justify-center text-sm font-semibold">
+                    {i + 1}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                    {step}
+                  </h3>
+                </div>
+                <PhoneMockup variant={(i + 1) as 1 | 2 | 3} />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-center">
             <Link href="/signup">
-              <Button className="bg-green-600 hover:bg-green-700">
+              <Button
+                className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-14 h-14 text-base font-medium shadow-md"
+                data-testid="button-get-started-bottom"
+              >
                 {t("landing.getStarted")}
               </Button>
             </Link>
-            <Link href="/test-auth">
-              <Button variant="outline" size="sm" className="text-xs">
-                Test Auth
-              </Button>
-            </Link>
           </div>
-        </div>
-      </header>
+        </section>
 
-      {/* Language selector (above hero) */}
-      <div className="px-6 mt-6 max-w-4xl mx-auto flex justify-center">
-        <label htmlFor="lang-select" className="sr-only">
-          Language
-        </label>
-        <select
-          id="lang-select"
-          value={selectedLanguage}
-          onChange={(e) => handleLanguageChange(e.target.value)}
-          className="rounded-md border-2 border-gray-300 px-3 py-2 text-sm bg-white"
-          aria-label="Select language"
-        >
-          <option value="en">English</option>
-          <option value="fr">Français</option>
-          <option value="es">Español</option>
-          <option value="de">Deutsch</option>
-        </select>
+        {/* Language selector + footer */}
+        <footer className="mt-16 flex flex-col items-center gap-3">
+          <select
+            id="lang-select"
+            value={selectedLanguage}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-gray-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            aria-label="Select language"
+            data-testid="language-selector"
+          >
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
+            <option value="ja">日本語</option>
+            <option value="zh">中文</option>
+            <option value="ar">العربية</option>
+            <option value="hi">हिन्दी</option>
+          </select>
+          <p className="text-xs text-gray-400">
+            © 2026 {t("app.title")}
+          </p>
+        </footer>
       </div>
-
-      {/* Hero Section */}
-      <section className="px-6 py-16 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            {t("landing.heroTitle")}{" "}
-            <span className="text-green-600">{t("landing.heroHighlight")}</span>
-          </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            {t("landing.heroDescription")}
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/signup">
-              <Button
-                size="lg"
-                className="bg-green-600 hover:bg-green-700 px-8 py-4 text-lg"
-              >
-                {t("landing.startFreeTrial")}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section - Commented out per user request
-      <section className="px-6 py-16 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <h3 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Everything you need to go paperless
-          </h3>
-          
-          <div className="space-y-4 mb-8">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <QrCode className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Instant QR Scanning</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  Scan any receipt QR code with your camera. Instantly capture transaction details from Square, Tesco, and more.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <Smartphone className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Smart Organisation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  Automatic categorization, expense tracking, and receipt splitting. Your receipts organised intelligently.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <Leaf className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Eco Impact Tracking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  See your environmental impact. Track papers saved, CO₂ reduced, and trees protected by going digital.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Expense Analytics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  Detailed spending insights, subscription tracking, and budget management tools to control your finances.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <Users className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Bill Splitting</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  Split receipts with friends instantly. Generate payment links and track who owes what with ease.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <ShieldCheck className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <CardTitle className="text-xl">Warranty Tracking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-center">
-                  Never lose a warranty again. Track expiry dates, get reminders, and manage all your product warranties.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-      */}
-
-      {/* Stats Section */}
-      <img
-        src={happyCustomerImg}
-        alt="Happy customer using Receiptify"
-        className="xl shadow-lg mx-auto max-w-md w-full"
-      />
-      <section className="px-6 py-16 bg-green-600 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-3xl font-bold mb">{t("landing.statsTitle")}</h3>
-          <div className="grid md:grid-cols-3 gap"></div>
-          <div className="mt"></div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="px-6 py-16 text-center">
-        <div className="max-w-3xl mx-auto">
-          <h3 className="text-3xl font-bold text-gray-900 mb-6">
-            {t("landing.ctaTitle")}
-          </h3>
-          <p className="text-xl text-gray-600 mb-8">
-            {t("landing.ctaDescription")}
-          </p>
-          <Link href="/signup">
-            <Button
-              size="lg"
-              className="bg-green-600 hover:bg-green-700 px-12 py-4 text-lg"
-            >
-              {t("landing.startYourFreeTrial")}
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="px-6 py-8 bg-gray-900 text-white">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Leaf className="w-6 h-6 text-green-400" />
-            <span className="text-xl font-bold">{t("app.title")}</span>
-          </div>
-          <p className="text-gray-400">{t("landing.footerTagline")} © 2025</p>
-        </div>
-      </footer>
-
-      {/* Demo Video Modal */}
-      <Dialog open={showDemoModal} onOpenChange={setShowDemoModal}>
-        <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Leaf className="w-5 h-5 text-green-600" />
-              {t("app.title")} - {t("landing.watchDemo")}
-            </DialogTitle>
-            <DialogDescription className="sr-only">
-              {t("landing.heroDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-4">
-            <video
-              src={demoVideo}
-              controls
-              autoPlay
-              className="w-full rounded-lg"
-              data-testid="demo-video"
-            >
-              Your browser does not support the video tag.
-            </video>
-            <div className="mt-4 text-center">
-              <p className="text-gray-600 mb-4">
-                {t("landing.heroDescription")}
-              </p>
-              <Link href="/signup">
-                <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setShowDemoModal(false)}
-                  data-testid="button-get-started-modal"
-                >
-                  {t("landing.getStarted")}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
