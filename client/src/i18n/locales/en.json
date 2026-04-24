@@ -58,7 +58,27 @@
     "howStep3": "Search, track, and manage purchases",
     "finalCtaTitle": "Start your receipt wallet today",
     "finalCtaBody": "Join thousands taking control of every purchase.",
-    "footerTagline": "Your receipt wallet"
+    "footerTagline": "Your receipt wallet",
+    "navHome": "Home",
+    "navSitemap": "Site map",
+    "faqTitle": "Frequently asked questions",
+    "faqSubtitle": "Everything you might want to know about Receiptify in one place.",
+    "faq1Q": "What is Receiptify?",
+    "faq1A": "Receiptify is the UK's digital receipt wallet. It captures every purchase from any retailer — paper or email — and uses on-device AI plus Google Gemini OCR to automatically extract the merchant, date, total, currency, line items and category, so you can see and act on what you actually spend without any manual entry.",
+    "faq2Q": "How does Receiptify capture my receipts?",
+    "faq2A": "Three ways. (1) Snap a paper receipt with the in-app camera. (2) Upload a photo or PDF file. (3) Forward an email receipt to your personal Receiptify inbox address. Whichever route you use, the same AI extractor reads the receipt and adds it to your wallet.",
+    "faq3Q": "Is Receiptify free?",
+    "faq3A": "Yes. Receiptify is free for individual UK users.",
+    "faq4Q": "Does Receiptify support multiple currencies?",
+    "faq4A": "Yes. Receipts in any currency are accepted. Receiptify snapshots the daily exchange rate at the time of capture and converts each receipt to GBP automatically, so your spending insights are always in your local currency.",
+    "faq5Q": "Can I track warranties and split bills?",
+    "faq5A": "Yes. Add a warranty length to any receipt and Receiptify calculates the expiry date and shows you active, expiring and expired warranties at a glance. To split a bill, pick which line items belong to whom, send a payment link, and track who has paid.",
+    "faq6Q": "Which languages does Receiptify support?",
+    "faq6A": "Ten: English, French, Spanish, German, Italian, Portuguese, Japanese, Chinese, Arabic and Hindi. Receipts in any language are read and normalised."
+  },
+  "seo": {
+    "landingTitle": "Receiptify — Your digital receipt wallet | Track UK spending automatically",
+    "landingDescription": "Receiptify is the UK's digital receipt wallet. Snap, email or import receipts from any retailer and we organise merchant, date, amount, currency and category automatically — so you can see and act on what you actually spend."
   },
   "nav": {
     "scan": "Scan",

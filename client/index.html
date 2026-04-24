@@ -1,11 +1,145 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#059669" />
+    <meta name="color-scheme" content="light" />
+
+    <title>Receiptify — Your digital receipt wallet | Track UK spending automatically</title>
+    <meta
+      name="description"
+      content="Receiptify is the UK's digital receipt wallet. Snap, email or import receipts from any retailer and we organise merchant, date, amount, currency and category automatically — so you can see and act on what you actually spend."
+    />
+    <meta name="keywords" content="digital receipt wallet, receipt scanner UK, expense tracker, receipt management app, OCR receipt scanner, spending tracker, paperless receipts, Receiptify" />
+    <meta name="author" content="Receiptify" />
+    <meta name="application-name" content="Receiptify" />
+    <meta name="generator" content="Receiptify" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <link rel="canonical" href="https://www.receiptify.co.uk/" />
+    <link rel="alternate" hreflang="en-GB" href="https://www.receiptify.co.uk/" />
+    <link rel="alternate" hreflang="en" href="https://www.receiptify.co.uk/" />
+    <link rel="alternate" hreflang="x-default" href="https://www.receiptify.co.uk/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Receiptify" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:title" content="Receiptify — Your digital receipt wallet" />
+    <meta
+      property="og:description"
+      content="Snap, email or import any UK receipt. Receiptify reads merchant, date, amount, currency and category automatically — so you can see and act on what you actually spend."
+    />
+    <meta property="og:url" content="https://www.receiptify.co.uk/" />
+    <meta property="og:image" content="https://www.receiptify.co.uk/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Receiptify — your digital receipt wallet" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Receiptify — Your digital receipt wallet" />
+    <meta
+      name="twitter:description"
+      content="Snap, email or import any UK receipt. Receiptify reads merchant, date, amount, currency and category automatically."
+    />
+    <meta name="twitter:image" content="https://www.receiptify.co.uk/og-image.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Preconnect to commonly-used third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Sitemap discovery (some crawlers honour this) -->
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- Structured data: Organization -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Receiptify",
+        "alternateName": "Receiptify UK",
+        "url": "https://www.receiptify.co.uk/",
+        "logo": "https://www.receiptify.co.uk/favicon.png",
+        "description": "Receiptify is the UK's digital receipt wallet. Capture, organise and analyse every purchase from any retailer — automatically.",
+        "areaServed": "GB",
+        "foundingDate": "2025",
+        "sameAs": []
+      }
+    </script>
+
+    <!-- Structured data: WebSite (with site search action) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Receiptify",
+        "url": "https://www.receiptify.co.uk/",
+        "inLanguage": ["en-GB", "en"],
+        "publisher": { "@type": "Organization", "name": "Receiptify" }
+      }
+    </script>
+
+    <!-- Structured data: SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Receiptify",
+        "applicationCategory": "FinanceApplication",
+        "applicationSubCategory": "ReceiptManagement",
+        "operatingSystem": "Web, iOS, Android",
+        "url": "https://www.receiptify.co.uk/",
+        "description": "Digital receipt wallet that captures receipts from any retailer and organises merchant, date, amount, currency and category automatically.",
+        "inLanguage": ["en-GB", "en", "fr", "es", "de", "it", "pt", "ja", "zh", "ar", "hi"],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "GBP",
+          "availability": "https://schema.org/InStock"
+        },
+        "featureList": [
+          "Snap receipts with the camera",
+          "Forward email receipts to a personal Receiptify inbox",
+          "Automatic merchant, date, amount, currency and category extraction",
+          "Multi-currency conversion to GBP",
+          "Spending insights and category breakdowns",
+          "Loyalty card management",
+          "Warranty tracking",
+          "Subscription detection",
+          "Receipt splitting and shared payments"
+        ]
+      }
+    </script>
   </head>
   <body>
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[1000] focus:rounded-md focus:bg-emerald-700 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
+    >
+      Skip to main content
+    </a>
     <div id="root"></div>
+    <noscript>
+      <div style="padding:24px;font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;color:#111">
+        <h1 style="font-size:24px;margin:0 0 12px">Receiptify — your digital receipt wallet</h1>
+        <p style="font-size:15px;line-height:1.5;color:#374151">
+          Receiptify captures, organises and analyses every receipt from any UK retailer.
+          This app needs JavaScript to run. Please enable JavaScript and reload the page,
+          or visit our
+          <a href="/sitemap" style="color:#047857;text-decoration:underline">site map</a>
+          to browse available pages.
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>

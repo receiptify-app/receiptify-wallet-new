@@ -13,6 +13,7 @@ import {
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import logoPath from "@assets/R_logo_1777038726271.png";
+import { Seo } from "@/components/seo";
 
 /* ----------------------------- Helper components --------------------------- */
 
@@ -266,7 +267,33 @@ export default function Landing() {
     t("landing.insightsBullet3"),
   ];
 
+  const faqItems = [
+    { q: t("landing.faq1Q"), a: t("landing.faq1A") },
+    { q: t("landing.faq2Q"), a: t("landing.faq2A") },
+    { q: t("landing.faq3Q"), a: t("landing.faq3A") },
+    { q: t("landing.faq4Q"), a: t("landing.faq4A") },
+    { q: t("landing.faq5Q"), a: t("landing.faq5A") },
+    { q: t("landing.faq6Q"), a: t("landing.faq6A") },
+  ];
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqItems.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
   return (
+    <>
+      <Seo
+        title={t("seo.landingTitle")}
+        description={t("seo.landingDescription")}
+        path="/"
+        jsonLd={faqJsonLd}
+      />
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-green-50/40 to-white font-sans antialiased">
       {/* Sticky pill nav */}
       <nav className="sticky top-3 z-50 px-3 sm:px-6">
@@ -326,7 +353,7 @@ export default function Landing() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-6xl px-6">
+      <main id="main-content" className="mx-auto max-w-6xl px-6">
         {/* HERO */}
         <section className="pt-12 sm:pt-20 pb-16 sm:pb-24 grid lg:grid-cols-2 gap-12 items-center">
           <div className="text-center lg:text-left">
@@ -567,6 +594,43 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* FAQ — GEO-friendly Q&A with FAQPage JSON-LD */}
+        <section id="faq" className="py-14 sm:py-20">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+              {t("landing.faqTitle")}
+            </h2>
+            <p className="mt-4 text-base sm:text-lg text-gray-600">
+              {t("landing.faqSubtitle")}
+            </p>
+          </div>
+          <div className="mt-10 mx-auto max-w-3xl divide-y divide-gray-100 bg-white rounded-3xl border border-gray-100 shadow-[0_4px_24px_rgba(0,0,0,0.05)]">
+            {faqItems.map((item, i) => (
+              <details
+                key={i}
+                className="group p-6 sm:p-7"
+                data-testid={`faq-${i + 1}`}
+                {...(i === 0 ? { open: true } : {})}
+              >
+                <summary className="flex items-start justify-between gap-4 cursor-pointer list-none">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
+                    {item.q}
+                  </h3>
+                  <span
+                    aria-hidden
+                    className="shrink-0 mt-1 w-6 h-6 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm font-bold transition-transform group-open:rotate-45"
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm sm:text-[15px] text-gray-600 leading-relaxed">
+                  {item.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         {/* FINAL CTA */}
         <section className="py-14 sm:py-20">
           <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-500 to-emerald-700 px-8 py-14 sm:px-14 sm:py-20 text-center text-white shadow-[0_30px_60px_-20px_rgba(16,185,129,0.55)]">
@@ -627,9 +691,36 @@ export default function Landing() {
           <p className="text-xs text-gray-400">
             © 2026 {t("app.title")} · {t("landing.footerTagline")}
           </p>
+          <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500">
+            <Link href="/" className="hover:text-emerald-700" data-testid="footer-home">
+              {t("landing.navHome")}
+            </Link>
+            <a href="#product" className="hover:text-emerald-700">
+              {t("landing.navProduct")}
+            </a>
+            <a href="#how" className="hover:text-emerald-700">
+              {t("landing.navHowItWorks")}
+            </a>
+            <a href="#why" className="hover:text-emerald-700">
+              {t("landing.navWhy")}
+            </a>
+            <a href="#faq" className="hover:text-emerald-700">
+              {t("landing.faqTitle")}
+            </a>
+            <Link href="/sitemap" className="hover:text-emerald-700" data-testid="footer-sitemap">
+              {t("landing.navSitemap")}
+            </Link>
+            <Link href="/login" className="hover:text-emerald-700" data-testid="footer-signin">
+              {t("landing.signIn")}
+            </Link>
+            <Link href="/signup" className="hover:text-emerald-700" data-testid="footer-signup">
+              {t("landing.getStarted")}
+            </Link>
+          </nav>
         </footer>
       </main>
     </div>
+    </>
   );
 }
 

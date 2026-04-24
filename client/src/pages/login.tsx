@@ -11,6 +11,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { useTranslation } from 'react-i18next';
+import { Seo } from "@/components/seo";
 
 interface LoginForm {
   email: string;
@@ -90,6 +91,13 @@ export default function Login() {
   };
 
   return (
+    <>
+      <Seo
+        title="Sign in to Receiptify — Your digital receipt wallet"
+        description="Sign in to your Receiptify account to access your digital receipt wallet, spending insights, loyalty cards, warranties and exports."
+        path="/login"
+        robots="noindex,follow"
+      />
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4">
@@ -213,5 +221,6 @@ export default function Login() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

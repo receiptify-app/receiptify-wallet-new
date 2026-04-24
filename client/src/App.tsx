@@ -29,6 +29,7 @@ import ExportReceiptsPage from "@/pages/exports";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import VerifyEmail from "@/pages/verify-email";
+import SitemapPage from "@/pages/sitemap";
 
 function UserSync() {
   const { currentUser } = useAuth();
@@ -63,6 +64,7 @@ function AuthenticatedRouter() {
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
         <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/sitemap" component={SitemapPage} />
         <Route path="/test-auth" component={TestAuth} />
         <Route component={Landing} />
       </Switch>

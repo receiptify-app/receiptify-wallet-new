@@ -1,0 +1,87 @@
+# Receiptify
+
+> Receiptify is the UK's digital receipt wallet. It captures every purchase from any retailer (camera scan, photo upload, email forwarding or QR scan) and uses on-device AI plus Google Gemini OCR to automatically extract the merchant, date, total, currency, line items and category — so users see and act on what they actually spend, with no manual entry.
+
+## What it is
+
+- **Product type:** Mobile-first web application (also available on iOS and Android web).
+- **Audience:** Consumers in the United Kingdom; multilingual interface (English (en-GB), French, Spanish, German, Italian, Portuguese, Japanese, Chinese, Arabic, Hindi).
+- **Primary domain:** https://www.receiptify.co.uk/
+- **Slogan:** "Your receipt wallet — store, track, return stress-free."
+
+## Core value propositions
+
+1. **One place for everything you buy.** Cards, cash, PayPal, Apple Pay, Google Pay, in-store, online, abroad — every receipt in one searchable wallet.
+2. **No manual entry.** AI reads each receipt and pulls out merchant, date, amount, currency, category and line items automatically.
+3. **Spending you can act on.** Monthly totals, category breakdowns and month-over-month comparisons in plain numbers, in your local currency (GBP by default with multi-currency conversion).
+4. **Built for the UK.** GBP-first, supports HMRC-friendly VAT line capture, recognises UK retailers (Tesco, Sainsbury's, Waitrose, Shell, Pret a Manger, Amazon UK and many more).
+5. **Multilingual.** Full UI in 10 languages; receipts in any language are read and normalised.
+
+## Key features
+
+- **Smart capture:** Camera scan, file upload, QR codes, and a personal email-forwarding inbox so retailers can send receipts directly.
+- **AI extraction:** Google Gemini powered OCR with structured JSON output; Tesseract OCR fallback for redundancy.
+- **Currency conversion:** Daily exchange rates snapshotted onto each receipt at the time of capture (Frankfurter API).
+- **Insights dashboard:** Monthly spend, category breakdown, merchant trends, month-over-month comparison.
+- **Loyalty cards:** Store and surface major UK retailer loyalty cards alongside their receipts.
+- **Warranty tracker:** Add warranty length to any receipt; expiry dates are auto-calculated; status (active / expiring / expired) is tracked automatically.
+- **Subscription detection:** Recurring purchases are detected from your receipts; pause or cancel from inside the app.
+- **Receipt splitting:** Pick which line items belong to whom, send a payment link, and track who has paid.
+- **Map view:** See where your receipts came from on an interactive map.
+- **Exports:** Download all receipts as CSV / PDF for accounting or HMRC submission.
+- **Authentication:** Firebase Auth with Google sign-in and email/password (with email verification).
+
+## Common use cases
+
+- Replacing a shoebox or photo roll of receipts with a searchable wallet.
+- Tracking household spending across multiple cards and payment methods in one place.
+- Preparing a self-employed VAT or expense return.
+- Reconciling shared bills with friends or family.
+- Keeping warranty proof-of-purchase for electronics, appliances and furniture.
+- Detecting unwanted recurring subscriptions from on-card purchases.
+
+## Pricing
+
+Receiptify is free to use for individual consumers.
+
+## Important pages
+
+- [Home / overview](https://www.receiptify.co.uk/): Product overview, features, FAQ.
+- [Sign up](https://www.receiptify.co.uk/signup): Create a Receiptify account.
+- [Sign in](https://www.receiptify.co.uk/login): Sign in with Google or email.
+- [Site map](https://www.receiptify.co.uk/sitemap): Browse every public page.
+
+## Frequently asked questions
+
+**What is Receiptify?**
+Receiptify is a UK-focused digital receipt wallet that captures every purchase from any retailer and organises merchant, date, amount, currency and category automatically using AI.
+
+**Is Receiptify free?**
+Yes, Receiptify is free for individual users.
+
+**Which countries is Receiptify available in?**
+Receiptify is built for the United Kingdom (GBP-first), but the app reads receipts in any currency and converts them to GBP automatically, so it works internationally too.
+
+**How does Receiptify capture my receipts?**
+Three ways: (1) snap a photo with the in-app camera, (2) upload a photo or PDF file, or (3) forward an email receipt to your personal Receiptify inbox address.
+
+**Does Receiptify read paper receipts as well as email receipts?**
+Yes. Both paper receipts (via the camera) and email receipts (via forwarding) are processed by the same AI extractor.
+
+**What data does Receiptify extract from a receipt?**
+Merchant name, transaction date, total amount, currency, payment method, individual line items, VAT where shown, and an automatic category (e.g. groceries, fuel, dining, transport).
+
+**Can I track warranties with Receiptify?**
+Yes. Add a warranty length to any receipt and Receiptify calculates the expiry date and surfaces active, expiring and expired warranties.
+
+**Can I split a bill with friends?**
+Yes. You can pick the line items for each person, generate a payment link and track who has paid.
+
+**Does Receiptify support multiple currencies?**
+Yes. Receipts in any currency are accepted and converted to GBP using the daily exchange rate at the time of capture.
+
+**Which languages does Receiptify support?**
+English, French, Spanish, German, Italian, Portuguese, Japanese, Chinese, Arabic and Hindi.
+
+**Is my data private?**
+Receipts are stored in your account and are not sold. Authentication is handled by Firebase. Sensitive data is never shared with third parties for advertising.

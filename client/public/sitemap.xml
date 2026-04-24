@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sitemap intentionally lists indexable, public, evergreen URLs only.
+  /login, /signup, /forgot-password, /verify-email are noindex auth
+  pages and are deliberately excluded — they are also linked from the
+  HTML site map at /sitemap for human discoverability.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://www.receiptify.co.uk/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en-GB" href="https://www.receiptify.co.uk/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.receiptify.co.uk/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.receiptify.co.uk/" />
+  </url>
+  <url>
+    <loc>https://www.receiptify.co.uk/sitemap</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+</urlset>

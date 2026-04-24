@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Mail, RefreshCw, LogOut } from "lucide-react";
 import logoPath from "@assets/R_logo_1777038726271.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { Seo } from "@/components/seo";
 
 export default function VerifyEmail() {
   const { currentUser, logout, resendVerificationEmail } = useAuth();
@@ -43,6 +44,13 @@ export default function VerifyEmail() {
   };
 
   return (
+    <>
+      <Seo
+        title="Verify your email — Receiptify"
+        description="Confirm your email address to activate your Receiptify account and start using your digital receipt wallet."
+        path="/verify-email"
+        robots="noindex,follow"
+      />
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <Card className="shadow-xl border-0">
@@ -130,5 +138,6 @@ export default function VerifyEmail() {
         </Card>
       </div>
     </div>
+    </>
   );
 }

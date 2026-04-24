@@ -20,6 +20,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { useTranslation } from 'react-i18next';
+import { Seo } from "@/components/seo";
 
 interface SignupForm {
   name: string;
@@ -156,6 +157,13 @@ export default function Signup() {
   };
 
   return (
+    <>
+      <Seo
+        title="Sign up free — Receiptify | Your digital receipt wallet"
+        description="Create a free Receiptify account and start storing every receipt in one place. Snap, email or import — Receiptify reads merchant, date, amount, currency and category automatically."
+        path="/signup"
+        robots="noindex,follow"
+      />
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Link href="/">
@@ -435,5 +443,6 @@ export default function Signup() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

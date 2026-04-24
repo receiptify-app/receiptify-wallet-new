@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { useTranslation } from 'react-i18next';
+import { Seo } from "@/components/seo";
 
 interface ForgotPasswordForm {
   email: string;
@@ -36,6 +37,13 @@ export default function ForgotPassword() {
 
   if (emailSent) {
     return (
+      <>
+        <Seo
+          title="Check your email — Receiptify password reset"
+          description="A password reset link has been sent to your email address. Open the link to set a new password for your Receiptify account."
+          path="/forgot-password"
+          robots="noindex,follow"
+        />
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-xl border-0">
           <CardHeader className="text-center space-y-4">
@@ -69,10 +77,18 @@ export default function ForgotPassword() {
           </CardContent>
         </Card>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+      <Seo
+        title="Reset your Receiptify password"
+        description="Forgotten your Receiptify password? Enter your email address and we'll send you a secure link to reset it."
+        path="/forgot-password"
+        robots="noindex,follow"
+      />
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4">
@@ -141,5 +157,6 @@ export default function ForgotPassword() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }
