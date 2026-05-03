@@ -128,6 +128,26 @@ export default {
           "0%, 100%": { transform: "scale(1)" },
           "40%": { transform: "scale(1.08)" },
         },
+        "scale-in": {
+          from: { opacity: "0", transform: "translate(-50%, -50%) scale(0.85)" },
+          to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+        },
+        "fly-in-left": {
+          from: { opacity: "0", transform: "translateX(-24px) scale(0.9)" },
+          to: { opacity: "1", transform: "translateX(0) scale(1)" },
+        },
+        "fly-in-right": {
+          from: { opacity: "0", transform: "translateX(24px) scale(0.9)" },
+          to: { opacity: "1", transform: "translateX(0) scale(1)" },
+        },
+        "drift-y": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-6px)" },
+        },
+        "total-flash": {
+          "0%, 100%": { backgroundColor: "transparent" },
+          "50%": { backgroundColor: "rgba(16,185,129,0.10)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -140,6 +160,11 @@ export default {
         "halo-pulse": "halo-pulse 5s ease-in-out infinite",
         "slide-in-right": "slide-in-right 0.6s cubic-bezier(0.22,1,0.36,1) both",
         "count-tick": "count-tick 2.4s ease-in-out infinite",
+        "scale-in": "scale-in 0.7s cubic-bezier(0.22,1,0.36,1) both",
+        "fly-in-left": "fly-in-left 0.7s cubic-bezier(0.22,1,0.36,1) both",
+        "fly-in-right": "fly-in-right 0.7s cubic-bezier(0.22,1,0.36,1) both",
+        "drift-y": "drift-y 5s ease-in-out infinite",
+        "total-flash": "total-flash 3s ease-in-out infinite",
       },
     },
   },

@@ -105,8 +105,13 @@ function HeroPhone() {
 function AnnotatedReceipt({ t }: { t: (k: string) => string }) {
   return (
     <div className="relative mx-auto w-full max-w-[420px] aspect-square">
+      {/* Soft halo behind receipt */}
+      <div
+        aria-hidden
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[230px] h-[260px] -z-10 rounded-3xl bg-emerald-200/30 blur-2xl motion-safe:animate-halo-pulse"
+      />
       {/* Receipt paper */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] sm:w-[200px] rounded-xl bg-white shadow-[0_30px_60px_-20px_rgba(16,185,129,0.35)] border border-gray-100 overflow-hidden">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] sm:w-[200px] rounded-xl bg-white shadow-[0_30px_60px_-20px_rgba(16,185,129,0.35)] border border-gray-100 overflow-hidden motion-safe:animate-scale-in">
         <div className="px-4 pt-4 pb-3 text-center border-b border-dashed border-gray-200">
           <p className="text-[11px] font-bold tracking-wider text-gray-900">
             TESCO EXPRESS
@@ -122,17 +127,18 @@ function AnnotatedReceipt({ t }: { t: (k: string) => string }) {
             ["Bananas 1kg", "£1.40"],
             ["Olive oil 500ml", "£6.99"],
             ["Espresso beans", "£10.71"],
-          ].map(([n, v]) => (
+          ].map(([n, v], i) => (
             <div
               key={n}
-              className="flex items-center justify-between text-[9px] text-gray-700"
+              className="flex items-center justify-between text-[9px] text-gray-700 motion-safe:animate-fade-up"
+              style={{ animationDelay: `${0.5 + i * 0.12}s` }}
             >
               <span>{n}</span>
               <span className="font-medium">{v}</span>
             </div>
           ))}
         </div>
-        <div className="px-4 py-2 border-t border-dashed border-gray-200 flex items-center justify-between text-[10px] font-bold">
+        <div className="px-4 py-2 border-t border-dashed border-gray-200 flex items-center justify-between text-[10px] font-bold motion-safe:animate-total-flash">
           <span>TOTAL</span>
           <span>£24.80</span>
         </div>
@@ -141,31 +147,41 @@ function AnnotatedReceipt({ t }: { t: (k: string) => string }) {
         </div>
       </div>
 
-      {/* Callout pills */}
+      {/* Callout pills — fly in from their side, then gently drift */}
       <Callout
         label={t("landing.captureField1")}
         className="left-2 top-12"
         align="right"
+        delay={0.2}
+        from="left"
       />
       <Callout
         label={t("landing.captureField2")}
         className="right-2 top-6"
         align="left"
+        delay={0.35}
+        from="right"
       />
       <Callout
         label={t("landing.captureField4")}
         className="left-0 top-1/2"
         align="right"
+        delay={0.5}
+        from="left"
       />
       <Callout
         label={t("landing.captureField3")}
         className="right-0 bottom-16"
         align="left"
+        delay={0.65}
+        from="right"
       />
       <Callout
         label={t("landing.captureField5")}
         className="left-4 bottom-6"
         align="right"
+        delay={0.8}
+        from="left"
       />
     </div>
   );
@@ -175,22 +191,36 @@ function Callout({
   label,
   className = "",
   align = "left",
+  delay = 0,
+  from = "left",
 }: {
   label: string;
   className?: string;
   align?: "left" | "right";
+  delay?: number;
+  from?: "left" | "right";
 }) {
+  const flyIn =
+    from === "left"
+      ? "motion-safe:animate-fly-in-left"
+      : "motion-safe:animate-fly-in-right";
   return (
     <div
-      className={`absolute inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[10px] font-bold tracking-wider text-emerald-700 shadow-md ${className}`}
+      className={`absolute ${className} ${flyIn}`}
+      style={{ animationDelay: `${delay}s` }}
     >
-      {align === "right" && (
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-      )}
-      <span>{label}</span>
-      {align === "left" && (
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-      )}
+      <div
+        className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[10px] font-bold tracking-wider text-emerald-700 shadow-md motion-safe:animate-drift-y"
+        style={{ animationDelay: `${delay + 0.7}s` }}
+      >
+        {align === "right" && (
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-eco-pulse" />
+        )}
+        <span>{label}</span>
+        {align === "left" && (
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-eco-pulse" />
+        )}
+      </div>
     </div>
   );
 }
