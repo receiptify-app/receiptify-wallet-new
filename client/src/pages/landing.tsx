@@ -34,11 +34,11 @@ function HeroPhone() {
     { name: "Amazon", cat: "Shopping", amount: "£36.99" },
   ];
   return (
-    <div className="relative mx-auto w-[260px] sm:w-[280px]">
+    <div className="relative mx-auto w-[260px] sm:w-[280px] motion-safe:animate-float">
       {/* Soft halo */}
       <div
         aria-hidden
-        className="absolute -inset-6 -z-10 rounded-[3rem] bg-emerald-200/40 blur-2xl"
+        className="absolute -inset-6 -z-10 rounded-[3rem] bg-emerald-200/40 blur-2xl motion-safe:animate-halo-pulse"
       />
       {/* Phone */}
       <div className="rounded-[2.4rem] bg-gray-900 p-2 shadow-[0_30px_60px_-20px_rgba(16,185,129,0.35)]">
@@ -58,7 +58,7 @@ function HeroPhone() {
               />
             </div>
             <p className="text-[10px] text-gray-500">This month</p>
-            <p className="text-2xl font-bold text-gray-900 tracking-tight">
+            <p className="text-2xl font-bold text-gray-900 tracking-tight motion-safe:animate-count-tick origin-left">
               £342.18
             </p>
             <div className="mt-2 flex items-center gap-1">
@@ -72,14 +72,15 @@ function HeroPhone() {
           </div>
           {/* Receipts list */}
           <div className="px-3 pb-4 space-y-2">
-            {items.map((it) => (
+            {items.map((it, i) => (
               <div
                 key={it.name}
-                className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2"
+                className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 motion-safe:animate-slide-in-right"
+                style={{ animationDelay: `${0.6 + i * 0.18}s` }}
               >
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 motion-safe:animate-eco-pulse" />
                   </div>
                   <div className="leading-tight">
                     <p className="text-[11px] font-semibold text-gray-900">
@@ -357,23 +358,37 @@ export default function Landing() {
         {/* HERO */}
         <section className="pt-12 sm:pt-20 pb-16 sm:pb-24 grid lg:grid-cols-2 gap-12 items-center">
           <div className="text-center lg:text-left">
-            <Pill>{t("landing.heroBadge")}</Pill>
+            <div className="motion-safe:animate-fade-up" style={{ animationDelay: "0.05s" }}>
+              <Pill>{t("landing.heroBadge")}</Pill>
+            </div>
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.4rem] leading-[1.05] font-bold tracking-tight text-gray-900">
-              <span className="block">{t("landing.heroTitlePart1")}</span>
               <span
-                className="block text-emerald-600 mt-1"
+                className="block motion-safe:animate-fade-up"
+                style={{ animationDelay: "0.15s" }}
+              >
+                {t("landing.heroTitlePart1")}
+              </span>
+              <span
+                className="block text-emerald-600 mt-1 motion-safe:animate-fade-up"
+                style={{ animationDelay: "0.3s" }}
                 data-testid="hero-highlight"
               >
                 {t("landing.heroTitlePart2")}
               </span>
             </h1>
-            <p className="mt-5 text-base sm:text-lg text-gray-600 leading-relaxed max-w-md mx-auto md:mx-0">
+            <p
+              className="mt-5 text-base sm:text-lg text-gray-600 leading-relaxed max-w-md mx-auto md:mx-0 motion-safe:animate-fade-up"
+              style={{ animationDelay: "0.45s" }}
+            >
               {t("landing.heroSubtitle")}
             </p>
-            <div className="mt-8 flex items-center justify-center md:justify-start gap-3">
+            <div
+              className="mt-8 flex items-center justify-center md:justify-start gap-3 motion-safe:animate-fade-up"
+              style={{ animationDelay: "0.6s" }}
+            >
               <Link href="/signup">
                 <Button
-                  className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-12 text-base font-medium shadow-sm"
+                  className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-12 text-base font-medium shadow-sm transition-transform duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md"
                   data-testid="button-get-started"
                 >
                   {t("landing.getStarted")}
@@ -382,19 +397,25 @@ export default function Landing() {
               <Link href="/login">
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white border-gray-200 text-gray-900 hover:bg-gray-50 px-8 h-12 text-base font-medium shadow-sm"
+                  className="rounded-full bg-white border-gray-200 text-gray-900 hover:bg-gray-50 px-8 h-12 text-base font-medium shadow-sm transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
                   data-testid="button-sign-in"
                 >
                   {t("landing.signIn")}
                 </Button>
               </Link>
             </div>
-            <p className="mt-6 text-sm text-gray-500 text-center md:text-left">
+            <p
+              className="mt-6 text-sm text-gray-500 text-center md:text-left motion-safe:animate-fade-up"
+              style={{ animationDelay: "0.75s" }}
+            >
               {t("landing.heroCaption")}
             </p>
           </div>
 
-          <div className="flex justify-center md:justify-end">
+          <div
+            className="flex justify-center md:justify-end motion-safe:animate-fade-in-soft"
+            style={{ animationDelay: "0.2s" }}
+          >
             <HeroPhone />
           </div>
         </section>
