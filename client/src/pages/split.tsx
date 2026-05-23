@@ -1,9 +1,22 @@
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, FolderOpen, Receipt as ReceiptIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Users, FolderOpen, Receipt as ReceiptIcon, Plus } from "lucide-react";
 import AppHeader from "@/components/app-header";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type FolderSummary = {
   id: string;
@@ -23,17 +36,58 @@ function initials(name?: string | null) {
 }
 
 export default function SplitPage() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
   const { data: folders, isLoading } = useQuery<FolderSummary[]>({
     queryKey: ["/api/split-folders"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/split-folders", {
+        name: name.trim(),
+        description: description.trim() || null,
+      });
+      const folder = await res.json();
+      return folder.id as string;
+    },
+    onSuccess: (folderId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      setName("");
+      setDescription("");
+      setCreateOpen(false);
+      navigate(`/split/${folderId}`);
+    },
+    onError: (err: any) =>
+      toast({
+        title: "Couldn't create folder",
+        description: err.message,
+        variant: "destructive",
+      }),
   });
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <AppHeader />
       <div className="px-6 py-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Users className="w-6 h-6 text-green-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Split folders</h1>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2">
+            <Users className="w-6 h-6 text-green-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Split folders</h1>
+          </div>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            size="sm"
+            className="bg-green-600 hover:bg-green-700"
+            data-testid="button-new-folder"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            New folder
+          </Button>
         </div>
         <p className="text-sm text-gray-600 mb-6">Group receipts and settle up with friends.</p>
 
@@ -53,11 +107,17 @@ export default function SplitPage() {
               </div>
               <h2 className="text-lg font-semibold text-gray-900">No split folders yet</h2>
               <p className="text-sm text-gray-600">
-                Open any receipt and tap <span className="font-medium">Split</span> to start a folder with friends.
+                Create a folder to start grouping receipts and inviting friends,
+                or open any receipt and tap <span className="font-medium">Split</span>.
               </p>
-              <Link href="/receipts" className="inline-block text-green-600 font-medium underline">
-                Browse receipts
-              </Link>
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-empty-new-folder"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Create your first folder
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -115,6 +175,60 @@ export default function SplitPage() {
           ))}
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-600" />
+              New split folder
+            </DialogTitle>
+            <DialogDescription>
+              Give your folder a name. You can add receipts and invite friends to it next.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="folder-name">Folder name</Label>
+              <Input
+                id="folder-name"
+                placeholder="e.g. Weekend in Brighton"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                data-testid="input-new-folder-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="folder-desc">Description (optional)</Label>
+              <Input
+                id="folder-desc"
+                placeholder="Anything to remember about this trip"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                data-testid="input-new-folder-desc"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => createMutation.mutate()}
+                disabled={!name.trim() || createMutation.isPending}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                data-testid="button-create-new-folder"
+              >
+                {createMutation.isPending ? "Creating…" : "Create folder"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+                disabled={createMutation.isPending}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

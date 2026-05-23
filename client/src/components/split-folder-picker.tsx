@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,6 +85,11 @@ export default function SplitFolderPicker({ open, onOpenChange, receiptId }: Pro
             <Users className="w-5 h-5 text-green-600" />
             {mode === "create" ? "New split folder" : "Add to split folder"}
           </DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? "Name your folder. This receipt will be added to it automatically."
+              : "Choose an existing folder to add this receipt to, or create a new one."}
+          </DialogDescription>
         </DialogHeader>
 
         {mode === "pick" ? (

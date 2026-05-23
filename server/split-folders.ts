@@ -188,12 +188,10 @@ export function registerSplitFolderRoutes(app: Express) {
 
   // --- Create folder ---
   app.post("/api/split-folders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-    console.log("[split-folders] POST create reached, body=", JSON.stringify(req.body), "user=", req.user?.id);
     try {
       const body = createFolderBody.parse(req.body);
       const userId = req.user!.id;
       const folder = await splitFolderStorage.createFolder({ ...body, ownerId: userId });
-      console.log("[split-folders] createFolder returned", folder);
       // Owner is added as an active member so they show up in member lists and assignments.
       await splitFolderStorage.createMember({
         folderId: folder.id,
@@ -203,10 +201,8 @@ export function registerSplitFolderRoutes(app: Express) {
         status: "active",
         role: "owner",
       });
-      console.log("[split-folders] createMember done, responding 201");
       res.status(201).json(folder);
     } catch (err: any) {
-      console.error("[split-folders] POST create FAILED:", err?.message, err?.stack);
       res.status(400).json({ error: err?.message || "Failed to create folder" });
     }
   });
