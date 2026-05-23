@@ -54,3 +54,7 @@ integrations = ["javascript_gemini_ai_integrations:1.0.0", "javascript_object_st
 
 [objectStorage]
 defaultBucketID = "replit-objstore-57b6044f-3b8d-4227-aa11-ab9d390a587c"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
