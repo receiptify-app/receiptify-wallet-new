@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,6 +85,9 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Invite a friend</DialogTitle>
+          <DialogDescription>
+            Send a link, email, or invite by username.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2">
           {[

@@ -22,6 +22,26 @@ function num(n: string | number | null | undefined): number {
   return typeof n === "number" ? n : parseFloat(n);
 }
 
+// Convert a receipt total to GBP using the snapshotted exchange rate.
+// GBP receipts have a null rate so they stay unchanged.
+function totalInGBP(r: { total: string | number; exchangeRateToGBP: string | number | null }): number {
+  const rawTotal = num(r.total);
+  let rate = r.exchangeRateToGBP ? num(r.exchangeRateToGBP) : 1;
+  if (!isFinite(rate)) rate = 1;
+  return rawTotal * rate;
+}
+
+// Convert an item price to GBP using the parent receipt's exchange rate.
+function itemPriceInGBP(
+  item: { price: string | number },
+  receipt: { exchangeRateToGBP: string | number | null },
+): number {
+  const rawPrice = num(item.price);
+  let rate = receipt.exchangeRateToGBP ? num(receipt.exchangeRateToGBP) : 1;
+  if (!isFinite(rate)) rate = 1;
+  return rawPrice * rate;
+}
+
 async function loadFolderForUser(folderId: string, userId: string): Promise<SplitFolder | null> {
   const folder = await splitFolderStorage.getFolder(folderId);
   if (!folder) return null;
@@ -42,7 +62,7 @@ async function buildFolderSummary(folder: SplitFolder) {
     splitFolderStorage.listFolderReceipts(folder.id),
     splitFolderStorage.listAssignments(folder.id),
   ]);
-  const totalAmount = folderReceipts.reduce((s, r) => s + num(r.total), 0);
+  const totalAmount = folderReceipts.reduce((s, r) => s + totalInGBP(r), 0);
   const allSettled =
     assignments.length > 0 && assignments.every((a) => a.status === "paid");
   return {
@@ -161,7 +181,12 @@ async function sendInviteEmail(
 ) {
   const link = `${origin}/split/invite/${inviteToken}`;
   const folderReceipts = await splitFolderStorage.listFolderReceipts(folder.id);
-  const { text, html } = inviteEmailBody(folder.name, inviterName, link, folderReceipts);
+  const receiptsForEmail = folderReceipts.map((r) => ({
+    merchantName: r.merchantName,
+    total: totalInGBP(r),
+    date: r.date,
+  }));
+  const { text, html } = inviteEmailBody(folder.name, inviterName, link, receiptsForEmail);
   return sendEmail({
     to: toEmail,
     subject: `${inviterName} invited you to split a Receiptify folder`,
@@ -262,11 +287,15 @@ export function registerSplitFolderRoutes(app: Express) {
       members: members.map(sanitizeMember),
       receipts: folderReceipts.map((r) => ({
         ...r,
-        items: itemsByReceipt.get(r.id) || [],
+        total: String(totalInGBP(r)),
+        items: (itemsByReceipt.get(r.id) || []).map((item) => ({
+          ...item,
+          price: String(itemPriceInGBP(item, r)),
+        })),
         assignments: assignmentsByReceipt.get(r.id) || [],
       })),
       settlement,
-      totalAmount: folderReceipts.reduce((s, r) => s + num(r.total), 0),
+      totalAmount: folderReceipts.reduce((s, r) => s + totalInGBP(r), 0),
       isOwner: folder.ownerId === userId,
     });
   });
@@ -505,9 +534,9 @@ export function registerSplitFolderRoutes(app: Express) {
         const body = setAssignmentsBody.parse(req.body);
 
         // Validate that the sum of share amounts is within a small rounding tolerance
-        // of the receipt total — prevents clients sending arbitrary inflated/deflated shares.
+        // of the receipt total in GBP — prevents clients sending arbitrary inflated/deflated shares.
         const sum = body.assignments.reduce((s, a) => s + parseFloat(a.shareAmount || "0"), 0);
-        const receiptTotal = parseFloat(receipt.total);
+        const receiptTotal = totalInGBP(receipt);
         const tolerance = Math.max(0.05, body.assignments.length * 0.01);
         if (body.assignments.length > 0 && Math.abs(sum - receiptTotal) > tolerance) {
           return res.status(400).json({
