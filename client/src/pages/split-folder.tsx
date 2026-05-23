@@ -1,0 +1,502 @@
+import { useMemo, useState } from "react";
+import { useLocation, useParams, Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ArrowLeft,
+  UserPlus,
+  Users,
+  Check,
+  X as XIcon,
+  Receipt as ReceiptIcon,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import SplitInviteDialog from "@/components/split-invite-dialog";
+
+type Member = {
+  id: string;
+  folderId: string;
+  userId: string | null;
+  inviteEmail: string | null;
+  displayName: string | null;
+  status: string;
+  role: string;
+};
+
+type Assignment = {
+  id: string;
+  memberId: string;
+  itemId: string | null;
+  shareAmount: string;
+  status: "pending" | "paid";
+};
+
+type FolderReceipt = {
+  id: string;
+  merchantName: string;
+  total: string;
+  date: string;
+  items: Array<{ id: string; name: string; price: string; quantity: string | null }>;
+  assignments: Assignment[];
+};
+
+type FolderDetail = {
+  folder: { id: string; name: string; description: string | null; ownerId: string };
+  members: Member[];
+  receipts: FolderReceipt[];
+  settlement: Array<{ memberId: string; displayName: string | null; userId: string | null; inviteEmail: string | null; owed: number; paid: number; total: number; status: string; role: string }>;
+  totalAmount: number;
+  isOwner: boolean;
+};
+
+function initials(name?: string | null) {
+  if (!name) return "?";
+  const parts = name.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || name[0].toUpperCase();
+}
+
+// Per-receipt editor — handles both split modes and persists via the mutation.
+function ReceiptSplitter({
+  receipt,
+  members,
+  folderId,
+}: {
+  receipt: FolderReceipt;
+  members: Member[];
+  folderId: string;
+}) {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const total = parseFloat(receipt.total);
+
+  // Infer the prior mode from saved assignments so re-opening the editor preserves intent.
+  const initialMode: "whole" | "items" = receipt.assignments.some((a) => a.itemId) ? "items" : "whole";
+  const [mode, setMode] = useState<"whole" | "items">(initialMode);
+
+  // whole-bill state: list of member IDs splitting equally
+  const initialWholeMembers = receipt.assignments
+    .filter((a) => !a.itemId)
+    .map((a) => a.memberId);
+  const [wholeMembers, setWholeMembers] = useState<string[]>(initialWholeMembers);
+
+  // per-item state: itemId -> memberId[]
+  const initialItemMap: Record<string, string[]> = {};
+  receipt.assignments.forEach((a) => {
+    if (a.itemId) {
+      (initialItemMap[a.itemId] ||= []).push(a.memberId);
+    }
+  });
+  const [itemMap, setItemMap] = useState<Record<string, string[]>>(initialItemMap);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const assignments: Array<{ memberId: string; itemId: string | null; shareAmount: string }> = [];
+      if (mode === "whole") {
+        if (wholeMembers.length === 0) {
+          // no-op: clears assignments
+        } else {
+          const share = total / wholeMembers.length;
+          wholeMembers.forEach((memberId) => {
+            assignments.push({ memberId, itemId: null, shareAmount: share.toFixed(2) });
+          });
+        }
+      } else {
+        receipt.items.forEach((item) => {
+          const assigned = itemMap[item.id] || [];
+          if (assigned.length === 0) return;
+          const share = parseFloat(item.price) / assigned.length;
+          assigned.forEach((memberId) => {
+            assignments.push({ memberId, itemId: item.id, shareAmount: share.toFixed(2) });
+          });
+        });
+      }
+      const res = await apiRequest(
+        "PUT",
+        `/api/split-folders/${folderId}/receipts/${receipt.id}/assignments`,
+        { mode, assignments },
+      );
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      toast({ title: "Split saved" });
+      setExpanded(false);
+    },
+    onError: (err: any) => toast({ title: "Couldn't save split", description: err.message, variant: "destructive" }),
+  });
+
+  const detachMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/split-folders/${folderId}/receipts/${receipt.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      toast({ title: "Receipt removed from folder" });
+    },
+  });
+
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const toggleWhole = (memberId: string) => {
+    setWholeMembers((cur) =>
+      cur.includes(memberId) ? cur.filter((m) => m !== memberId) : [...cur, memberId],
+    );
+  };
+
+  const toggleItem = (itemId: string, memberId: string) => {
+    setItemMap((cur) => {
+      const next = { ...cur };
+      const arr = next[itemId] || [];
+      next[itemId] = arr.includes(memberId) ? arr.filter((m) => m !== memberId) : [...arr, memberId];
+      return next;
+    });
+  };
+
+  const activeMembers = members.filter((m) => m.status === "active");
+  const assignedTotal = useMemo(() => {
+    if (mode === "whole") return wholeMembers.length > 0 ? total : 0;
+    return Object.entries(itemMap).reduce((s, [itemId, ids]) => {
+      if (ids.length === 0) return s;
+      const item = receipt.items.find((i) => i.id === itemId);
+      return s + (item ? parseFloat(item.price) : 0);
+    }, 0);
+  }, [mode, wholeMembers, itemMap, receipt.items, total]);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-gray-900 truncate">{receipt.merchantName}</div>
+            <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString()} · £{total.toFixed(2)}</div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="text-xs">
+              {receipt.assignments.length === 0
+                ? "No split"
+                : receipt.assignments.every((a) => a.status === "paid")
+                ? "Paid"
+                : "Pending"}
+            </Badge>
+            <Button size="sm" variant="ghost" onClick={() => setExpanded((e) => !e)} data-testid={`toggle-receipt-${receipt.id}`}>
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-4 space-y-3">
+            <div className="flex gap-2">
+              <Button size="sm" variant={mode === "whole" ? "default" : "outline"} className={mode === "whole" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("whole")}>
+                Entire bill
+              </Button>
+              <Button size="sm" variant={mode === "items" ? "default" : "outline"} className={mode === "items" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("items")}>
+                Individual items
+              </Button>
+            </div>
+
+            {mode === "whole" && (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500">Split equally among:</div>
+                {activeMembers.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <Checkbox checked={wholeMembers.includes(m.id)} onCheckedChange={() => toggleWhole(m.id)} />
+                    <span className="flex-1 text-sm">{m.displayName}</span>
+                    {wholeMembers.length > 0 && wholeMembers.includes(m.id) && (
+                      <span className="text-sm font-medium text-gray-700">£{(total / wholeMembers.length).toFixed(2)}</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {mode === "items" && (
+              <div className="space-y-3">
+                {receipt.items.length === 0 && (
+                  <div className="text-sm text-gray-500 italic">This receipt has no line items captured.</div>
+                )}
+                {receipt.items.map((item) => {
+                  const assigned = itemMap[item.id] || [];
+                  return (
+                    <div key={item.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">{item.name}</div>
+                        <div className="text-sm font-semibold">£{parseFloat(item.price).toFixed(2)}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {activeMembers.map((m) => {
+                          const on = assigned.includes(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => toggleItem(item.id, m.id)}
+                              className={`text-xs px-2 py-1 rounded-full border ${on ? "bg-green-600 text-white border-green-600" : "bg-white text-gray-700 border-gray-300"}`}
+                              data-testid={`item-${item.id}-member-${m.id}`}
+                            >
+                              {initials(m.displayName)}
+                              {on && assigned.length > 0 && (
+                                <span className="ml-1">£{(parseFloat(item.price) / assigned.length).toFixed(2)}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Assigned</span>
+              <span className={Math.abs(assignedTotal - total) < 0.01 ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                £{assignedTotal.toFixed(2)} / £{total.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 bg-green-600 hover:bg-green-700">
+                {saveMutation.isPending ? "Saving…" : "Save split"}
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmRemove(true)}>
+                Remove
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove this receipt from the folder?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The receipt stays in your wallet, but it'll be detached from this folder and all its split assignments will be cleared.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={() => detachMutation.mutate()}
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function SplitFolderPage() {
+  const params = useParams();
+  const folderId = params.folderId as string;
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery<FolderDetail>({
+    queryKey: ["/api/split-folders", folderId],
+  });
+
+  const settleMutation = useMutation({
+    mutationFn: async (memberId: string) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/members/${memberId}/settle`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      toast({ title: "Marked as settled" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't mark settled", description: err.message, variant: "destructive" }),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (memberId: string) =>
+      apiRequest("DELETE", `/api/split-folders/${folderId}/members/${memberId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      setConfirmRemove(null);
+      toast({ title: "Member removed" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't remove member", description: err.message, variant: "destructive" }),
+  });
+
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const { folder, members, receipts: folderReceipts, settlement, totalAmount, isOwner } = data;
+  const activeMembers = members.filter((m) => m.status !== "removed");
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <div className="px-6 pt-6 pb-2 flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/split")} data-testid="back-to-split">
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <span className="text-sm text-gray-500">Split folders</span>
+      </div>
+
+      <div className="px-6 space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{folder.name}</h1>
+          {folder.description && <p className="text-sm text-gray-600 mt-1">{folder.description}</p>}
+          <div className="mt-3 flex items-center justify-between">
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Total</div>
+              <div className="text-2xl font-bold text-gray-900">£{totalAmount.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide text-right">Receipts</div>
+              <div className="text-2xl font-bold text-gray-900 text-right">{folderReceipts.length}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Members */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-green-600" />
+                <h3 className="font-semibold">Members ({activeMembers.length})</h3>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} data-testid="button-invite">
+                <UserPlus className="w-4 h-4 mr-1" /> Invite
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {activeMembers.map((m) => (
+                <div key={m.id} className="flex items-center gap-2 py-1.5">
+                  <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 text-xs font-semibold flex items-center justify-center">
+                    {initials(m.displayName)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{m.displayName}</div>
+                    <div className="text-xs text-gray-500">
+                      {m.role === "owner" ? "Owner" : m.status === "invited" ? "Invited" : "Member"}
+                      {m.inviteEmail && ` · ${m.inviteEmail}`}
+                    </div>
+                  </div>
+                  {isOwner && m.role !== "owner" && (
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(m.id)} className="text-gray-400 hover:text-red-600">
+                      <XIcon className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Receipts */}
+        <div className="space-y-3">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <ReceiptIcon className="w-4 h-4 text-green-600" /> Receipts in this folder
+          </h3>
+          {folderReceipts.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-6 text-center text-sm text-gray-500">
+                Open a receipt from <Link href="/receipts" className="text-green-600 underline">My Receipts</Link> and tap Split to add it here.
+              </CardContent>
+            </Card>
+          ) : (
+            folderReceipts.map((r) => (
+              <ReceiptSplitter key={r.id} receipt={r} members={members} folderId={folderId} />
+            ))
+          )}
+        </div>
+
+        {/* Settlement */}
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-3">Settlement</h3>
+            {settlement.length === 0 || settlement.every((s) => s.total === 0) ? (
+              <p className="text-sm text-gray-500">Once you've split a receipt, who-owes-who appears here.</p>
+            ) : (
+              <div className="space-y-2">
+                {settlement.map((s) => (
+                  <div key={s.memberId} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 text-xs font-semibold flex items-center justify-center">
+                        {initials(s.displayName)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{s.displayName}</div>
+                        <div className="text-xs text-gray-500">
+                          {s.role === "owner"
+                            ? `paid for £${s.total.toFixed(2)}`
+                            : s.owed > 0
+                            ? `owes you £${s.owed.toFixed(2)} · ${s.status}`
+                            : s.total > 0
+                            ? `settled · £${s.paid.toFixed(2)}`
+                            : "no share yet"}
+                        </div>
+                      </div>
+                    </div>
+                    {s.role !== "owner" && s.owed > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => settleMutation.mutate(s.memberId)}
+                        disabled={settleMutation.isPending}
+                        data-testid={`settle-${s.memberId}`}
+                      >
+                        <Check className="w-4 h-4 mr-1" /> Mark settled
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <SplitInviteDialog folderId={folderId} open={inviteOpen} onOpenChange={setInviteOpen} />
+
+      <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All of their assignments in this folder will be cleared. They can be re-invited later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => confirmRemove && removeMemberMutation.mutate(confirmRemove)}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

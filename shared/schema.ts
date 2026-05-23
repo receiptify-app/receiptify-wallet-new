@@ -50,10 +50,12 @@ export const receipts = pgTable("receipts", {
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   ecoPoints: integer("ecoPoints").default(1),
+  splitFolderId: varchar("split_folder_id"),
   createdAt: timestamp("createdAt").defaultNow(),
 }, (table) => [
   index("receipts_user_id_idx").on(table.userId),
   index("receipts_user_date_idx").on(table.userId, table.date),
+  index("receipts_split_folder_idx").on(table.splitFolderId),
 ]);
 
 export const receiptItems = pgTable("receipt_items", {
@@ -161,6 +163,49 @@ export const splits = pgTable("splits", {
   paymentLink: text("payment_link"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Split folders - named groupings of receipts shared with friends
+export const splitFolders = pgTable("split_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("split_folders_owner_id_idx").on(table.ownerId),
+]);
+
+export const splitFolderMembers = pgTable("split_folder_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  userId: varchar("user_id"),
+  inviteEmail: text("invite_email"),
+  inviteUsername: text("invite_username"),
+  displayName: text("display_name"),
+  inviteToken: text("invite_token").notNull().unique(),
+  status: text("status").default("invited"), // invited, active, removed
+  role: text("role").default("member"), // owner, member
+  joinedAt: timestamp("joined_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("split_folder_members_folder_idx").on(table.folderId),
+  index("split_folder_members_user_idx").on(table.userId),
+]);
+
+export const splitAssignments = pgTable("split_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  receiptId: varchar("receipt_id").notNull(),
+  memberId: varchar("member_id").notNull(),
+  itemId: varchar("item_id"), // null = entire-bill share
+  shareAmount: decimal("share_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").default("pending"), // pending, paid
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("split_assignments_folder_idx").on(table.folderId),
+  index("split_assignments_receipt_idx").on(table.receiptId),
+  index("split_assignments_member_idx").on(table.memberId),
+]);
 
 export const paymentMethods = pgTable("payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -463,6 +508,22 @@ export const insertSplitSchema = createInsertSchema(splits).omit({
   createdAt: true,
 });
 
+export const insertSplitFolderSchema = createInsertSchema(splitFolders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSplitFolderMemberSchema = createInsertSchema(splitFolderMembers).omit({
+  id: true,
+  createdAt: true,
+  joinedAt: true,
+});
+
+export const insertSplitAssignmentSchema = createInsertSchema(splitAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -493,6 +554,15 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 
 export type Split = typeof splits.$inferSelect;
 export type InsertSplit = z.infer<typeof insertSplitSchema>;
+
+export type SplitFolder = typeof splitFolders.$inferSelect;
+export type InsertSplitFolder = z.infer<typeof insertSplitFolderSchema>;
+
+export type SplitFolderMember = typeof splitFolderMembers.$inferSelect;
+export type InsertSplitFolderMember = z.infer<typeof insertSplitFolderMemberSchema>;
+
+export type SplitAssignment = typeof splitAssignments.$inferSelect;
+export type InsertSplitAssignment = z.infer<typeof insertSplitAssignmentSchema>;
 
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;

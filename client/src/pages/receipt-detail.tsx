@@ -24,7 +24,10 @@ import {
   Plus,
   Trash2,
   Edit2,
+  Users,
+  ArrowRight,
 } from "lucide-react";
+import SplitFolderPicker from "@/components/split-folder-picker";
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
@@ -46,6 +49,7 @@ export default function ReceiptDetailPage() {
 
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [splitPickerOpen, setSplitPickerOpen] = useState(false);
   const [warrantyForm, setWarrantyForm] = useState({
     productName: "",
     durationMonths: 12,
@@ -322,6 +326,56 @@ export default function ReceiptDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Split with friends */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    {receipt.splitFolderId ? "In a split folder" : "Split with friends"}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {receipt.splitFolderId
+                      ? "Open the folder to edit who pays what"
+                      : "Group this receipt with friends and settle up"}
+                  </div>
+                </div>
+              </div>
+              {receipt.splitFolderId ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(`/split/${receipt.splitFolderId}`)}
+                  data-testid="button-open-split-folder"
+                >
+                  Open <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => setSplitPickerOpen(true)}
+                  data-testid="button-split-receipt"
+                >
+                  Split
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {receiptId && (
+          <SplitFolderPicker
+            open={splitPickerOpen}
+            onOpenChange={setSplitPickerOpen}
+            receiptId={receiptId}
+          />
+        )}
 
         {/* Warranty Section */}
         {/* <Card className="bg-white shadow-sm border-0">

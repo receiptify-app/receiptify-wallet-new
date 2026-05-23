@@ -6,6 +6,7 @@ import { registerEmailRoutes } from "./email-routes";
 import { emailOAuthRouter } from "./email-oauth";
 import { forwardingInboxRouter } from "./forwarding-inbox";
 import { adminRouter } from "./admin-routes";
+import { registerSplitFolderRoutes } from "./split-folders";
 import { ObjectStorageService, registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
   insertReceiptSchema, 
@@ -160,6 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register email import routes
   registerEmailRoutes(app);
+  registerSplitFolderRoutes(app);
   
   // Register OAuth routes
   app.use("/api/email/oauth", emailOAuthRouter);

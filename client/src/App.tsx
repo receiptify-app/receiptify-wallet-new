@@ -15,6 +15,9 @@ import Profile from "@/pages/profile";
 import Map from "@/pages/map";
 import ReceiptDetail from "@/pages/receipt-detail";
 import SplitReceipt from "@/pages/split-receipt";
+import SplitPage from "@/pages/split";
+import SplitFolderPage from "@/pages/split-folder";
+import SplitInvitePage from "@/pages/split-invite";
 import Payment from "@/pages/payment";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
@@ -66,6 +69,7 @@ function AuthenticatedRouter() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/sitemap" component={SitemapPage} />
         <Route path="/test-auth" component={TestAuth} />
+        <Route path="/split/invite/:token" component={SplitInvitePage} />
         <Route component={Landing} />
       </Switch>
     );
@@ -94,6 +98,9 @@ function AuthenticatedRouter() {
         <Route path="/profile" component={Profile} />
         <Route path="/receipts/:id" component={ReceiptDetail} />
         <Route path="/split-receipt" component={SplitReceipt} />
+        <Route path="/split" component={SplitPage} />
+        <Route path="/split/invite/:token" component={SplitInvitePage} />
+        <Route path="/split/:folderId" component={SplitFolderPage} />
         <Route path="/payment" component={Payment} />
         <Route path="/settings/email" component={EmailSettings} />
         <Route path="/inbox/imports" component={EmailImports} />
