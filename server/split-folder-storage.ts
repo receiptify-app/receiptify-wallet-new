@@ -20,6 +20,52 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, ilike, inArray } from "drizzle-orm";
 
+function normShare(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return "0";
+  const n = typeof v === "number" ? v : parseFloat(v);
+  if (!isFinite(n)) return "0";
+  return n.toFixed(2);
+}
+
+function assignmentKey(memberId: string, itemId: string | null | undefined, shareAmount: string | number): string {
+  return `${memberId}|${itemId ?? ""}|${normShare(shareAmount)}`;
+}
+
+export type ExistingAssignmentLike = {
+  id: string;
+  memberId: string;
+  itemId: string | null;
+  shareAmount: string;
+};
+
+export type DesiredAssignmentLike = {
+  memberId: string;
+  itemId: string | null;
+  shareAmount: string;
+};
+
+export function diffReceiptAssignments(
+  existing: ExistingAssignmentLike[],
+  desired: DesiredAssignmentLike[],
+): { toDeleteIds: string[]; toInsertIndexes: number[] } {
+  const existingByKey = new Map<string, ExistingAssignmentLike>();
+  for (const e of existing) existingByKey.set(assignmentKey(e.memberId, e.itemId, e.shareAmount), e);
+
+  const desiredKeys = new Set<string>();
+  const toInsertIndexes: number[] = [];
+  desired.forEach((d, i) => {
+    const key = assignmentKey(d.memberId, d.itemId, d.shareAmount);
+    desiredKeys.add(key);
+    if (!existingByKey.has(key)) toInsertIndexes.push(i);
+  });
+
+  const toDeleteIds: string[] = [];
+  for (const [key, e] of existingByKey) {
+    if (!desiredKeys.has(key)) toDeleteIds.push(e.id);
+  }
+  return { toDeleteIds, toInsertIndexes };
+}
+
 export interface ISplitFolderStorage {
   listFoldersForUser(userId: string): Promise<SplitFolder[]>;
   getFolder(folderId: string): Promise<SplitFolder | undefined>;
@@ -153,13 +199,26 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
   }
 
   async replaceReceiptAssignments(folderId: string, receiptId: string, rows: InsertSplitAssignment[]): Promise<SplitAssignment[]> {
-    await db
-      .delete(splitAssignments)
+    // Preserve existing rows whose (memberId, itemId, shareAmount) is unchanged
+    // so already-"paid" assignments don't get reset to "pending" when the owner
+    // edits the split (e.g. adds another friend).
+    const existing = await db
+      .select()
+      .from(splitAssignments)
       .where(
         and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.receiptId, receiptId)),
       );
-    if (rows.length) {
-      await db.insert(splitAssignments).values(rows);
+
+    const { toDeleteIds, toInsertIndexes } = diffReceiptAssignments(
+      existing.map((e) => ({ id: e.id, memberId: e.memberId, itemId: e.itemId, shareAmount: e.shareAmount })),
+      rows.map((r) => ({ memberId: r.memberId, itemId: r.itemId ?? null, shareAmount: String(r.shareAmount) })),
+    );
+
+    if (toDeleteIds.length) {
+      await db.delete(splitAssignments).where(inArray(splitAssignments.id, toDeleteIds));
+    }
+    if (toInsertIndexes.length) {
+      await db.insert(splitAssignments).values(toInsertIndexes.map((i) => rows[i]));
     }
     return db
       .select()
