@@ -29,6 +29,13 @@ async function loadFolderForUser(folderId: string, userId: string): Promise<Spli
   return (await splitFolderStorage.isUserActiveInFolder(folderId, userId)) ? folder : null;
 }
 
+// inviteToken is a secret used as the join URL; never leak it in list/detail responses.
+// (The token is returned once at invite-creation time so the owner can share the link.)
+function sanitizeMember(m: SplitFolderMember) {
+  const { inviteToken, ...safe } = m;
+  return safe;
+}
+
 async function buildFolderSummary(folder: SplitFolder) {
   const [members, folderReceipts, assignments] = await Promise.all([
     splitFolderStorage.listMembers(folder.id),
@@ -43,7 +50,7 @@ async function buildFolderSummary(folder: SplitFolder) {
     totalAmount,
     memberCount: members.filter((m) => m.status !== "removed").length,
     receiptCount: folderReceipts.length,
-    members,
+    members: members.map(sanitizeMember),
     status: allSettled ? "settled" : "pending",
   };
 }
@@ -169,7 +176,7 @@ export function registerSplitFolderRoutes(app: Express) {
 
     res.json({
       folder,
-      members,
+      members: members.map(sanitizeMember),
       receipts: folderReceipts.map((r) => ({
         ...r,
         items: itemsByReceipt.get(r.id) || [],

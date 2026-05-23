@@ -169,7 +169,13 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signup(data.email, data.password, data.name, data.username.toLowerCase());
-      navigate("/");
+      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
+      if (pendingInvite) {
+        sessionStorage.removeItem("pendingSplitInvite");
+        navigate(`/split/invite/${pendingInvite}`);
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -181,7 +187,13 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      navigate("/");
+      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
+      if (pendingInvite) {
+        sessionStorage.removeItem("pendingSplitInvite");
+        navigate(`/split/invite/${pendingInvite}`);
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       console.error(`${provider} signup error:`, error);
     } finally {

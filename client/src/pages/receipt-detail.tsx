@@ -347,14 +347,24 @@ export default function ReceiptDetailPage() {
                 </div>
               </div>
               {receipt.splitFolderId ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/split/${receipt.splitFolderId}`)}
-                  data-testid="button-open-split-folder"
-                >
-                  Open <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSplitPickerOpen(true)}
+                    data-testid="button-move-split-folder"
+                  >
+                    Move
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => navigate(`/split/${receipt.splitFolderId}`)}
+                    data-testid="button-open-split-folder"
+                  >
+                    Open <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
               ) : (
                 <Button
                   size="sm"

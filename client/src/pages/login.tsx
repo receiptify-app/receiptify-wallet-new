@@ -67,7 +67,13 @@ export default function Login() {
     try {
       await login(data.email, data.password);
       trackActivity('signup_completed', { method: 'email' });
-      navigate("/");
+      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
+      if (pendingInvite) {
+        sessionStorage.removeItem("pendingSplitInvite");
+        navigate(`/split/invite/${pendingInvite}`);
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       console.error("Login error:", error);
       trackActivity('signup_dropped', { method: 'email', reason: 'login_failed' });
@@ -81,7 +87,13 @@ export default function Login() {
     try {
       await signInWithGoogle();
       trackActivity('signup_completed', { method: 'google' });
-      navigate("/");
+      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
+      if (pendingInvite) {
+        sessionStorage.removeItem("pendingSplitInvite");
+        navigate(`/split/invite/${pendingInvite}`);
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       console.error(`${provider} login error:`, error);
       trackActivity('signup_dropped', { method: 'google', reason: 'cancelled_or_failed' });
