@@ -40,7 +40,28 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
     },
     onSuccess: (member: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
-      if (member.inviteToken && (tab === "link" || (!member.userId && tab !== "username"))) {
+      if (tab === "email" && member.inviteEmail) {
+        if (member.emailSent) {
+          toast({
+            title: "Invite sent",
+            description: `We emailed the invite to ${member.inviteEmail}.`,
+          });
+          onOpenChange(false);
+          setUsername("");
+          setEmail("");
+        } else {
+          toast({
+            title: "Couldn't send email",
+            description:
+              (member.emailError || "Email delivery failed.") +
+              " You can resend it from the folder's members list.",
+            variant: "destructive",
+          });
+          onOpenChange(false);
+          setUsername("");
+          setEmail("");
+        }
+      } else if (member.inviteToken && (tab === "link" || (!member.userId && tab !== "username"))) {
         const url = `${window.location.origin}/split/invite/${member.inviteToken}`;
         setLinkUrl(url);
         navigator.clipboard?.writeText(url).catch(() => {});

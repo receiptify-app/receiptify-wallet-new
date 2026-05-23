@@ -25,6 +25,7 @@ import {
   Receipt as ReceiptIcon,
   ChevronDown,
   ChevronUp,
+  Send,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -443,6 +444,38 @@ export default function SplitFolderPage() {
     onError: (err: any) => toast({ title: "Couldn't mark settled", description: err.message, variant: "destructive" }),
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const res = await apiRequest(
+        "POST",
+        `/api/split-folders/${folderId}/members/${memberId}/resend-invite`,
+        {},
+      );
+      return res.json();
+    },
+    onSuccess: (data: any, memberId: string) => {
+      const member = data?.inviteEmail
+        ? data
+        : (queryClient.getQueryData<FolderDetail>(["/api/split-folders", folderId])?.members.find((m) => m.id === memberId));
+      toast({
+        title: "Invite resent",
+        description: member?.inviteEmail
+          ? `We re-sent the invite to ${member.inviteEmail}.`
+          : "Invite email re-sent.",
+      });
+    },
+    onError: (err: any) => {
+      let description = err?.message || "Couldn't resend invite";
+      try {
+        const parsed = JSON.parse(description.split(": ").slice(1).join(": "));
+        if (parsed?.emailError || parsed?.error) {
+          description = parsed.emailError || parsed.error;
+        }
+      } catch {}
+      toast({ title: "Couldn't resend invite", description, variant: "destructive" });
+    },
+  });
+
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) =>
       apiRequest("DELETE", `/api/split-folders/${folderId}/members/${memberId}`),
@@ -515,6 +548,19 @@ export default function SplitFolderPage() {
                       {m.inviteEmail && ` · ${m.inviteEmail}`}
                     </div>
                   </div>
+                  {isOwner && m.role !== "owner" && m.status === "invited" && m.inviteEmail && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => resendInviteMutation.mutate(m.id)}
+                      disabled={resendInviteMutation.isPending}
+                      className="text-gray-500 hover:text-green-700"
+                      data-testid={`resend-invite-${m.id}`}
+                      title="Resend invite email"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  )}
                   {isOwner && m.role !== "owner" && (
                     <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(m.id)} className="text-gray-400 hover:text-red-600">
                       <XIcon className="w-4 h-4" />

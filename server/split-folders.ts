@@ -78,13 +78,96 @@ const setAssignmentsBody = z.object({
   assignments: z.array(assignmentInput),
 });
 
-function inviteEmailBody(folderName: string, inviterName: string, link: string) {
-  const text = `${inviterName} invited you to split receipts on Receiptify.\n\nFolder: ${folderName}\n\nJoin: ${link}\n\nIf you don't have an account yet, you'll be asked to sign up first.`;
-  const html = `<p><strong>${inviterName}</strong> invited you to split receipts on <strong>Receiptify</strong>.</p>
-<p>Folder: <strong>${folderName}</strong></p>
-<p><a href="${link}">Tap here to join the folder</a></p>
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatReceiptDate(d: Date | string | null | undefined) {
+  if (!d) return "";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function inviteEmailBody(
+  folderName: string,
+  inviterName: string,
+  link: string,
+  receipts: Array<{ merchantName: string; total: string | number; date: Date | string | null }>,
+) {
+  const receiptsForEmail = receipts.slice(0, 8);
+  const moreCount = Math.max(0, receipts.length - receiptsForEmail.length);
+
+  const receiptsTextLines = receiptsForEmail.map((r) => {
+    const date = formatReceiptDate(r.date);
+    const amount = `£${num(r.total).toFixed(2)}`;
+    return `  • ${r.merchantName}${date ? ` (${date})` : ""} — ${amount}`;
+  });
+  const receiptsText =
+    receipts.length > 0
+      ? `\nReceipts shared in this folder:\n${receiptsTextLines.join("\n")}${
+          moreCount > 0 ? `\n  • …and ${moreCount} more` : ""
+        }\n`
+      : "\nNo receipts have been added to this folder yet.\n";
+
+  const receiptsHtml =
+    receipts.length > 0
+      ? `<p style="margin-bottom:6px"><strong>Receipts shared in this folder:</strong></p>
+<ul style="padding-left:18px;margin-top:0">
+${receiptsForEmail
+  .map((r) => {
+    const date = formatReceiptDate(r.date);
+    return `<li style="margin-bottom:4px">${escapeHtml(r.merchantName)}${
+      date ? ` <span style="color:#666">(${escapeHtml(date)})</span>` : ""
+    } — £${num(r.total).toFixed(2)}</li>`;
+  })
+  .join("\n")}
+${moreCount > 0 ? `<li style="color:#666">…and ${moreCount} more</li>` : ""}
+</ul>`
+      : `<p style="color:#666">No receipts have been added to this folder yet.</p>`;
+
+  const text = `${inviterName} invited you to split receipts on Receiptify.
+
+Folder: ${folderName}
+${receiptsText}
+Join: ${link}
+
+If you don't have an account yet, you'll be asked to sign up first.`;
+
+  const html = `<p><strong>${escapeHtml(inviterName)}</strong> invited you to split receipts on <strong>Receiptify</strong>.</p>
+<p>Folder: <strong>${escapeHtml(folderName)}</strong></p>
+${receiptsHtml}
+<p><a href="${escapeHtml(link)}" style="display:inline-block;background:#16a34a;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Tap here to join the folder</a></p>
 <p style="color:#666;font-size:12px">If you don't have an account yet, you'll be asked to sign up first.</p>`;
+
   return { text, html };
+}
+
+function inviteOrigin(req: { headers: any; protocol: string; get: (k: string) => string | undefined }) {
+  return req.headers.origin?.toString() || `${req.protocol}://${req.get("host")}`;
+}
+
+async function sendInviteEmail(
+  toEmail: string,
+  inviterName: string,
+  folder: SplitFolder,
+  inviteToken: string,
+  origin: string,
+) {
+  const link = `${origin}/split/invite/${inviteToken}`;
+  const folderReceipts = await splitFolderStorage.listFolderReceipts(folder.id);
+  const { text, html } = inviteEmailBody(folder.name, inviterName, link, folderReceipts);
+  return sendEmail({
+    to: toEmail,
+    subject: `${inviterName} invited you to split a Receiptify folder`,
+    text,
+    html,
+  });
 }
 
 export function registerSplitFolderRoutes(app: Express) {
@@ -279,18 +362,14 @@ export function registerSplitFolderRoutes(app: Express) {
         let emailSent = false;
         let emailError: string | undefined;
         if (body.email && !body.generateLinkOnly) {
-          const origin =
-            req.headers.origin?.toString() ||
-            `${req.protocol}://${req.get("host")}`;
-          const link = `${origin}/split/invite/${member.inviteToken}`;
           const inviter = req.user!.name || req.user!.email || "A friend";
-          const { text, html } = inviteEmailBody(folder.name, inviter, link);
-          const result = await sendEmail({
-            to: body.email,
-            subject: `${inviter} invited you to split a Receiptify folder`,
-            text,
-            html,
-          });
+          const result = await sendInviteEmail(
+            body.email,
+            inviter,
+            folder,
+            member.inviteToken,
+            inviteOrigin(req),
+          );
           emailSent = result.sent;
           emailError = result.reason;
         }
@@ -299,6 +378,46 @@ export function registerSplitFolderRoutes(app: Express) {
       } catch (err: any) {
         res.status(400).json({ error: err?.message || "Failed to invite" });
       }
+    },
+  );
+
+  // --- Resend an email invite (owner only) ---
+  app.post(
+    "/api/split-folders/:id/members/:memberId/resend-invite",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      const userId = req.user!.id;
+      const folder = await loadFolderForUser(req.params.id, userId);
+      if (!folder) return res.status(404).json({ error: "Folder not found" });
+      if (folder.ownerId !== userId) {
+        return res.status(403).json({ error: "Only the folder owner can resend invites" });
+      }
+      const member = await splitFolderStorage.getMember(req.params.memberId);
+      if (!member || member.folderId !== folder.id) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      if (member.status === "removed") {
+        return res.status(410).json({ error: "Invite has been revoked" });
+      }
+      if (!member.inviteEmail) {
+        return res.status(400).json({ error: "This invite has no email to send to" });
+      }
+
+      const inviter = req.user!.name || req.user!.email || "A friend";
+      const result = await sendInviteEmail(
+        member.inviteEmail,
+        inviter,
+        folder,
+        member.inviteToken,
+        inviteOrigin(req),
+      );
+      if (!result.sent) {
+        return res.status(502).json({
+          emailSent: false,
+          emailError: result.reason || "Failed to send invite email",
+        });
+      }
+      res.json({ emailSent: true });
     },
   );
 
