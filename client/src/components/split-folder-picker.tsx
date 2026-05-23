@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,10 +36,12 @@ export default function SplitFolderPicker({ open, onOpenChange, receiptId }: Pro
     enabled: open,
   });
 
-  // Auto-switch to "create" when the user has no folders yet.
-  if (open && !isLoading && folders.length === 0 && mode === "pick") {
-    setMode("create");
-  }
+  // Auto-switch to "create" when the user has no folders yet (effect, not render).
+  useEffect(() => {
+    if (open && !isLoading && folders.length === 0 && mode === "pick") {
+      setMode("create");
+    }
+  }, [open, isLoading, folders.length, mode]);
 
   const attachMutation = useMutation({
     mutationFn: async (folderId: string) => {

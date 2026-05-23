@@ -90,11 +90,26 @@ function ReceiptSplitter({
   const initialMode: "whole" | "items" = receipt.assignments.some((a) => a.itemId) ? "items" : "whole";
   const [mode, setMode] = useState<"whole" | "items">(initialMode);
 
-  // whole-bill state: list of member IDs splitting equally
-  const initialWholeMembers = receipt.assignments
-    .filter((a) => !a.itemId)
-    .map((a) => a.memberId);
+  // whole-bill state: list of member IDs + how to split (equal or custom amounts)
+  const initialWholeAssignments = receipt.assignments.filter((a) => !a.itemId);
+  const initialWholeMembers = initialWholeAssignments.map((a) => a.memberId);
   const [wholeMembers, setWholeMembers] = useState<string[]>(initialWholeMembers);
+
+  // If any saved share differs from a strict equal split, restore "custom" mode.
+  const equalShare = initialWholeMembers.length > 0 ? total / initialWholeMembers.length : 0;
+  const initialWholeMode: "equal" | "custom" =
+    initialWholeAssignments.length > 0 &&
+    initialWholeAssignments.some((a) => Math.abs(parseFloat(a.shareAmount) - equalShare) > 0.02)
+      ? "custom"
+      : "equal";
+  const [wholeMode, setWholeMode] = useState<"equal" | "custom">(initialWholeMode);
+
+  // Per-member custom amount strings (kept as strings so the input is fully controlled).
+  const initialCustomAmounts: Record<string, string> = {};
+  initialWholeAssignments.forEach((a) => {
+    initialCustomAmounts[a.memberId] = parseFloat(a.shareAmount).toFixed(2);
+  });
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(initialCustomAmounts);
 
   // per-item state: itemId -> memberId[]
   const initialItemMap: Record<string, string[]> = {};
@@ -111,10 +126,30 @@ function ReceiptSplitter({
       if (mode === "whole") {
         if (wholeMembers.length === 0) {
           // no-op: clears assignments
-        } else {
+        } else if (wholeMode === "equal") {
+          // Distribute equally with a final-row adjustment so the sum lands exactly on total.
           const share = total / wholeMembers.length;
+          let runningSum = 0;
+          wholeMembers.forEach((memberId, idx) => {
+            const raw =
+              idx === wholeMembers.length - 1
+                ? (total - runningSum).toFixed(2)
+                : share.toFixed(2);
+            runningSum += parseFloat(raw);
+            assignments.push({ memberId, itemId: null, shareAmount: raw });
+          });
+        } else {
+          // Custom amounts — validate against receipt total before sending.
+          const sum = wholeMembers.reduce(
+            (s, id) => s + (parseFloat(customAmounts[id] || "0") || 0),
+            0,
+          );
+          if (Math.abs(sum - total) > 0.01) {
+            throw new Error(`Custom amounts add up to £${sum.toFixed(2)}, but the bill is £${total.toFixed(2)}.`);
+          }
           wholeMembers.forEach((memberId) => {
-            assignments.push({ memberId, itemId: null, shareAmount: share.toFixed(2) });
+            const raw = parseFloat(customAmounts[memberId] || "0") || 0;
+            assignments.push({ memberId, itemId: null, shareAmount: raw.toFixed(2) });
           });
         }
       } else {
@@ -154,9 +189,37 @@ function ReceiptSplitter({
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const toggleWhole = (memberId: string) => {
-    setWholeMembers((cur) =>
-      cur.includes(memberId) ? cur.filter((m) => m !== memberId) : [...cur, memberId],
-    );
+    setWholeMembers((cur) => {
+      const next = cur.includes(memberId) ? cur.filter((m) => m !== memberId) : [...cur, memberId];
+      // Seed a default custom amount for newly added members so the input isn't blank.
+      if (!cur.includes(memberId) && wholeMode === "custom") {
+        setCustomAmounts((c) => ({
+          ...c,
+          [memberId]: c[memberId] || (total / Math.max(next.length, 1)).toFixed(2),
+        }));
+      }
+      return next;
+    });
+  };
+
+  const setCustomAmount = (memberId: string, value: string) => {
+    // Allow empty / partial input while the user types; we'll validate on save.
+    setCustomAmounts((c) => ({ ...c, [memberId]: value.replace(/[^0-9.]/g, "") }));
+  };
+
+  const switchWholeMode = (next: "equal" | "custom") => {
+    setWholeMode(next);
+    if (next === "custom") {
+      // Pre-fill blank inputs with an even share so the form is immediately usable.
+      const baseShare = wholeMembers.length > 0 ? total / wholeMembers.length : 0;
+      setCustomAmounts((c) => {
+        const out = { ...c };
+        wholeMembers.forEach((id) => {
+          if (!out[id]) out[id] = baseShare.toFixed(2);
+        });
+        return out;
+      });
+    }
   };
 
   const toggleItem = (itemId: string, memberId: string) => {
@@ -170,13 +233,23 @@ function ReceiptSplitter({
 
   const activeMembers = members.filter((m) => m.status === "active");
   const assignedTotal = useMemo(() => {
-    if (mode === "whole") return wholeMembers.length > 0 ? total : 0;
+    if (mode === "whole") {
+      if (wholeMembers.length === 0) return 0;
+      if (wholeMode === "equal") return total;
+      return wholeMembers.reduce(
+        (s, id) => s + (parseFloat(customAmounts[id] || "0") || 0),
+        0,
+      );
+    }
     return Object.entries(itemMap).reduce((s, [itemId, ids]) => {
       if (ids.length === 0) return s;
       const item = receipt.items.find((i) => i.id === itemId);
       return s + (item ? parseFloat(item.price) : 0);
     }, 0);
-  }, [mode, wholeMembers, itemMap, receipt.items, total]);
+  }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, receipt.items, total]);
+
+  const wholeCustomOff =
+    mode === "whole" && wholeMode === "custom" && Math.abs(assignedTotal - total) > 0.01;
 
   return (
     <Card className="overflow-hidden">
@@ -213,16 +286,53 @@ function ReceiptSplitter({
 
             {mode === "whole" && (
               <div className="space-y-2">
-                <div className="text-xs text-gray-500">Split equally among:</div>
-                {activeMembers.map((m) => (
-                  <label key={m.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <Checkbox checked={wholeMembers.includes(m.id)} onCheckedChange={() => toggleWhole(m.id)} />
-                    <span className="flex-1 text-sm">{m.displayName}</span>
-                    {wholeMembers.length > 0 && wholeMembers.includes(m.id) && (
-                      <span className="text-sm font-medium text-gray-700">£{(total / wholeMembers.length).toFixed(2)}</span>
-                    )}
-                  </label>
-                ))}
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => switchWholeMode("equal")}
+                    className={`px-3 py-1 rounded-full border ${wholeMode === "equal" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
+                    data-testid={`whole-mode-equal-${receipt.id}`}
+                  >
+                    Equal split
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchWholeMode("custom")}
+                    className={`px-3 py-1 rounded-full border ${wholeMode === "custom" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
+                    data-testid={`whole-mode-custom-${receipt.id}`}
+                  >
+                    Custom amounts
+                  </button>
+                </div>
+                {activeMembers.map((m) => {
+                  const selected = wholeMembers.includes(m.id);
+                  return (
+                    <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
+                      <Checkbox checked={selected} onCheckedChange={() => toggleWhole(m.id)} />
+                      <span className="flex-1 text-sm">{m.displayName}</span>
+                      {selected && wholeMode === "equal" && (
+                        <span className="text-sm font-medium text-gray-700">£{(total / wholeMembers.length).toFixed(2)}</span>
+                      )}
+                      {selected && wholeMode === "custom" && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm text-gray-500">£</span>
+                          <Input
+                            inputMode="decimal"
+                            value={customAmounts[m.id] ?? ""}
+                            onChange={(e) => setCustomAmount(m.id, e.target.value)}
+                            className="w-20 h-8 text-sm"
+                            data-testid={`custom-amount-${receipt.id}-${m.id}`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {wholeCustomOff && (
+                  <div className="text-xs text-amber-600">
+                    Custom amounts need to add up to £{total.toFixed(2)} before you can save.
+                  </div>
+                )}
               </div>
             )}
 
@@ -272,7 +382,11 @@ function ReceiptSplitter({
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 bg-green-600 hover:bg-green-700">
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || wholeCustomOff}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
                 {saveMutation.isPending ? "Saving…" : "Save split"}
               </Button>
               <Button variant="outline" onClick={() => setConfirmRemove(true)}>

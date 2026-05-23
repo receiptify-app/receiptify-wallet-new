@@ -1,22 +1,16 @@
 import type { Express, Response } from "express";
 import { randomBytes } from "crypto";
-import { db } from "./db";
+import { z } from "zod";
+import { storage } from "./storage";
+import { splitFolderStorage } from "./split-folder-storage";
+import { sendEmail } from "./email-sender";
 import {
-  splitFolders,
-  splitFolderMembers,
-  splitAssignments,
-  receipts,
-  receiptItems,
-  users,
   insertSplitFolderSchema,
   type SplitFolder,
   type SplitFolderMember,
   type SplitAssignment,
-  type Receipt,
   type ReceiptItem,
 } from "@shared/schema";
-import { and, desc, eq, inArray, ilike } from "drizzle-orm";
-import { z } from "zod";
 import { requireAuth, type AuthenticatedRequest } from "./auth-middleware";
 
 function newToken() {
@@ -28,44 +22,19 @@ function num(n: string | number | null | undefined): number {
   return typeof n === "number" ? n : parseFloat(n);
 }
 
-async function getFolderForUser(folderId: string, userId: string): Promise<SplitFolder | null> {
-  const [folder] = await db.select().from(splitFolders).where(eq(splitFolders.id, folderId));
+async function loadFolderForUser(folderId: string, userId: string): Promise<SplitFolder | null> {
+  const folder = await splitFolderStorage.getFolder(folderId);
   if (!folder) return null;
   if (folder.ownerId === userId) return folder;
-  const [member] = await db
-    .select()
-    .from(splitFolderMembers)
-    .where(
-      and(
-        eq(splitFolderMembers.folderId, folderId),
-        eq(splitFolderMembers.userId, userId),
-        eq(splitFolderMembers.status, "active"),
-      ),
-    );
-  return member ? folder : null;
+  return (await splitFolderStorage.isUserActiveInFolder(folderId, userId)) ? folder : null;
 }
 
-type FolderSummary = SplitFolder & {
-  totalAmount: number;
-  memberCount: number;
-  receiptCount: number;
-  members: SplitFolderMember[];
-  status: "settled" | "pending";
-};
-
-async function buildFolderSummary(folder: SplitFolder): Promise<FolderSummary> {
-  const members = await db
-    .select()
-    .from(splitFolderMembers)
-    .where(eq(splitFolderMembers.folderId, folder.id));
-  const folderReceipts = await db
-    .select()
-    .from(receipts)
-    .where(eq(receipts.splitFolderId, folder.id));
-  const assignments = await db
-    .select()
-    .from(splitAssignments)
-    .where(eq(splitAssignments.folderId, folder.id));
+async function buildFolderSummary(folder: SplitFolder) {
+  const [members, folderReceipts, assignments] = await Promise.all([
+    splitFolderStorage.listMembers(folder.id),
+    splitFolderStorage.listFolderReceipts(folder.id),
+    splitFolderStorage.listAssignments(folder.id),
+  ]);
   const totalAmount = folderReceipts.reduce((s, r) => s + num(r.total), 0);
   const allSettled =
     assignments.length > 0 && assignments.every((a) => a.status === "paid");
@@ -102,40 +71,28 @@ const setAssignmentsBody = z.object({
   assignments: z.array(assignmentInput),
 });
 
+function inviteEmailBody(folderName: string, inviterName: string, link: string) {
+  const text = `${inviterName} invited you to split receipts on Receiptify.\n\nFolder: ${folderName}\n\nJoin: ${link}\n\nIf you don't have an account yet, you'll be asked to sign up first.`;
+  const html = `<p><strong>${inviterName}</strong> invited you to split receipts on <strong>Receiptify</strong>.</p>
+<p>Folder: <strong>${folderName}</strong></p>
+<p><a href="${link}">Tap here to join the folder</a></p>
+<p style="color:#666;font-size:12px">If you don't have an account yet, you'll be asked to sign up first.</p>`;
+  return { text, html };
+}
+
 export function registerSplitFolderRoutes(app: Express) {
-  // --- Username autocomplete (for invite typeahead) ---
+  // --- Username autocomplete (username-only to avoid email probing) ---
   app.get("/api/users/search", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const q = String(req.query.q || "").trim();
     if (q.length < 1) return res.json([]);
-    // Username-only search so this can't be abused to probe whether arbitrary emails are registered.
-    const rows = await db
-      .select({ id: users.id, username: users.username, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
-      .from(users)
-      .where(ilike(users.username, `${q}%`))
-      .limit(8);
-    res.json(rows.filter((r) => r.id !== req.user!.id));
+    const rows = await splitFolderStorage.searchUsernames(q, req.user!.id);
+    res.json(rows);
   });
 
   // --- List folders the user belongs to ---
   app.get("/api/split-folders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user!.id;
-    const owned = await db.select().from(splitFolders).where(eq(splitFolders.ownerId, userId));
-    const memberships = await db
-      .select({ folderId: splitFolderMembers.folderId })
-      .from(splitFolderMembers)
-      .where(
-        and(eq(splitFolderMembers.userId, userId), eq(splitFolderMembers.status, "active")),
-      );
-    const memberFolderIds = memberships.map((m) => m.folderId);
-    const memberFolders = memberFolderIds.length
-      ? await db.select().from(splitFolders).where(inArray(splitFolders.id, memberFolderIds))
-      : [];
-    const map = new Map<string, SplitFolder>();
-    [...owned, ...memberFolders].forEach((f) => map.set(f.id, f));
-    const summaries = await Promise.all(Array.from(map.values()).map(buildFolderSummary));
-    summaries.sort(
-      (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
-    );
+    const folders = await splitFolderStorage.listFoldersForUser(req.user!.id);
+    const summaries = await Promise.all(folders.map(buildFolderSummary));
     res.json(summaries);
   });
 
@@ -144,19 +101,15 @@ export function registerSplitFolderRoutes(app: Express) {
     try {
       const body = createFolderBody.parse(req.body);
       const userId = req.user!.id;
-      const [folder] = await db
-        .insert(splitFolders)
-        .values({ ...body, ownerId: userId })
-        .returning();
-      // Add owner as an active member so they show up in member lists and assignments.
-      await db.insert(splitFolderMembers).values({
+      const folder = await splitFolderStorage.createFolder({ ...body, ownerId: userId });
+      // Owner is added as an active member so they show up in member lists and assignments.
+      await splitFolderStorage.createMember({
         folderId: folder.id,
         userId,
         displayName: req.user!.name || req.user!.email || "You",
         inviteToken: newToken(),
         status: "active",
         role: "owner",
-        joinedAt: new Date(),
       });
       res.status(201).json(folder);
     } catch (err: any) {
@@ -167,26 +120,15 @@ export function registerSplitFolderRoutes(app: Express) {
   // --- Get folder detail ---
   app.get("/api/split-folders/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
-    const folder = await getFolderForUser(req.params.id, userId);
+    const folder = await loadFolderForUser(req.params.id, userId);
     if (!folder) return res.status(404).json({ error: "Folder not found" });
 
-    const members = await db
-      .select()
-      .from(splitFolderMembers)
-      .where(eq(splitFolderMembers.folderId, folder.id));
-    const folderReceipts = await db
-      .select()
-      .from(receipts)
-      .where(eq(receipts.splitFolderId, folder.id))
-      .orderBy(desc(receipts.date));
-    const receiptIds = folderReceipts.map((r) => r.id);
-    const items = receiptIds.length
-      ? await db.select().from(receiptItems).where(inArray(receiptItems.receiptId, receiptIds))
-      : [];
-    const assignments = await db
-      .select()
-      .from(splitAssignments)
-      .where(eq(splitAssignments.folderId, folder.id));
+    const [members, folderReceipts, assignments] = await Promise.all([
+      splitFolderStorage.listMembers(folder.id),
+      splitFolderStorage.listFolderReceipts(folder.id),
+      splitFolderStorage.listAssignments(folder.id),
+    ]);
+    const items = await splitFolderStorage.getReceiptItemsForReceipts(folderReceipts.map((r) => r.id));
 
     const itemsByReceipt = new Map<string, ReceiptItem[]>();
     items.forEach((it) => {
@@ -201,7 +143,7 @@ export function registerSplitFolderRoutes(app: Express) {
       assignmentsByReceipt.set(a.receiptId, arr);
     });
 
-    // Settlement aggregated per member
+    // Per-member settlement is always computed, never stored.
     const settlement = members
       .filter((m) => m.status !== "removed")
       .map((m) => {
@@ -239,82 +181,56 @@ export function registerSplitFolderRoutes(app: Express) {
     });
   });
 
-  // --- Attach a receipt to the folder (moves it if it was in another) ---
+  // --- Attach a receipt (moves it from any prior folder, clearing old assignments) ---
   app.post(
     "/api/split-folders/:id/receipts",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
-      const folder = await getFolderForUser(req.params.id, userId);
+      const folder = await loadFolderForUser(req.params.id, userId);
       if (!folder) return res.status(404).json({ error: "Folder not found" });
       const receiptId = z.string().parse(req.body?.receiptId);
-      const [receipt] = await db.select().from(receipts).where(eq(receipts.id, receiptId));
+      const receipt = await storage.getReceipt(receiptId);
       if (!receipt || receipt.userId !== userId) {
         return res.status(404).json({ error: "Receipt not found" });
       }
       if (receipt.splitFolderId && receipt.splitFolderId !== folder.id) {
-        // Clear assignments from the previous folder for this receipt.
-        await db
-          .delete(splitAssignments)
-          .where(
-            and(
-              eq(splitAssignments.folderId, receipt.splitFolderId),
-              eq(splitAssignments.receiptId, receiptId),
-            ),
-          );
+        await splitFolderStorage.clearReceiptAssignments(receipt.splitFolderId, receiptId);
       }
-      const [updated] = await db
-        .update(receipts)
-        .set({ splitFolderId: folder.id })
-        .where(eq(receipts.id, receiptId))
-        .returning();
+      const updated = await splitFolderStorage.attachReceipt(receiptId, folder.id);
       res.json(updated);
     },
   );
 
-  // --- Detach a receipt from a folder ---
-  // Only the receipt owner or the folder owner may detach, since this wipes assignments.
+  // --- Detach a receipt — only the receipt owner or the folder owner can do this ---
   app.delete(
     "/api/split-folders/:id/receipts/:receiptId",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
-      const folder = await getFolderForUser(req.params.id, userId);
+      const folder = await loadFolderForUser(req.params.id, userId);
       if (!folder) return res.status(404).json({ error: "Folder not found" });
-      const [receipt] = await db
-        .select()
-        .from(receipts)
-        .where(eq(receipts.id, req.params.receiptId));
+      const receipt = await storage.getReceipt(req.params.receiptId);
       if (!receipt || receipt.splitFolderId !== folder.id) {
         return res.status(404).json({ error: "Receipt not in folder" });
       }
       if (receipt.userId !== userId && folder.ownerId !== userId) {
         return res.status(403).json({ error: "Only the receipt owner or folder owner can remove this receipt" });
       }
-      await db
-        .delete(splitAssignments)
-        .where(
-          and(
-            eq(splitAssignments.folderId, folder.id),
-            eq(splitAssignments.receiptId, req.params.receiptId),
-          ),
-        );
-      await db
-        .update(receipts)
-        .set({ splitFolderId: null })
-        .where(and(eq(receipts.id, req.params.receiptId), eq(receipts.splitFolderId, folder.id)));
+      await splitFolderStorage.clearReceiptAssignments(folder.id, receipt.id);
+      await splitFolderStorage.detachReceipt(receipt.id, folder.id);
       res.json({ ok: true });
     },
   );
 
-  // --- Invite a member (or just generate a shareable link) ---
+  // --- Invite a member (or generate a shareable link) ---
   app.post(
     "/api/split-folders/:id/members",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user!.id;
-        const folder = await getFolderForUser(req.params.id, userId);
+        const folder = await loadFolderForUser(req.params.id, userId);
         if (!folder) return res.status(404).json({ error: "Folder not found" });
         const body = inviteBody.parse(req.body);
 
@@ -324,120 +240,124 @@ export function registerSplitFolderRoutes(app: Express) {
         let displayName = body.displayName || body.username || body.email || "Invited friend";
 
         if (body.username) {
-          const [u] = await db
-            .select()
-            .from(users)
-            .where(eq(users.username, body.username));
+          const u = await splitFolderStorage.findUserByUsername(body.username);
           if (u) {
             invitedUserId = u.id;
             displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || displayName;
           }
         } else if (body.email) {
-          const [u] = await db.select().from(users).where(eq(users.email, body.email));
+          const u = await splitFolderStorage.findUserByEmail(body.email);
           if (u) {
             invitedUserId = u.id;
             displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || body.email;
           }
         }
 
-        const [member] = await db
-          .insert(splitFolderMembers)
-          .values({
-            folderId: folder.id,
-            userId: invitedUserId,
-            inviteEmail,
-            inviteUsername,
-            displayName,
-            inviteToken: newToken(),
-            // If the invitee already has a Receiptify account we mark them active straight away.
-            status: invitedUserId ? "active" : "invited",
-            role: "member",
-            joinedAt: invitedUserId ? new Date() : null,
-          })
-          .returning();
-        res.status(201).json(member);
+        const member = await splitFolderStorage.createMember({
+          folderId: folder.id,
+          userId: invitedUserId,
+          inviteEmail,
+          inviteUsername,
+          displayName,
+          inviteToken: newToken(),
+          // If the invitee already has a Receiptify account, mark them active straight away.
+          status: invitedUserId ? "active" : "invited",
+          role: "member",
+        });
+        if (invitedUserId) {
+          await splitFolderStorage.updateMember(member.id, { joinedAt: new Date() });
+        }
+
+        // Email dispatch for email-based invites only (link tab returns the URL for manual share)
+        let emailSent = false;
+        let emailError: string | undefined;
+        if (body.email && !body.generateLinkOnly) {
+          const origin =
+            req.headers.origin?.toString() ||
+            `${req.protocol}://${req.get("host")}`;
+          const link = `${origin}/split/invite/${member.inviteToken}`;
+          const inviter = req.user!.name || req.user!.email || "A friend";
+          const { text, html } = inviteEmailBody(folder.name, inviter, link);
+          const result = await sendEmail({
+            to: body.email,
+            subject: `${inviter} invited you to split a Receiptify folder`,
+            text,
+            html,
+          });
+          emailSent = result.sent;
+          emailError = result.reason;
+        }
+
+        res.status(201).json({ ...member, emailSent, emailError });
       } catch (err: any) {
         res.status(400).json({ error: err?.message || "Failed to invite" });
       }
     },
   );
 
-  // --- Remove a member ---
+  // --- Remove a member (owner only) ---
   app.delete(
     "/api/split-folders/:id/members/:memberId",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
-      const folder = await getFolderForUser(req.params.id, userId);
+      const folder = await loadFolderForUser(req.params.id, userId);
       if (!folder) return res.status(404).json({ error: "Folder not found" });
       if (folder.ownerId !== userId) {
         return res.status(403).json({ error: "Only the folder owner can remove members" });
       }
-      const [member] = await db
-        .select()
-        .from(splitFolderMembers)
-        .where(eq(splitFolderMembers.id, req.params.memberId));
+      const member = await splitFolderStorage.getMember(req.params.memberId);
       if (!member || member.folderId !== folder.id) {
         return res.status(404).json({ error: "Member not found" });
       }
       if (member.role === "owner") {
         return res.status(400).json({ error: "Cannot remove the folder owner" });
       }
-      await db
-        .delete(splitAssignments)
-        .where(eq(splitAssignments.memberId, member.id));
-      await db
-        .update(splitFolderMembers)
-        .set({ status: "removed" })
-        .where(eq(splitFolderMembers.id, member.id));
+      await splitFolderStorage.clearMemberAssignments(member.id);
+      await splitFolderStorage.updateMember(member.id, { status: "removed" });
       res.json({ ok: true });
     },
   );
 
-  // --- Accept invite (auth required, joins current user to folder) ---
+  // --- Accept invite (auth required) ---
   app.post(
     "/api/split-folders/invites/:token/accept",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
-      const [member] = await db
-        .select()
-        .from(splitFolderMembers)
-        .where(eq(splitFolderMembers.inviteToken, req.params.token));
+      const member = await splitFolderStorage.getMemberByToken(req.params.token);
       if (!member) return res.status(404).json({ error: "Invite not found" });
       if (member.status === "removed") {
         return res.status(410).json({ error: "Invite revoked" });
       }
-      // If the seat is unclaimed, bind it to this user.
       if (!member.userId) {
-        await db
-          .update(splitFolderMembers)
-          .set({ userId, status: "active", joinedAt: new Date() })
-          .where(eq(splitFolderMembers.id, member.id));
+        await splitFolderStorage.updateMember(member.id, {
+          userId,
+          status: "active",
+          joinedAt: new Date(),
+        });
       } else if (member.userId !== userId) {
         return res.status(403).json({ error: "This invite belongs to another account" });
       } else if (member.status !== "active") {
-        await db
-          .update(splitFolderMembers)
-          .set({ status: "active", joinedAt: new Date() })
-          .where(eq(splitFolderMembers.id, member.id));
+        await splitFolderStorage.updateMember(member.id, { status: "active", joinedAt: new Date() });
       }
       res.json({ folderId: member.folderId });
     },
   );
 
-  // --- Public invite preview (no auth) so the join page can show folder name ---
+  // --- Public invite preview (no auth) for the join page ---
   app.get("/api/split-folders/invites/:token", async (req, res: Response) => {
-    const [member] = await db
-      .select()
-      .from(splitFolderMembers)
-      .where(eq(splitFolderMembers.inviteToken, req.params.token));
+    const member = await splitFolderStorage.getMemberByToken(req.params.token);
     if (!member || member.status === "removed") {
       return res.status(404).json({ error: "Invite not found" });
     }
-    const [folder] = await db.select().from(splitFolders).where(eq(splitFolders.id, member.folderId));
+    const folder = await splitFolderStorage.getFolder(member.folderId);
     if (!folder) return res.status(404).json({ error: "Invite not found" });
-    res.json({ folderName: folder.name, folderDescription: folder.description, alreadyActive: member.status === "active" });
+    res.json({
+      folderName: folder.name,
+      folderDescription: folder.description,
+      alreadyActive: member.status === "active",
+    });
   });
 
   // --- Set split mode + assignments for a receipt in a folder ---
@@ -447,22 +367,18 @@ export function registerSplitFolderRoutes(app: Express) {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user!.id;
-        const folder = await getFolderForUser(req.params.id, userId);
+        const folder = await loadFolderForUser(req.params.id, userId);
         if (!folder) return res.status(404).json({ error: "Folder not found" });
-        const [receipt] = await db
-          .select()
-          .from(receipts)
-          .where(eq(receipts.id, req.params.receiptId));
+        const receipt = await storage.getReceipt(req.params.receiptId);
         if (!receipt || receipt.splitFolderId !== folder.id) {
           return res.status(404).json({ error: "Receipt not in folder" });
         }
-        // Only the receipt owner or folder owner can change who pays what.
         if (receipt.userId !== userId && folder.ownerId !== userId) {
           return res.status(403).json({ error: "Only the receipt owner or folder owner can edit assignments" });
         }
         const body = setAssignmentsBody.parse(req.body);
 
-        // Validate the total of all share amounts is within a small rounding tolerance
+        // Validate that the sum of share amounts is within a small rounding tolerance
         // of the receipt total — prevents clients sending arbitrary inflated/deflated shares.
         const sum = body.assignments.reduce((s, a) => s + parseFloat(a.shareAmount || "0"), 0);
         const receiptTotal = parseFloat(receipt.total);
@@ -473,46 +389,30 @@ export function registerSplitFolderRoutes(app: Express) {
           });
         }
 
+        // Make sure every memberId actually belongs to this folder.
         const memberIds = new Set(body.assignments.map((a) => a.memberId));
         if (memberIds.size > 0) {
-          const memberRows = await db
-            .select()
-            .from(splitFolderMembers)
-            .where(inArray(splitFolderMembers.id, Array.from(memberIds)));
-          if (memberRows.length !== memberIds.size || memberRows.some((m) => m.folderId !== folder.id)) {
-            return res.status(400).json({ error: "Invalid member references" });
+          const folderMembers = await splitFolderStorage.listMembers(folder.id);
+          const validIds = new Set(folderMembers.map((m) => m.id));
+          for (const id of Array.from(memberIds)) {
+            if (!validIds.has(id)) {
+              return res.status(400).json({ error: "Invalid member references" });
+            }
           }
         }
 
-        await db
-          .delete(splitAssignments)
-          .where(
-            and(
-              eq(splitAssignments.folderId, folder.id),
-              eq(splitAssignments.receiptId, receipt.id),
-            ),
-          );
-        if (body.assignments.length) {
-          await db.insert(splitAssignments).values(
-            body.assignments.map((a) => ({
-              folderId: folder.id,
-              receiptId: receipt.id,
-              memberId: a.memberId,
-              itemId: a.itemId || null,
-              shareAmount: a.shareAmount,
-              status: "pending" as const,
-            })),
-          );
-        }
-        const rows = await db
-          .select()
-          .from(splitAssignments)
-          .where(
-            and(
-              eq(splitAssignments.folderId, folder.id),
-              eq(splitAssignments.receiptId, receipt.id),
-            ),
-          );
+        const rows = await splitFolderStorage.replaceReceiptAssignments(
+          folder.id,
+          receipt.id,
+          body.assignments.map((a) => ({
+            folderId: folder.id,
+            receiptId: receipt.id,
+            memberId: a.memberId,
+            itemId: a.itemId || null,
+            shareAmount: a.shareAmount,
+            status: "pending",
+          })),
+        );
         res.json({ assignments: rows, mode: body.mode });
       } catch (err: any) {
         res.status(400).json({ error: err?.message || "Failed to save assignments" });
@@ -520,34 +420,22 @@ export function registerSplitFolderRoutes(app: Express) {
     },
   );
 
-  // --- Mark a member's outstanding assignments as paid ---
+  // --- Mark a member's outstanding assignments as paid (owner only) ---
   app.post(
     "/api/split-folders/:id/members/:memberId/settle",
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
-      const folder = await getFolderForUser(req.params.id, userId);
+      const folder = await loadFolderForUser(req.params.id, userId);
       if (!folder) return res.status(404).json({ error: "Folder not found" });
-      // Only the folder owner can confirm a member has paid, so a debtor can't fake settlement.
       if (folder.ownerId !== userId) {
         return res.status(403).json({ error: "Only the folder owner can mark settlement" });
       }
-      const [member] = await db
-        .select()
-        .from(splitFolderMembers)
-        .where(eq(splitFolderMembers.id, req.params.memberId));
+      const member = await splitFolderStorage.getMember(req.params.memberId);
       if (!member || member.folderId !== folder.id) {
         return res.status(404).json({ error: "Member not found" });
       }
-      await db
-        .update(splitAssignments)
-        .set({ status: "paid" })
-        .where(
-          and(
-            eq(splitAssignments.folderId, folder.id),
-            eq(splitAssignments.memberId, member.id),
-          ),
-        );
+      await splitFolderStorage.markMemberSettled(folder.id, member.id);
       res.json({ ok: true });
     },
   );
