@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { useTranslation } from 'react-i18next';
 import { Seo } from "@/components/seo";
+import { getPostAuthRedirect } from "@/lib/post-auth-redirect";
 
 interface LoginForm {
   email: string;
@@ -67,13 +68,7 @@ export default function Login() {
     try {
       await login(data.email, data.password);
       trackActivity('signup_completed', { method: 'email' });
-      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
-      if (pendingInvite) {
-        sessionStorage.removeItem("pendingSplitInvite");
-        navigate(`/split/invite/${pendingInvite}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostAuthRedirect());
     } catch (error) {
       console.error("Login error:", error);
       trackActivity('signup_dropped', { method: 'email', reason: 'login_failed' });
@@ -87,13 +82,7 @@ export default function Login() {
     try {
       await signInWithGoogle();
       trackActivity('signup_completed', { method: 'google' });
-      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
-      if (pendingInvite) {
-        sessionStorage.removeItem("pendingSplitInvite");
-        navigate(`/split/invite/${pendingInvite}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostAuthRedirect());
     } catch (error) {
       console.error(`${provider} login error:`, error);
       trackActivity('signup_dropped', { method: 'google', reason: 'cancelled_or_failed' });

@@ -7,6 +7,7 @@ import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { setPendingSplitInvite, consumePendingSplitInvite } from "@/lib/post-auth-redirect";
 
 export default function SplitInvitePage() {
   const params = useParams();
@@ -25,6 +26,7 @@ export default function SplitInvitePage() {
       return res.json() as Promise<{ folderId: string }>;
     },
     onSuccess: (data) => {
+      consumePendingSplitInvite();
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
       toast({ title: "You're in!", description: `Joined ${preview?.folderName ?? "the folder"}.` });
       navigate(`/split/${data.folderId}`);
@@ -34,7 +36,7 @@ export default function SplitInvitePage() {
 
   // Save token so post-login flow can return here.
   useEffect(() => {
-    if (token) sessionStorage.setItem("pendingSplitInvite", token);
+    if (token) setPendingSplitInvite(token);
   }, [token]);
 
   if (!currentUser) {

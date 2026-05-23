@@ -33,6 +33,16 @@ import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import VerifyEmail from "@/pages/verify-email";
 import SitemapPage from "@/pages/sitemap";
+import { getPostAuthRedirect } from "@/lib/post-auth-redirect";
+
+function PostAuthRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    const dest = getPostAuthRedirect();
+    navigate(dest, { replace: true });
+  }, [navigate]);
+  return null;
+}
 
 function UserSync() {
   const { currentUser } = useAuth();
@@ -107,9 +117,9 @@ function AuthenticatedRouter() {
         <Route path="/exports" component={ExportReceiptsPage} />
         {/* <Route path="/warranties" component={Warranties} /> */}
         <Route path="/test-auth" component={TestAuth} />
-        <Route path="/login">{() => { window.location.href = "/"; return null; }}</Route>
-        <Route path="/signup">{() => { window.location.href = "/"; return null; }}</Route>
-        <Route path="/forgot-password">{() => { window.location.href = "/"; return null; }}</Route>
+        <Route path="/login">{() => <PostAuthRedirect />}</Route>
+        <Route path="/signup">{() => <PostAuthRedirect />}</Route>
+        <Route path="/forgot-password">{() => <PostAuthRedirect />}</Route>
         <Route component={NotFound} />
       </Switch>
       <BottomNavigation />

@@ -34,6 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Seo } from "@/components/seo";
+import { getPostAuthRedirect } from "@/lib/post-auth-redirect";
 
 interface SignupForm {
   name: string;
@@ -169,13 +170,7 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signup(data.email, data.password, data.name, data.username.toLowerCase());
-      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
-      if (pendingInvite) {
-        sessionStorage.removeItem("pendingSplitInvite");
-        navigate(`/split/invite/${pendingInvite}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostAuthRedirect());
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -187,13 +182,7 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      const pendingInvite = sessionStorage.getItem("pendingSplitInvite");
-      if (pendingInvite) {
-        sessionStorage.removeItem("pendingSplitInvite");
-        navigate(`/split/invite/${pendingInvite}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostAuthRedirect());
     } catch (error) {
       console.error(`${provider} signup error:`, error);
     } finally {
