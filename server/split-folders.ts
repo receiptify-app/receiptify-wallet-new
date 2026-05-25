@@ -351,7 +351,7 @@ export function registerSplitFolderRoutes(app: Express) {
         if (body.email) {
           const u = await splitFolderStorage.findUserByEmail(body.email);
           if (u) {
-            invitedUserId = u.id;
+            invitedUserId = u.providerId ?? null;
             displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || body.email;
           }
         }
