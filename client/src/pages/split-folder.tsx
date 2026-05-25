@@ -73,6 +73,20 @@ function initials(name?: string | null) {
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || name[0].toUpperCase();
 }
 
+function computeShares(amount: number, memberIds: string[]): { memberId: string; share: string }[] {
+  if (memberIds.length === 0) return [];
+  const share = amount / memberIds.length;
+  let runningSum = 0;
+  return memberIds.map((memberId, idx) => {
+    const raw =
+      idx === memberIds.length - 1
+        ? (amount - runningSum).toFixed(2)
+        : share.toFixed(2);
+    runningSum += parseFloat(raw);
+    return { memberId, share: raw };
+  });
+}
+
 // Per-receipt editor — handles both split modes and persists via the mutation.
 function ReceiptSplitter({
   receipt,
@@ -385,15 +399,18 @@ function ReceiptSplitter({
                 )}
                 {receipt.items.map((item) => {
                   const assigned = itemMap[item.id] || [];
+                  const itemPrice = parseFloat(item.price);
+                  const shares = computeShares(itemPrice, assigned);
                   return (
                     <div key={item.id} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-medium">{item.name}</div>
-                        <div className="text-sm font-semibold">£{parseFloat(item.price).toFixed(2)}</div>
+                        <div className="text-sm font-semibold">£{itemPrice.toFixed(2)}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {activeMembers.map((m) => {
                           const on = assigned.includes(m.id);
+                          const shareEntry = shares.find((s) => s.memberId === m.id);
                           return (
                             <button
                               key={m.id}
@@ -403,8 +420,8 @@ function ReceiptSplitter({
                               data-testid={`item-${item.id}-member-${m.id}`}
                             >
                               {initials(m.displayName)}
-                              {on && assigned.length > 0 && (
-                                <span className="ml-1">£{(parseFloat(item.price) / assigned.length).toFixed(2)}</span>
+                              {on && shareEntry && (
+                                <span className="ml-1">£{shareEntry.share}</span>
                               )}
                             </button>
                           );
@@ -426,6 +443,8 @@ function ReceiptSplitter({
                     <div className="flex flex-wrap gap-1">
                       {activeMembers.map((m) => {
                         const on = additionalMembers.includes(m.id);
+                        const addShares = computeShares(additionalAmount, additionalMembers);
+                        const shareEntry = addShares.find((s) => s.memberId === m.id);
                         return (
                           <button
                             key={m.id}
@@ -435,8 +454,8 @@ function ReceiptSplitter({
                             data-testid={`additional-member-${m.id}`}
                           >
                             {initials(m.displayName)}
-                            {on && additionalMembers.length > 0 && (
-                              <span className="ml-1">£{(additionalAmount / additionalMembers.length).toFixed(2)}</span>
+                            {on && shareEntry && (
+                              <span className="ml-1">£{shareEntry.share}</span>
                             )}
                           </button>
                         );
