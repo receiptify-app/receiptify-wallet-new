@@ -64,10 +64,11 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
     onError: (err: any) => toast({ title: "Invite failed", description: err.message, variant: "destructive" }),
   });
 
-  const reset = () => { setLinkUrl(null); setCopied(false); setEmail(""); setLinkName(""); };
+  const resetTabState = () => { setLinkUrl(null); setCopied(false); setEmail(""); };
+  const resetAll = () => { resetTabState(); setLinkName(""); };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetAll(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Invite a friend</DialogTitle>
@@ -82,7 +83,7 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
           ].map(({ k, label, icon: Icon }) => (
             <button
               key={k}
-              onClick={() => { setTab(k as any); reset(); }}
+              onClick={() => { setTab(k as any); resetTabState(); }}
               className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-medium ${tab === k ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600"}`}
               data-testid={`invite-tab-${k}`}
             >
@@ -92,18 +93,29 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
         </div>
 
         {tab === "email" && (
-          <div className="space-y-2">
-            <Label htmlFor="invite-email">Email address</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="friend@example.com"
-              data-testid="input-invite-email"
-            />
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="invite-name">Friend's name</Label>
+              <Input
+                id="invite-name"
+                value={linkName}
+                onChange={(e) => setLinkName(e.target.value)}
+                placeholder="e.g. Sarah"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="invite-email">Email address</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="friend@example.com"
+                data-testid="input-invite-email"
+              />
+            </div>
             <Button
-              onClick={() => inviteMutation.mutate({ email: email.trim() })}
+              onClick={() => inviteMutation.mutate({ email: email.trim(), displayName: linkName.trim() || undefined })}
               disabled={!email.trim() || inviteMutation.isPending}
               className="w-full bg-green-600 hover:bg-green-700"
             >

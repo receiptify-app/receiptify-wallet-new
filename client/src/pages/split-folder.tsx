@@ -636,7 +636,6 @@ export default function SplitFolderPage() {
                     <div className="text-sm font-medium truncate">{m.displayName}</div>
                     <div className="text-xs text-gray-500">
                       {m.role === "owner" ? "Owner" : m.status === "invited" ? "Invited" : "Member"}
-                      {m.inviteEmail && ` · ${m.inviteEmail}`}
                     </div>
                   </div>
                   {isOwner && m.role !== "owner" && m.status === "invited" && m.inviteEmail && (
