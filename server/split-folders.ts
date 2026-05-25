@@ -70,7 +70,7 @@ async function buildFolderSummary(folder: SplitFolder) {
     totalAmount,
     memberCount: members.filter((m) => m.status !== "removed").length,
     receiptCount: folderReceipts.length,
-    members: members.map(sanitizeMember),
+    members: members.filter((m) => m.status !== "removed").map(sanitizeMember),
     status: allSettled ? "settled" : "pending",
   };
 }
@@ -284,7 +284,7 @@ export function registerSplitFolderRoutes(app: Express) {
 
     res.json({
       folder,
-      members: members.map(sanitizeMember),
+      members: members.filter((m) => m.status !== "removed").map(sanitizeMember),
       receipts: folderReceipts.map((r) => ({
         ...r,
         total: String(totalInGBP(r)),

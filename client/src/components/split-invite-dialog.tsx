@@ -21,6 +21,7 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
   const [tab, setTab] = useState<"username" | "email" | "link">("username");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [linkName, setLinkName] = useState("");
   const [copied, setCopied] = useState(false);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
     onError: (err: any) => toast({ title: "Invite failed", description: err.message, variant: "destructive" }),
   });
 
-  const reset = () => { setLinkUrl(null); setCopied(false); setUsername(""); setEmail(""); };
+  const reset = () => { setLinkUrl(null); setCopied(false); setUsername(""); setEmail(""); setLinkName(""); };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
@@ -174,9 +175,18 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
         {tab === "link" && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600">Generate a shareable invite link anyone with the URL can use to join.</p>
+            <div className="space-y-1">
+              <Label htmlFor="link-name">Friend's name</Label>
+              <Input
+                id="link-name"
+                value={linkName}
+                onChange={(e) => setLinkName(e.target.value)}
+                placeholder="e.g. Sarah"
+              />
+            </div>
             {!linkUrl ? (
               <Button
-                onClick={() => inviteMutation.mutate({ generateLinkOnly: true, displayName: "Invited friend" })}
+                onClick={() => inviteMutation.mutate({ generateLinkOnly: true, displayName: linkName.trim() || "Invited friend" })}
                 disabled={inviteMutation.isPending}
                 className="w-full bg-green-600 hover:bg-green-700"
                 data-testid="button-generate-link"
