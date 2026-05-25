@@ -463,21 +463,41 @@ export function registerSplitFolderRoutes(app: Express) {
     requireAuth,
     async (req: AuthenticatedRequest, res: Response) => {
       const userId = req.user!.id;
+      const userEmail = req.user!.email?.toLowerCase() ?? null;
       const member = await splitFolderStorage.getMemberByToken(req.params.token);
       if (!member) return res.status(404).json({ error: "Invite not found" });
       if (member.status === "removed") {
         return res.status(410).json({ error: "Invite revoked" });
       }
-      if (!member.userId) {
-        await splitFolderStorage.updateMember(member.id, {
-          userId,
-          status: "active",
-          joinedAt: new Date(),
-        });
-      } else if (member.userId !== userId) {
+
+      // Resolve the current user's DB record so we can match against either
+      // their Firebase UID or their internal DB UUID (older invites may have
+      // stored either one).
+      const currentDbUser = await storage.getUserByProviderId("firebase", userId);
+      const possibleIds = new Set<string>([userId]);
+      if (currentDbUser?.id) possibleIds.add(currentDbUser.id);
+
+      const inviteEmailLc = member.inviteEmail?.toLowerCase() ?? null;
+      const emailMatches = !!(userEmail && inviteEmailLc && userEmail === inviteEmailLc);
+      const storedIdMatches = !!(member.userId && possibleIds.has(member.userId));
+
+      if (!member.userId || emailMatches || storedIdMatches) {
+        // Normalize the stored userId to the Firebase UID on every accept so
+        // future lookups (listFoldersForUser, etc.) work consistently.
+        if (member.userId !== userId || member.status !== "active") {
+          await splitFolderStorage.updateMember(member.id, {
+            userId,
+            status: "active",
+            joinedAt: member.joinedAt ?? new Date(),
+          });
+        }
+      } else {
+        console.warn(
+          `[invite] reject accept: token=${req.params.token} memberUserId=${member.userId} ` +
+            `currentUid=${userId} currentDbId=${currentDbUser?.id ?? "none"} ` +
+            `memberEmail=${inviteEmailLc} userEmail=${userEmail}`,
+        );
         return res.status(403).json({ error: "This invite belongs to another account" });
-      } else if (member.status !== "active") {
-        await splitFolderStorage.updateMember(member.id, { status: "active", joinedAt: new Date() });
       }
       res.json({ folderId: member.folderId });
     },
