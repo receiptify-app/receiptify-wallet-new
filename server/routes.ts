@@ -675,6 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: sanitized.total !== null ? String(sanitized.total) : '0.00',
           subtotal: sanitized.subtotal !== null ? String(sanitized.subtotal) : undefined,
           tax: sanitized.tax !== null ? String(sanitized.tax) : undefined,
+          serviceCharge: sanitized.serviceCharge !== null ? String(sanitized.serviceCharge) : undefined,
           date: safeParseDate(sanitized.date) || new Date(),
           category: sanitized.category || 'Shopping',
           paymentMethod: sanitized.paymentMethod || 'Unknown',
@@ -699,6 +700,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           } catch (error) {
             console.error('Error adding receipt item:', error);
+          }
+        }
+
+        // Add service charge as a line item if detected by OCR
+        const serviceChargeNum = sanitized.serviceCharge !== null ? Number(sanitized.serviceCharge) : null;
+        if (serviceChargeNum && serviceChargeNum > 0) {
+          try {
+            await storage.createReceiptItem({
+              receiptId: receipt.id,
+              name: "Service Charge",
+              price: serviceChargeNum.toFixed(2),
+              quantity: "1",
+              category: "Other"
+            });
+          } catch (error) {
+            console.error('Error adding service charge item:', error);
+          }
+        }
+
+        // Calculate any remaining gap (total - items - serviceCharge - tax) and add as "Other Additional Charges"
+        const taxNum = sanitized.tax !== null ? Number(sanitized.tax) : 0;
+        const itemsSum = extractedData.items.reduce((s: number, it: any) => s + (Number(it.price) || 0), 0);
+        const totalNum = sanitized.total !== null ? Number(sanitized.total) : 0;
+        const otherCharges = totalNum - itemsSum - (serviceChargeNum || 0) - (taxNum || 0);
+        if (otherCharges > 0.01) {
+          try {
+            await storage.createReceiptItem({
+              receiptId: receipt.id,
+              name: "Other Additional Charges",
+              price: otherCharges.toFixed(2),
+              quantity: "1",
+              category: "Other"
+            });
+          } catch (error) {
+            console.error('Error adding other additional charges item:', error);
           }
         }
         
@@ -1857,6 +1893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     copy.total = toNum(copy.total);
     copy.subtotal = toNum(copy.subtotal);
     copy.tax = toNum(copy.tax);
+    copy.serviceCharge = toNum(copy.serviceCharge);
     copy.confidence = toNum(copy.confidence);
 
     if (copy.items && Array.isArray(copy.items)) {

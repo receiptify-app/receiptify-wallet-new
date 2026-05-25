@@ -23,6 +23,7 @@ export interface ParsedReceiptData {
   total: string;
   subtotal?: string;
   tax?: string;
+  serviceCharge?: string;
   date?: Date;
   receiptNumber?: string;
   paymentMethod?: string;
@@ -50,9 +51,12 @@ IMPORTANT RULES:
 3. Detect the currency symbol used (£, $, €, etc.) and include it in the currency field
 4. Parse the date into ISO 8601 format (YYYY-MM-DDTHH:mm:ss.000Z)
 5. If you cannot find a value, use null
-6. For items, extract each line item with its name, price, and quantity (default quantity to 1 if not specified)
+6. For items, extract each PRODUCT/FOOD line item with its name, price, and quantity (default quantity to 1 if not specified). Do NOT include subtotal, tax, service charge, or total lines as items.
 7. Identify the merchant/store name from the top of the receipt
 8. Categorize the purchase into one of: Groceries, Dining, Transport, Healthcare, Electronics, Shopping, Entertainment, Travel, Utilities, Other
+9. SERVICE CHARGE DETECTION: Look for any of these near the bottom of the receipt (after subtotal, before total): "service charge", "svc chg", "serv charge", "gratuity", "tip", "service fee", lines like "10% service", "12.5% service charge", etc. Extract the numeric amount into the serviceCharge field. Support percentage-based lines (e.g. "10% Service Charge £8.55" → serviceCharge = "8.55").
+10. TAX/VAT: Extract any VAT, GST, or sales tax amount into the tax field.
+11. SUBTOTAL: The amount before service charge and tax.
 
 Be thorough and accurate. This is a real receipt that needs precise data extraction.`;
 
@@ -117,9 +121,10 @@ export async function processReceiptWithGemini(imagePath: string): Promise<Parse
                 properties: {
                   merchantName: { type: Type.STRING, description: "Store or merchant name" },
                   location: { type: Type.STRING, description: "Store address or location" },
-                  total: { type: Type.STRING, description: "Total amount as numeric string" },
-                  subtotal: { type: Type.STRING, description: "Subtotal before tax" },
-                  tax: { type: Type.STRING, description: "Tax amount" },
+                  total: { type: Type.STRING, description: "Final total amount as numeric string" },
+                  subtotal: { type: Type.STRING, description: "Subtotal before service charge and tax" },
+                  tax: { type: Type.STRING, description: "Tax/VAT/GST amount as numeric string" },
+                  serviceCharge: { type: Type.STRING, description: "Service charge, gratuity, or tip amount as numeric string (look for: service charge, svc chg, gratuity, tip, 10% service, etc.)" },
                   date: { type: Type.STRING, description: "Date in ISO 8601 format" },
                   receiptNumber: { type: Type.STRING, description: "Receipt or transaction number" },
                   paymentMethod: { type: Type.STRING, description: "Payment method used (Card, Cash, etc.)" },
@@ -200,6 +205,7 @@ export async function processReceiptWithGemini(imagePath: string): Promise<Parse
       total: parsed.total || "0.00",
       subtotal: parsed.subtotal || undefined,
       tax: parsed.tax || undefined,
+      serviceCharge: parsed.serviceCharge || undefined,
       date: parsed.date ? new Date(parsed.date) : undefined,
       receiptNumber: parsed.receiptNumber || undefined,
       paymentMethod: parsed.paymentMethod || "Unknown",

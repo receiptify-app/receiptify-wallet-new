@@ -114,12 +114,18 @@ function ReceiptSplitter({
 
   // per-item state: itemId -> memberId[]
   const initialItemMap: Record<string, string[]> = {};
+  const initialAdditionalMembers: string[] = [];
   receipt.assignments.forEach((a) => {
     if (a.itemId) {
       (initialItemMap[a.itemId] ||= []).push(a.memberId);
+    } else if (initialMode === "items") {
+      // null-itemId in items mode = additional charges assignment
+      if (!initialAdditionalMembers.includes(a.memberId)) initialAdditionalMembers.push(a.memberId);
     }
   });
   const [itemMap, setItemMap] = useState<Record<string, string[]>>(initialItemMap);
+  // additional charges split (virtual row for gap between sum-of-items and receipt total)
+  const [additionalMembers, setAdditionalMembers] = useState<string[]>(initialAdditionalMembers);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -169,6 +175,20 @@ function ReceiptSplitter({
             assignments.push({ memberId, itemId: item.id, shareAmount: raw });
           });
         });
+        // Additional charges (gap between item prices and receipt total)
+        const additionalAmount = parseFloat((total - receipt.items.reduce((s, i) => s + parseFloat(i.price), 0)).toFixed(2));
+        if (additionalAmount > 0.01 && additionalMembers.length > 0) {
+          const share = additionalAmount / additionalMembers.length;
+          let runningSum = 0;
+          additionalMembers.forEach((memberId, idx) => {
+            const raw =
+              idx === additionalMembers.length - 1
+                ? (additionalAmount - runningSum).toFixed(2)
+                : share.toFixed(2);
+            runningSum += parseFloat(raw);
+            assignments.push({ memberId, itemId: null, shareAmount: raw });
+          });
+        }
       }
       const res = await apiRequest(
         "PUT",
@@ -240,6 +260,18 @@ function ReceiptSplitter({
   };
 
   const activeMembers = members.filter((m) => m.status === "active");
+
+  // The gap between the sum of all item prices and the receipt total (covers unitemised charges)
+  const itemsSubtotal = receipt.items.reduce((s, i) => s + parseFloat(i.price), 0);
+  const additionalAmount = parseFloat((total - itemsSubtotal).toFixed(2));
+  const hasAdditional = additionalAmount > 0.01;
+
+  const toggleAdditional = (memberId: string) => {
+    setAdditionalMembers((cur) =>
+      cur.includes(memberId) ? cur.filter((m) => m !== memberId) : [...cur, memberId],
+    );
+  };
+
   const assignedTotal = useMemo(() => {
     if (mode === "whole") {
       if (wholeMembers.length === 0) return 0;
@@ -249,12 +281,14 @@ function ReceiptSplitter({
         0,
       );
     }
-    return Object.entries(itemMap).reduce((s, [itemId, ids]) => {
+    const itemsAssigned = Object.entries(itemMap).reduce((s, [itemId, ids]) => {
       if (ids.length === 0) return s;
       const item = receipt.items.find((i) => i.id === itemId);
       return s + (item ? parseFloat(item.price) : 0);
     }, 0);
-  }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, receipt.items, total]);
+    const addAssigned = hasAdditional && additionalMembers.length > 0 ? additionalAmount : 0;
+    return itemsAssigned + addAssigned;
+  }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, receipt.items, total, additionalMembers, additionalAmount, hasAdditional]);
 
   const wholeCustomOff =
     mode === "whole" && wholeMode === "custom" && Math.abs(assignedTotal - total) > 0.01;
@@ -346,7 +380,7 @@ function ReceiptSplitter({
 
             {mode === "items" && (
               <div className="space-y-3">
-                {receipt.items.length === 0 && (
+                {receipt.items.length === 0 && !hasAdditional && (
                   <div className="text-sm text-gray-500 italic">This receipt has no line items captured.</div>
                 )}
                 {receipt.items.map((item) => {
@@ -379,6 +413,37 @@ function ReceiptSplitter({
                     </div>
                   );
                 })}
+
+                {hasAdditional && (
+                  <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-amber-800">Additional Charges</div>
+                      <div className="text-sm font-semibold text-amber-800">£{additionalAmount.toFixed(2)}</div>
+                    </div>
+                    <div className="text-xs text-amber-600 mb-1">
+                      Covers service charge, tax, or other charges not listed as items
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {activeMembers.map((m) => {
+                        const on = additionalMembers.includes(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => toggleAdditional(m.id)}
+                            className={`text-xs px-2 py-1 rounded-full border ${on ? "bg-amber-600 text-white border-amber-600" : "bg-white text-amber-700 border-amber-300"}`}
+                            data-testid={`additional-member-${m.id}`}
+                          >
+                            {initials(m.displayName)}
+                            {on && additionalMembers.length > 0 && (
+                              <span className="ml-1">£{(additionalAmount / additionalMembers.length).toFixed(2)}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
