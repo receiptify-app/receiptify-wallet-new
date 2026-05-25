@@ -95,16 +95,20 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
         {tab === "email" && (
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="invite-name">Friend's name</Label>
+              <Label htmlFor="invite-name">Friend's name <span className="text-red-500">*</span></Label>
               <Input
                 id="invite-name"
                 value={linkName}
                 onChange={(e) => setLinkName(e.target.value)}
                 placeholder="e.g. Sarah"
+                className={!linkName.trim() && email.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
               />
+              {!linkName.trim() && email.trim() && (
+                <p className="text-xs text-red-500">Please enter your friend's name</p>
+              )}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="invite-email">Email address</Label>
+              <Label htmlFor="invite-email">Email address <span className="text-red-500">*</span></Label>
               <Input
                 id="invite-email"
                 type="email"
@@ -116,7 +120,7 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
             </div>
             <Button
               onClick={() => inviteMutation.mutate({ email: email.trim(), displayName: linkName.trim() || undefined })}
-              disabled={!email.trim() || inviteMutation.isPending}
+              disabled={!email.trim() || !linkName.trim() || inviteMutation.isPending}
               className="w-full bg-green-600 hover:bg-green-700"
             >
               {inviteMutation.isPending ? "Sending…" : "Send invite"}
