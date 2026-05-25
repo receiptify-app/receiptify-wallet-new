@@ -157,9 +157,16 @@ function ReceiptSplitter({
         receipt.items.forEach((item) => {
           const assigned = itemMap[item.id] || [];
           if (assigned.length === 0) return;
-          const share = parseFloat(item.price) / assigned.length;
-          assigned.forEach((memberId) => {
-            assignments.push({ memberId, itemId: item.id, shareAmount: share.toFixed(2) });
+          const itemTotal = parseFloat(item.price);
+          const share = itemTotal / assigned.length;
+          let runningSum = 0;
+          assigned.forEach((memberId, idx) => {
+            const raw =
+              idx === assigned.length - 1
+                ? (itemTotal - runningSum).toFixed(2)
+                : share.toFixed(2);
+            runningSum += parseFloat(raw);
+            assignments.push({ memberId, itemId: item.id, shareAmount: raw });
           });
         });
       }

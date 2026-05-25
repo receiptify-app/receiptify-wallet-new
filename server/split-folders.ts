@@ -533,15 +533,31 @@ export function registerSplitFolderRoutes(app: Express) {
         }
         const body = setAssignmentsBody.parse(req.body);
 
-        // Validate that the sum of share amounts is within a small rounding tolerance
-        // of the receipt total in GBP — prevents clients sending arbitrary inflated/deflated shares.
-        const sum = body.assignments.reduce((s, a) => s + parseFloat(a.shareAmount || "0"), 0);
-        const receiptTotal = totalInGBP(receipt);
+        // Validate per-mode so unassigned items or items left out don't break the save.
         const tolerance = Math.max(0.05, body.assignments.length * 0.01);
-        if (body.assignments.length > 0 && Math.abs(sum - receiptTotal) > tolerance) {
-          return res.status(400).json({
-            error: `Assignment total £${sum.toFixed(2)} doesn't match receipt total £${receiptTotal.toFixed(2)}`,
-          });
+        if (body.mode === "whole") {
+          const sum = body.assignments.reduce((s, a) => s + parseFloat(a.shareAmount || "0"), 0);
+          const receiptTotal = totalInGBP(receipt);
+          if (body.assignments.length > 0 && Math.abs(sum - receiptTotal) > tolerance) {
+            return res.status(400).json({
+              error: `Assignment total £${sum.toFixed(2)} doesn't match receipt total £${receiptTotal.toFixed(2)}`,
+            });
+          }
+        } else if (body.mode === "items") {
+          const receiptItems = await storage.getReceiptItems(receipt.id);
+          const byItem = new Map<string, number>();
+          for (const a of body.assignments) {
+            byItem.set(a.itemId || "", (byItem.get(a.itemId || "") || 0) + parseFloat(a.shareAmount || "0"));
+          }
+          for (const item of receiptItems) {
+            const itemTotal = itemPriceInGBP(item, receipt);
+            const assigned = byItem.get(item.id) || 0;
+            if (assigned > 0 && Math.abs(assigned - itemTotal) > tolerance) {
+              return res.status(400).json({
+                error: `Item "${item.name}" shares (£${assigned.toFixed(2)}) don't add up to its price (£${itemTotal.toFixed(2)})`,
+              });
+            }
+          }
         }
 
         // Make sure every memberId actually belongs to this folder.
