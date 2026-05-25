@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, AtSign, Mail, Link as LinkIcon } from "lucide-react";
+import { Copy, Check, Mail, Link as LinkIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,25 +14,13 @@ interface Props {
   onOpenChange: (o: boolean) => void;
 }
 
-type UserHit = { id: string; username: string | null; email: string | null; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
-
 export default function SplitInviteDialog({ folderId, open, onOpenChange }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"username" | "email" | "link">("username");
-  const [username, setUsername] = useState("");
+  const [tab, setTab] = useState<"email" | "link">("email");
   const [email, setEmail] = useState("");
   const [linkName, setLinkName] = useState("");
   const [copied, setCopied] = useState(false);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
-
-  const { data: suggestions = [] } = useQuery<UserHit[]>({
-    queryKey: ["/api/users/search", username],
-    enabled: tab === "username" && username.trim().length > 0,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(username.trim())}`);
-      return res.json();
-    },
-  });
 
   const inviteMutation = useMutation({
     mutationFn: async (body: any) => {
@@ -48,7 +36,6 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
             description: `We emailed the invite to ${member.inviteEmail}.`,
           });
           onOpenChange(false);
-          setUsername("");
           setEmail("");
         } else {
           toast({
@@ -59,10 +46,9 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
             variant: "destructive",
           });
           onOpenChange(false);
-          setUsername("");
           setEmail("");
         }
-      } else if (member.inviteToken && (tab === "link" || (!member.userId && tab !== "username"))) {
+      } else if (member.inviteToken && (tab === "link" || !member.userId)) {
         const url = `${window.location.origin}/split/invite/${member.inviteToken}`;
         setLinkUrl(url);
         navigator.clipboard?.writeText(url).catch(() => {});
@@ -72,14 +58,13 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
       } else {
         toast({ title: "Invited", description: `Added ${member.displayName} to the folder.` });
         onOpenChange(false);
-        setUsername("");
         setEmail("");
       }
     },
     onError: (err: any) => toast({ title: "Invite failed", description: err.message, variant: "destructive" }),
   });
 
-  const reset = () => { setLinkUrl(null); setCopied(false); setUsername(""); setEmail(""); setLinkName(""); };
+  const reset = () => { setLinkUrl(null); setCopied(false); setEmail(""); setLinkName(""); };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
@@ -87,12 +72,11 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
         <DialogHeader>
           <DialogTitle>Invite a friend</DialogTitle>
           <DialogDescription>
-            Send a link, email, or invite by username.
+            Send a link or email invite to someone so they can join this folder.
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2">
           {[
-            { k: "username", label: "Username", icon: AtSign },
             { k: "email", label: "Email", icon: Mail },
             { k: "link", label: "Link", icon: LinkIcon },
           ].map(({ k, label, icon: Icon }) => (
@@ -106,47 +90,6 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
             </button>
           ))}
         </div>
-
-        {tab === "username" && (
-          <div className="space-y-2">
-            <Label htmlFor="invite-username">Receiptify username</Label>
-            <Input
-              id="invite-username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="@username"
-              data-testid="input-invite-username"
-            />
-            {suggestions.length > 0 && (
-              <div className="border rounded-lg divide-y">
-                {suggestions.map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => inviteMutation.mutate({ username: u.username })}
-                    disabled={inviteMutation.isPending || !u.username}
-                    className="w-full flex items-center gap-2 p-2 text-left hover:bg-gray-50"
-                    data-testid={`suggest-${u.id}`}
-                  >
-                    {u.profileImageUrl && (
-                      <img src={u.profileImageUrl} alt="" className="w-8 h-8 rounded-full" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{[u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || u.email}</div>
-                      <div className="text-xs text-gray-500 truncate">@{u.username || "—"}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button
-              onClick={() => inviteMutation.mutate({ username: username.trim() })}
-              disabled={!username.trim() || inviteMutation.isPending}
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              Invite
-            </Button>
-          </div>
-        )}
 
         {tab === "email" && (
           <div className="space-y-2">

@@ -78,14 +78,13 @@ async function buildFolderSummary(folder: SplitFolder) {
 const createFolderBody = insertSplitFolderSchema.omit({ ownerId: true });
 const inviteBody = z
   .object({
-    username: z.string().trim().min(1).optional(),
     email: z.string().email().optional(),
     displayName: z.string().trim().min(1).optional(),
     generateLinkOnly: z.boolean().optional(),
   })
   .refine(
-    (d) => !!d.username || !!d.email || !!d.generateLinkOnly,
-    "Provide a username, email, or set generateLinkOnly",
+    (d) => !!d.email || !!d.generateLinkOnly,
+    "Provide an email or set generateLinkOnly",
   );
 
 const assignmentInput = z.object({
@@ -196,14 +195,6 @@ async function sendInviteEmail(
 }
 
 export function registerSplitFolderRoutes(app: Express) {
-  // --- Username autocomplete (username-only to avoid email probing) ---
-  app.get("/api/users/search", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-    const q = String(req.query.q || "").trim();
-    if (q.length < 1) return res.json([]);
-    const rows = await splitFolderStorage.searchUsernames(q, req.user!.id);
-    res.json(rows);
-  });
-
   // --- List folders the user belongs to ---
   app.get("/api/split-folders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const folders = await splitFolderStorage.listFoldersForUser(req.user!.id);
@@ -355,20 +346,13 @@ export function registerSplitFolderRoutes(app: Express) {
 
         let invitedUserId: string | null = null;
         let inviteEmail: string | null = body.email ?? null;
-        let inviteUsername: string | null = body.username ?? null;
-        let displayName = body.displayName || body.username || body.email || "Invited friend";
+        let displayName = body.displayName || body.email || "Invited friend";
 
-        if (body.username) {
-          const u = await splitFolderStorage.findUserByUsername(body.username);
-          if (u) {
-            invitedUserId = u.id;
-            displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || displayName;
-          }
-        } else if (body.email) {
+        if (body.email) {
           const u = await splitFolderStorage.findUserByEmail(body.email);
           if (u) {
             invitedUserId = u.id;
-            displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || body.email;
+            displayName = body.displayName || [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || body.email;
           }
         }
 
@@ -376,7 +360,6 @@ export function registerSplitFolderRoutes(app: Express) {
           folderId: folder.id,
           userId: invitedUserId,
           inviteEmail,
-          inviteUsername,
           displayName,
           inviteToken: newToken(),
           // If the invitee already has a Receiptify account, mark them active straight away.

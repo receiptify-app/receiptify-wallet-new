@@ -18,7 +18,7 @@ import {
   type Receipt,
   type ReceiptItem,
 } from "@shared/schema";
-import { and, desc, eq, ilike, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 function normShare(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return "0";
@@ -90,8 +90,6 @@ export interface ISplitFolderStorage {
   clearMemberAssignments(memberId: string): Promise<void>;
   markMemberSettled(folderId: string, memberId: string): Promise<void>;
 
-  searchUsernames(query: string, excludeUserId: string, limit?: number): Promise<Array<Pick<typeof users.$inferSelect, "id" | "username" | "firstName" | "lastName" | "profileImageUrl">>>;
-  findUserByUsername(username: string): Promise<typeof users.$inferSelect | undefined>;
   findUserByEmail(email: string): Promise<typeof users.$inferSelect | undefined>;
 }
 
@@ -247,26 +245,6 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       .where(
         and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.memberId, memberId)),
       );
-  }
-
-  async searchUsernames(query: string, excludeUserId: string, limit = 8) {
-    const rows = await db
-      .select({
-        id: users.id,
-        username: users.username,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        profileImageUrl: users.profileImageUrl,
-      })
-      .from(users)
-      .where(ilike(users.username, `${query}%`))
-      .limit(limit);
-    return rows.filter((r) => r.id !== excludeUserId);
-  }
-
-  async findUserByUsername(username: string) {
-    const [row] = await db.select().from(users).where(eq(users.username, username));
-    return row;
   }
 
   async findUserByEmail(email: string) {
