@@ -1,19 +1,5 @@
-// Lightweight email dispatch. Uses SendGrid when SENDGRID_API_KEY is set,
+// Lightweight email dispatch. Uses Brevo (formerly Sendinblue) when BREVO_API_KEY is set,
 // otherwise logs the payload so local development still works.
-
-let sgMailPromise: Promise<any> | null = null;
-async function getSgMail() {
-  if (!sgMailPromise) {
-    sgMailPromise = import("@sendgrid/mail").then((mod) => {
-      const client = (mod as any).default ?? mod;
-      if (process.env.SENDGRID_API_KEY) {
-        client.setApiKey(process.env.SENDGRID_API_KEY);
-      }
-      return client;
-    });
-  }
-  return sgMailPromise;
-}
 
 export interface EmailMessage {
   to: string;
@@ -29,25 +15,48 @@ export interface SendResult {
 
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
   const from = process.env.EMAIL_FROM || "Receiptify <no-reply@receiptify.co.uk>";
-  if (!process.env.SENDGRID_API_KEY) {
+  const apiKey = process.env.BREVO_API_KEY;
+
+  if (!apiKey) {
     console.log(
-      `[email] SENDGRID_API_KEY not set — would have sent to ${message.to}: ${message.subject}`,
+      `[email] BREVO_API_KEY not set — would have sent to ${message.to}: ${message.subject}`,
     );
-    return { sent: false, reason: "SENDGRID_API_KEY not configured" };
+    return { sent: false, reason: "BREVO_API_KEY not configured" };
   }
+
+  // Parse "Name <email>" or plain email for the from field
+  const fromMatch = from.match(/^(.+)<(.+)>$/);
+  const fromObj = fromMatch
+    ? { name: fromMatch[1].trim(), email: fromMatch[2].trim() }
+    : { email: from.trim() };
+
   try {
-    const sgMail = await getSgMail();
-    await sgMail.send({
-      from,
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      html: message.html ?? message.text.replace(/\n/g, "<br>"),
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: fromObj,
+        to: [{ email: message.to }],
+        subject: message.subject,
+        textContent: message.text,
+        htmlContent: message.html ?? message.text.replace(/\n/g, "<br>"),
+      }),
     });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = (body as any)?.message || `HTTP ${res.status}`;
+      console.error("[email] Brevo error:", detail);
+      return { sent: false, reason: detail };
+    }
+
     return { sent: true };
   } catch (err: any) {
-    const detail = err?.response?.body?.errors?.[0]?.message || err?.message || "Unknown email error";
-    console.error("[email] SendGrid error:", detail);
-    return { sent: false, reason: detail };
+    console.error("[email] Brevo error:", err?.message || "Unknown error");
+    return { sent: false, reason: err?.message || "Unknown email error" };
   }
 }
