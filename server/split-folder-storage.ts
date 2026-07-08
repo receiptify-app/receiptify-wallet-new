@@ -91,6 +91,8 @@ export interface ISplitFolderStorage {
   markMemberSettled(folderId: string, memberId: string): Promise<void>;
 
   findUserByEmail(email: string): Promise<typeof users.$inferSelect | undefined>;
+
+  deleteFolder(folderId: string): Promise<void>;
 }
 
 class SplitFolderDbStorage implements ISplitFolderStorage {
@@ -250,6 +252,20 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
   async findUserByEmail(email: string) {
     const [row] = await db.select().from(users).where(eq(users.email, email));
     return row;
+  }
+
+  async deleteFolder(folderId: string): Promise<void> {
+    // All-or-nothing: a mid-sequence failure must not leave the folder half-deleted.
+    await db.transaction(async (tx) => {
+      // Receipts stay in their owners' wallets — just detach them from the folder.
+      await tx
+        .update(receipts)
+        .set({ splitFolderId: null })
+        .where(eq(receipts.splitFolderId, folderId));
+      await tx.delete(splitAssignments).where(eq(splitAssignments.folderId, folderId));
+      await tx.delete(splitFolderMembers).where(eq(splitFolderMembers.folderId, folderId));
+      await tx.delete(splitFolders).where(eq(splitFolders.id, folderId));
+    });
   }
 }
 

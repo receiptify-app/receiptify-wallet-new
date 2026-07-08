@@ -333,6 +333,61 @@ export function registerSplitFolderRoutes(app: Express) {
     },
   );
 
+  // --- Delete folder (owner only) — notifies members by email ---
+  app.delete(
+    "/api/split-folders/:id",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      const userId = req.user!.id;
+      const folder = await splitFolderStorage.getFolder(req.params.id);
+      if (!folder) return res.status(404).json({ error: "Folder not found" });
+      if (folder.ownerId !== userId) {
+        return res.status(403).json({ error: "Only the folder owner can delete this folder" });
+      }
+
+      // Collect member emails BEFORE deleting — the member rows go away with the folder.
+      const members = await splitFolderStorage.listMembers(folder.id);
+      const emails = new Set<string>();
+      for (const m of members) {
+        if (m.role === "owner" || m.status === "removed") continue;
+        if (m.inviteEmail) {
+          emails.add(m.inviteEmail.toLowerCase());
+        } else if (m.userId) {
+          // Member userIds are normally Firebase UIDs, but legacy rows may hold DB UUIDs.
+          const u =
+            (await storage.getUserByProviderId("firebase", m.userId)) ||
+            (await storage.getUser(m.userId));
+          if (u?.email) emails.add(u.email.toLowerCase());
+        }
+      }
+
+      await splitFolderStorage.deleteFolder(folder.id);
+      res.json({ ok: true });
+
+      // Notify members after responding — email failures shouldn't block deletion.
+      const ownerName = req.user!.name || req.user!.email || "The folder owner";
+      const subject = `"${folder.name}" split folder was deleted`;
+      const text = `${ownerName} deleted the shared split folder "${folder.name}" on Receiptify.
+
+Any receipts shared in it have been returned to their owners' wallets, and pending split assignments in this folder have been cleared.
+
+No action is needed from you.`;
+      const html = `<p><strong>${escapeHtml(ownerName)}</strong> deleted the shared split folder <strong>"${escapeHtml(folder.name)}"</strong> on <strong>Receiptify</strong>.</p>
+<p>Any receipts shared in it have been returned to their owners' wallets, and pending split assignments in this folder have been cleared.</p>
+<p style="color:#666;font-size:12px">No action is needed from you.</p>`;
+
+      const results = await Promise.allSettled(
+        Array.from(emails).map((to) => sendEmail({ to, subject, text, html })),
+      );
+      results.forEach((r, i) => {
+        if (r.status === "rejected" || (r.status === "fulfilled" && !r.value.sent)) {
+          const reason = r.status === "rejected" ? r.reason : r.value.reason;
+          console.warn(`[folder-delete] failed to notify ${Array.from(emails)[i]}:`, reason);
+        }
+      });
+    },
+  );
+
   // --- Invite a member (or generate a shareable link) ---
   app.post(
     "/api/split-folders/:id/members",

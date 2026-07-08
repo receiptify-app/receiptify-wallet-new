@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  Trash2,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -599,6 +600,7 @@ export default function SplitFolderPage() {
   const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(false);
 
   const { data, isLoading } = useQuery<FolderDetail>({
     queryKey: ["/api/split-folders", folderId],
@@ -647,6 +649,20 @@ export default function SplitFolderPage() {
     },
   });
 
+  const deleteFolderMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/split-folders/${folderId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      toast({
+        title: "Folder deleted",
+        description: "Members have been notified by email. Receipts are back in their owners' wallets.",
+      });
+      navigate("/split");
+    },
+    onError: (err: any) =>
+      toast({ title: "Couldn't delete folder", description: err.message, variant: "destructive" }),
+  });
+
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) =>
       apiRequest("DELETE", `/api/split-folders/${folderId}/members/${memberId}`),
@@ -675,7 +691,19 @@ export default function SplitFolderPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/split")} data-testid="back-to-split">
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <span className="text-sm text-gray-500">Split folders</span>
+        <span className="text-sm text-gray-500 flex-1">Split folders</span>
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmDeleteFolder(true)}
+            className="text-gray-400 hover:text-red-600"
+            data-testid="button-delete-folder"
+            title="Delete folder"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       <div className="px-6 space-y-5">
@@ -823,6 +851,28 @@ export default function SplitFolderPage() {
               onClick={() => confirmRemove && removeMemberMutation.mutate(confirmRemove)}
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDeleteFolder} onOpenChange={setConfirmDeleteFolder}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{folder.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the folder and all its split assignments. Receipts stay in
+              their owners' wallets. Everyone in the folder will be notified by email.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteFolderMutation.mutate()}
+              data-testid="confirm-delete-folder"
+            >
+              {deleteFolderMutation.isPending ? "Deleting…" : "Delete folder"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
