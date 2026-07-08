@@ -240,8 +240,9 @@ export default function ReceiptsPage() {
 
     filtered.forEach((receipt: Receipt) => {
       const receiptDate = new Date(receipt.date);
-      const monthKey = format(receiptDate, 'MMMM yyyy');
-      const sortKey = receiptDate.getFullYear() * 100 + receiptDate.getMonth();
+      // Group in UTC so month buckets match the displayed (UTC) receipt dates.
+      const monthKey = receiptDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const sortKey = receiptDate.getUTCFullYear() * 100 + receiptDate.getUTCMonth();
       
       if (!groups[monthKey]) {
         groups[monthKey] = { receipts: [], sortKey };
@@ -466,7 +467,7 @@ export default function ReceiptsPage() {
                                     {displayMerchant(receipt.merchantName)}
                                   </p>
                                   <p className="text-xs text-gray-500 truncate mt-1">
-                                    {format(new Date(receipt.date), 'MMM d, h:mm a')}
+                                    {new Date(receipt.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' })}
                                     {receipt.receiptNumber && ` • #${receipt.receiptNumber}`}
                                   </p>
                                 </div>

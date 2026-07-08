@@ -43,13 +43,44 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
+// Deterministic guard against day/year swaps on UK receipts (e.g. "20/04/26"
+// misread year-first as 2020-04-26 instead of DD/MM/YY = 2026-04-20).
+export function normalizeReceiptDate(raw: unknown): Date | undefined {
+  if (!raw || typeof raw !== "string") return undefined;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return undefined;
+
+  const now = Date.now();
+  const msDay = 86_400_000;
+  const plausible = (x: Date) =>
+    x.getTime() <= now + 2 * msDay && x.getTime() >= now - 5 * 365 * msDay;
+
+  if (plausible(d)) return d;
+
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/);
+  if (m) {
+    const [, year, month, day, rest] = m;
+    const newYear = 2000 + parseInt(day, 10);
+    const newDay = parseInt(year, 10) % 100;
+    if (newDay >= 1 && newDay <= 31) {
+      const iso = `${newYear}-${month}-${String(newDay).padStart(2, "0")}${rest || ""}`;
+      const swapped = new Date(iso);
+      if (!isNaN(swapped.getTime()) && plausible(swapped)) {
+        console.warn(`[gemini] implausible receipt date "${raw}" — reinterpreted as "${iso}" (day/year swap)`);
+        return swapped;
+      }
+    }
+  }
+  return d;
+}
+
 const RECEIPT_EXTRACTION_PROMPT = `You are an expert receipt parser. Analyze the receipt image and extract all information in a structured format.
 
 IMPORTANT RULES:
 1. Extract the EXACT text as it appears on the receipt
 2. For prices, include only the numeric value (e.g., "12.99" not "£12.99")
 3. Detect the currency symbol used (£, $, €, etc.) and include it in the currency field
-4. Parse the date into ISO 8601 format (YYYY-MM-DDTHH:mm:ss.000Z)
+4. Parse the date into ISO 8601 format (YYYY-MM-DDTHH:mm:ss.000Z). This is a UK receipt app: numeric dates are DAY-FIRST. "20/04/26" or "20/04/2026" means 20 April 2026 (DD/MM/YY or DD/MM/YYYY), NEVER year-first. Two-digit years are 20xx. Receipt dates are almost always in the recent past — if your interpretation gives a date years in the past or in the future, re-check the day/month/year ordering.
 5. If you cannot find a value, use null
 6. For items, extract each PRODUCT/FOOD line item with its name, price, and quantity (default quantity to 1 if not specified). Do NOT include subtotal, tax, service charge, or total lines as items.
 7. Identify the merchant/store name from the top of the receipt
@@ -206,7 +237,7 @@ export async function processReceiptWithGemini(imagePath: string): Promise<Parse
       subtotal: parsed.subtotal || undefined,
       tax: parsed.tax || undefined,
       serviceCharge: parsed.serviceCharge || undefined,
-      date: parsed.date ? new Date(parsed.date) : undefined,
+      date: normalizeReceiptDate(parsed.date),
       receiptNumber: parsed.receiptNumber || undefined,
       paymentMethod: parsed.paymentMethod || "Unknown",
       category: parsed.category || "Shopping",

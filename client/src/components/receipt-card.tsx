@@ -58,7 +58,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
               ${parseFloat(receipt.total).toFixed(2)}
             </div>
             <div className="text-xs text-gray-500">
-              {new Date(receipt.date).toLocaleDateString('en-UK')}
+              {new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
             </div>
           </div>
         </div>

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreVertical, MoveRight, Share2 } from "lucide-react";
-import { format } from "date-fns";
 import { getCategoryColor, getCategoryIcon, getCategoryByName, getCategoryById } from "@shared/categories";
 import {
   DropdownMenu,
@@ -120,7 +119,7 @@ export default function AnalyticsReceiptCard({
                   className="text-sm text-gray-600"
                   data-testid={`text-date-${receipt.id}`}
                 >
-                  {format(receiptDate, "MMM d, yyyy")}
+                  {receiptDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">

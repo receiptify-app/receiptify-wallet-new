@@ -58,7 +58,7 @@ export default function ReceiptMap({ receipts }: ReceiptMapProps) {
                     <div className="font-medium text-gray-900">{receipt.merchantName}</div>
                     <div className="text-sm text-gray-600">{receipt.location}</div>
                     <div className="text-xs text-gray-500">
-                      {new Date(receipt.date).toLocaleDateString()} • £{receipt.total}
+                      {new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })} • £{receipt.total}
                     </div>
                   </div>
                 </div>

@@ -385,7 +385,7 @@ function ReceiptSplitter({
           )}
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-gray-900 truncate">{receipt.merchantName}</div>
-            <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString()} · £{total.toFixed(2)}</div>
+            <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })} · £{total.toFixed(2)}</div>
           </div>
           <div className="flex items-center gap-1">
             <Badge variant="outline" className="text-xs">

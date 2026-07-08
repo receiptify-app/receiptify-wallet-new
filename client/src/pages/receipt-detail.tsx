@@ -233,6 +233,7 @@ export default function ReceiptDetailPage() {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "UTC",
   });
 
   return (
@@ -509,7 +510,7 @@ export default function ReceiptDetailPage() {
                   {receipt.date && (
                     <p className="text-xs text-gray-500 mt-1">
                       <Calendar className="h-3 w-3 inline mr-1" />
-                      Starts from receipt date: {new Date(receipt.date).toLocaleDateString()}
+                      Starts from receipt date: {new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
                     </p>
                   )}
                 </div>
