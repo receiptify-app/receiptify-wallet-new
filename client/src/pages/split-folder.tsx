@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,6 +54,7 @@ type FolderReceipt = {
   merchantName: string;
   total: string;
   date: string;
+  imageUrl: string | null;
   items: Array<{ id: string; name: string; price: string; quantity: string | null }>;
   assignments: Assignment[];
 };
@@ -71,6 +72,65 @@ function initials(name?: string | null) {
   if (!name) return "?";
   const parts = name.split(/\s+/).filter(Boolean);
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || name[0].toUpperCase();
+}
+
+function ReceiptImageOverlay({
+  imageUrl,
+  merchantName,
+  receiptId,
+  onClose,
+}: {
+  imageUrl: string;
+  merchantName: string;
+  receiptId: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${merchantName} receipt image`}
+      className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+      onClick={onClose}
+      data-testid={`receipt-image-overlay-${receiptId}`}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3 text-white flex-shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-sm font-medium truncate">{merchantName}</span>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-full hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50"
+          aria-label="Close image"
+          autoFocus
+        >
+          <XIcon className="w-6 h-6" />
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center overflow-auto p-4">
+        <img
+          src={imageUrl}
+          alt={`${merchantName} receipt`}
+          className="max-w-full max-h-full object-contain rounded"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </div>
+  );
 }
 
 function computeShares(amount: number, memberIds: string[]): { memberId: string; share: string }[] {
@@ -99,6 +159,7 @@ function ReceiptSplitter({
 }) {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
   const total = parseFloat(receipt.total);
 
   // Infer the prior mode from saved assignments so re-opening the editor preserves intent.
@@ -311,6 +372,16 @@ function ReceiptSplitter({
     <Card className="overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
+          {receipt.imageUrl && (
+            <button
+              onClick={() => setImageOpen(true)}
+              className="flex-shrink-0 w-12 h-12 rounded-md overflow-hidden border bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+              data-testid={`receipt-thumb-${receipt.id}`}
+              title="View receipt image"
+            >
+              <img src={receipt.imageUrl} alt={`${receipt.merchantName} receipt`} className="w-full h-full object-cover" />
+            </button>
+          )}
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-gray-900 truncate">{receipt.merchantName}</div>
             <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString()} · £{total.toFixed(2)}</div>
@@ -507,6 +578,15 @@ function ReceiptSplitter({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {imageOpen && receipt.imageUrl && (
+          <ReceiptImageOverlay
+            imageUrl={receipt.imageUrl}
+            merchantName={receipt.merchantName}
+            receiptId={receipt.id}
+            onClose={() => setImageOpen(false)}
+          />
+        )}
       </CardContent>
     </Card>
   );
