@@ -417,13 +417,11 @@ No action is needed from you.`;
           inviteEmail,
           displayName,
           inviteToken: newToken(),
-          // If the invitee already has a Receiptify account, mark them active straight away.
-          status: invitedUserId ? "active" : "invited",
+          // Even existing account holders must explicitly accept the invite —
+          // joining is only finalized in /invites/:token/accept.
+          status: "invited",
           role: "member",
         });
-        if (invitedUserId) {
-          await splitFolderStorage.updateMember(member.id, { joinedAt: new Date() });
-        }
 
         // Email dispatch for email-based invites only (link tab returns the URL for manual share)
         let emailSent = false;
