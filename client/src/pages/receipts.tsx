@@ -19,6 +19,7 @@ import CategoryPickerModal from "@/components/category-picker-modal";
 import { useCurrency } from "@/hooks/use-currency";
 import { getRatesFromBase } from "@/lib/currency-conversion";
 import { getCategoryByName, getCategoryById } from "@shared/categories";
+import { effectiveReceiptTotal } from "@shared/receipt-share";
 
 const normCat = (raw?: string | null) =>
   (getCategoryByName(raw ?? '') || getCategoryById(raw ?? ''))?.name ?? raw ?? '';
@@ -32,6 +33,8 @@ interface Receipt {
   currency?: string;
   receiptNumber?: string;
   paymentMethod?: string;
+  myShareType?: string | null;
+  myShareValue?: string | null;
 }
 
 export default function ReceiptsPage() {
@@ -65,14 +68,15 @@ export default function ReceiptsPage() {
   const convertedTotal = (receipt: Receipt): string => {
     const rCurrency = ((receipt as any).currency || userCurrency).toUpperCase();
     const uCurrency = userCurrency.toUpperCase();
-    if (rCurrency === uCurrency || !fxRates) return formatCurrency(receipt.total);
+    const myTotal = effectiveReceiptTotal(receipt);
+    if (rCurrency === uCurrency || !fxRates) return formatCurrency(myTotal);
     const storedRate = (receipt as any).exchangeRateToGBP ? parseFloat((receipt as any).exchangeRateToGBP) : null;
     if (storedRate !== null && fxRates['GBP']) {
-      return formatCurrency(parseFloat(receipt.total) * storedRate / fxRates['GBP']);
+      return formatCurrency(myTotal * storedRate / fxRates['GBP']);
     }
     const rate = fxRates[rCurrency];
-    if (!rate) return formatCurrency(receipt.total);
-    return formatCurrency(parseFloat(receipt.total) / rate);
+    if (!rate) return formatCurrency(myTotal);
+    return formatCurrency(myTotal / rate);
   };
 
   // Bulk move mutation
@@ -399,9 +403,13 @@ export default function ReceiptsPage() {
             {groupedReceipts.map(({ monthKey, receipts: monthReceipts }) => {
               const isExpanded = searchQuery.trim() ? true : expandedMonths.has(monthKey);
               const monthTotal = monthReceipts.reduce((sum, r) => {
+                // Same rate precedence as convertedTotal: snapshotted rate first,
+                // then live rate — so the month sum matches the rows beneath it.
                 const rCur = (r.currency || userCurrency).toUpperCase();
-                const raw = parseFloat(r.total || '0');
+                const raw = effectiveReceiptTotal(r);
                 if (rCur === userCurrency.toUpperCase() || !fxRates) return sum + raw;
+                const storedRate = (r as any).exchangeRateToGBP ? parseFloat((r as any).exchangeRateToGBP) : null;
+                if (storedRate !== null && fxRates['GBP']) return sum + raw * storedRate / fxRates['GBP'];
                 const rate = fxRates[rCur];
                 return sum + (rate ? raw / rate : raw);
               }, 0);

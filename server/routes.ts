@@ -21,6 +21,7 @@ import {
   insertKioskSessionSchema,
   insertWarrantyClaimSchema,
 } from "@shared/schema";
+import { effectiveReceiptTotal } from "@shared/receipt-share";
 import multer from "multer";
 import * as fs from "fs";
 import path from "path";
@@ -380,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const receipt of receipts) {
         const category = receipt.category || 'Other';
-        const amount = parseFloat(receipt.total);
+        const amount = effectiveReceiptTotal(receipt);
         
         categoryTotals[category] = (categoryTotals[category] || 0) + amount;
         totalSpending += amount;
@@ -400,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receipts: receipts.map(r => ({
           id: r.id,
           merchant: r.merchantName,
-          amount: parseFloat(r.total).toFixed(2),
+          amount: effectiveReceiptTotal(r).toFixed(2),
           date: r.date,
           category: r.category,
         })),
@@ -1016,6 +1017,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing QR code:", error);
       res.status(400).json({ error: "Failed to process QR code" });
+    }
+  });
+
+  // Set or clear the user's personal share of a receipt
+  app.patch("/api/receipts/:id/share", async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const existing = await storage.getReceipt(req.params.id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+
+      const { myShareType, myShareValue } = req.body ?? {};
+      if (myShareType === null || myShareType === undefined) {
+        // Clear the share — back to counting the full total
+        const receipt = await storage.updateReceipt(req.params.id, {
+          myShareType: null,
+          myShareValue: null,
+        });
+        return res.json(receipt);
+      }
+      if (myShareType !== "amount" && myShareType !== "percent") {
+        return res.status(400).json({ error: "myShareType must be 'amount' or 'percent'" });
+      }
+      const value =
+        typeof myShareValue === "string"
+          ? (/^\d+(\.\d+)?$/.test(myShareValue.trim()) ? parseFloat(myShareValue) : NaN)
+          : myShareValue;
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+        return res.status(400).json({ error: "myShareValue must be a non-negative number" });
+      }
+      if (myShareType === "percent" && value > 100) {
+        return res.status(400).json({ error: "Percentage share cannot exceed 100" });
+      }
+      if (myShareType === "amount" && value > parseFloat(existing.total)) {
+        return res.status(400).json({ error: "Share amount cannot exceed the receipt total" });
+      }
+      const receipt = await storage.updateReceipt(req.params.id, {
+        myShareType,
+        myShareValue: value.toFixed(2),
+      });
+      res.json(receipt);
+    } catch (error) {
+      console.error("Error updating receipt share:", error);
+      res.status(500).json({ error: "Failed to update receipt share" });
     }
   });
 

@@ -18,6 +18,7 @@ import { computeAnalytics, getAvailableMonthRanges, getMonthBoundsFromKey } from
 import type { Receipt } from "@shared/schema";
 import { useCurrency } from "@/hooks/use-currency";
 import { getRatesFromBase } from "@/lib/currency-conversion";
+import { effectiveReceiptTotal } from "@shared/receipt-share";
 
 type DateRange = 'week' | 'month' | 'custom';
 
@@ -50,19 +51,20 @@ export default function Home() {
   // Prefers the rate snapshotted at purchase time (exchangeRateToGBP) so the
   // converted amount never changes after the receipt is saved.
   const convertedReceipts = useMemo(() => {
-    if (!fxRates) return receipts;
     return receipts.map(r => {
+      // Use the user's personal share (if set) as the spend for this receipt
+      const myTotal = effectiveReceiptTotal(r as any);
       const rCur = ((r as any).currency || userCurrency).toUpperCase();
-      if (rCur === userCurrency.toUpperCase()) return r;
+      if (rCur === userCurrency.toUpperCase() || !fxRates) {
+        return { ...r, total: myTotal.toFixed(2) };
+      }
       const storedRate = (r as any).exchangeRateToGBP ? parseFloat((r as any).exchangeRateToGBP) : null;
       if (storedRate !== null && fxRates['GBP']) {
-        const convertedTotal = (parseFloat(String(r.total)) * storedRate / fxRates['GBP']).toFixed(2);
-        return { ...r, total: convertedTotal };
+        return { ...r, total: (myTotal * storedRate / fxRates['GBP']).toFixed(2) };
       }
       const rate = fxRates[rCur];
-      if (!rate) return r;
-      const convertedTotal = (parseFloat(String(r.total)) / rate).toFixed(2);
-      return { ...r, total: convertedTotal };
+      if (!rate) return { ...r, total: myTotal.toFixed(2) };
+      return { ...r, total: (myTotal / rate).toFixed(2) };
     });
   }, [receipts, fxRates, userCurrency]);
 

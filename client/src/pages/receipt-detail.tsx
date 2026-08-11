@@ -33,6 +33,8 @@ import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
 import { getCategoryByName, getCategoryById } from "@shared/categories";
 import { useCurrency } from "@/hooks/use-currency";
+import { useToast } from "@/hooks/use-toast";
+import { effectiveReceiptTotal } from "@shared/receipt-share";
 
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getExchangeRate, getRatesFromBase, formatWithCurrencyCode } from "@/lib/currency-conversion";
@@ -46,6 +48,7 @@ export default function ReceiptDetailPage() {
   const receiptId = params.id;
   const { format: formatCurrency, currency: userCurrency } = useCurrency();
   const { t } = useTranslation();
+  const { toast } = useToast();
 
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -101,6 +104,32 @@ export default function ReceiptDetailPage() {
     }
     return liveExchangeRate ?? null;
   })();
+
+  const [shareEditing, setShareEditing] = useState(false);
+  const [shareType, setShareType] = useState<"amount" | "percent">("percent");
+  const [shareValue, setShareValue] = useState("");
+
+  const hasShare = !!(receipt?.myShareType && receipt?.myShareValue != null);
+  const effectiveTotal = receipt ? effectiveReceiptTotal(receipt) : 0;
+  const previewShare = (() => {
+    const v = parseFloat(shareValue);
+    if (!receipt || !Number.isFinite(v)) return 0;
+    return effectiveReceiptTotal({ total: receipt.total, myShareType: shareType, myShareValue: v });
+  })();
+
+  const shareMutation = useMutation({
+    mutationFn: async (body: { myShareType: string; myShareValue: number } | null) =>
+      apiRequest("PATCH", `/api/receipts/${receiptId}/share`, body ?? { myShareType: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      setShareEditing(false);
+      toast({ title: "My share updated" });
+    },
+    onError: async (err: any) => {
+      toast({ title: "Couldn't update share", description: err.message, variant: "destructive" });
+    },
+  });
 
   const createWarrantyMutation = useMutation({
     mutationFn: async (data: typeof warrantyForm) => {
@@ -325,6 +354,112 @@ export default function ReceiptDetailPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* My share of this receipt */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-semibold text-gray-900">My share</div>
+              {hasShare && !shareEditing && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-gray-500"
+                  onClick={() => shareMutation.mutate(null)}
+                  disabled={shareMutation.isPending}
+                  data-testid="button-clear-share"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              If you didn't pay the full amount, set your portion — totals in My Receipts and
+              Analytics will use it instead of the full total.
+            </p>
+            {!shareEditing ? (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-900" data-testid="text-my-share">
+                  {hasShare ? (
+                    <>
+                      <span className="font-semibold">
+                        {isForeignCurrency
+                          ? formatWithCurrencyCode(effectiveTotal, receiptCurrency)
+                          : formatCurrency(effectiveTotal)}
+                      </span>
+                      <span className="text-gray-500 ml-1">
+                        {receipt.myShareType === "percent"
+                          ? `(${parseFloat(String(receipt.myShareValue))}% of total)`
+                          : "(fixed amount)"}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500">Full amount — no share set</span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShareType((receipt.myShareType as "amount" | "percent") || "percent");
+                    setShareValue(receipt.myShareValue ? String(parseFloat(String(receipt.myShareValue))) : "");
+                    setShareEditing(true);
+                  }}
+                  data-testid="button-edit-share"
+                >
+                  <Edit2 className="w-4 h-4 mr-1" /> {hasShare ? "Edit" : "Set my share"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Select value={shareType} onValueChange={(v) => setShareType(v as "amount" | "percent")}>
+                    <SelectTrigger className="w-36" data-testid="select-share-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percent">Percentage</SelectItem>
+                      <SelectItem value="amount">Amount ({receiptCurrency})</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={shareType === "percent" ? 100 : parseFloat(receipt.total)}
+                    step={shareType === "percent" ? 1 : 0.01}
+                    placeholder={shareType === "percent" ? "e.g. 50" : "e.g. 12.50"}
+                    value={shareValue}
+                    onChange={(e) => setShareValue(e.target.value)}
+                    data-testid="input-share-value"
+                  />
+                </div>
+                {shareValue && Number.isFinite(parseFloat(shareValue)) && (
+                  <p className="text-xs text-gray-500">
+                    Your share:{" "}
+                    {isForeignCurrency
+                      ? formatWithCurrencyCode(previewShare, receiptCurrency)
+                      : formatCurrency(previewShare)}
+                  </p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <Button size="sm" variant="ghost" onClick={() => setShareEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => shareMutation.mutate({ myShareType: shareType, myShareValue: parseFloat(shareValue) })}
+                    disabled={shareMutation.isPending || !shareValue || !Number.isFinite(parseFloat(shareValue))}
+                    data-testid="button-save-share"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1" /> Save
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

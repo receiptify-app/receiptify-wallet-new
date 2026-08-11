@@ -52,6 +52,10 @@ export const receipts = pgTable("receipts", {
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   ecoPoints: integer("ecoPoints").default(1),
   splitFolderId: varchar("split_folder_id"),
+  // Personal share of a shared receipt: when set, the user's spend for this
+  // receipt is myShareValue (amount) or total * myShareValue / 100 (percent).
+  myShareType: text("my_share_type"), // 'amount' | 'percent' | null (= full total)
+  myShareValue: decimal("my_share_value", { precision: 10, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow(),
 }, (table) => [
   index("receipts_user_id_idx").on(table.userId),
