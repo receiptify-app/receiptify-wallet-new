@@ -159,6 +159,8 @@ export default function Home() {
   });
 
   const handleReceiptSelect = (id: string) => {
+    // Shared receipts are read-only — exclude them from bulk selection
+    if ((receipts.find(r => r.id === id) as any)?.isShared) return;
     const newSelection = new Set(selectedReceipts);
     if (newSelection.has(id)) {
       newSelection.delete(id);
@@ -173,6 +175,7 @@ export default function Home() {
   };
 
   const handleReceiptLongPress = (id: string) => {
+    if ((receipts.find(r => r.id === id) as any)?.isShared) return;
     setSelectionMode(true);
     setSelectedReceipts(new Set([id]));
   };
@@ -365,7 +368,7 @@ export default function Home() {
                   isSelected={selectedReceipts.has(receipt.id)}
                   selectionMode={selectionMode}
                   onSelect={handleReceiptSelect}
-                  onMove={handleMoveReceipt}
+                  onMove={(receipt as any).isShared ? undefined : handleMoveReceipt}
                   onClick={(id) => navigate(`/receipts/${id}`)}
                 />
               ))}

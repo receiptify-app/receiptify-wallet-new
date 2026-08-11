@@ -18,7 +18,7 @@ import {
   type Receipt,
   type ReceiptItem,
 } from "@shared/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
 function normShare(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return "0";
@@ -90,6 +90,7 @@ export interface ISplitFolderStorage {
   clearMemberAssignments(memberId: string): Promise<void>;
   markMemberSettled(folderId: string, memberId: string): Promise<void>;
   markMemberUnsettled(folderId: string, memberId: string): Promise<number>;
+  getSharedReceiptsForUser(userId: string): Promise<Array<Receipt & { isShared: true }>>;
 
   findUserByEmail(email: string): Promise<typeof users.$inferSelect | undefined>;
 
@@ -263,6 +264,45 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       )
       .returning({ id: splitAssignments.id });
     return rows.length;
+  }
+
+  // Receipts shared with a user via split folders they're an active member of.
+  // Each receipt is returned with the member's own assigned share overriding
+  // the personal-share fields, so client totals count only their portion.
+  async getSharedReceiptsForUser(
+    userId: string,
+  ): Promise<Array<Receipt & { isShared: true }>> {
+    const memberships = await db
+      .select()
+      .from(splitFolderMembers)
+      .where(and(eq(splitFolderMembers.userId, userId), eq(splitFolderMembers.status, "active")));
+    if (memberships.length === 0) return [];
+    const folderIds = memberships.map((m) => m.folderId);
+    const memberIds = memberships.map((m) => m.id);
+
+    const [rows, assigns] = await Promise.all([
+      db
+        .select()
+        .from(receipts)
+        .where(and(inArray(receipts.splitFolderId, folderIds), ne(receipts.userId, userId)))
+        .orderBy(desc(receipts.date)),
+      db.select().from(splitAssignments).where(inArray(splitAssignments.memberId, memberIds)),
+    ]);
+
+    const shareByReceipt = new Map<string, number>();
+    for (const a of assigns) {
+      const amt = parseFloat(a.shareAmount);
+      if (Number.isFinite(amt)) {
+        shareByReceipt.set(a.receiptId, (shareByReceipt.get(a.receiptId) ?? 0) + amt);
+      }
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      isShared: true as const,
+      myShareType: "amount",
+      myShareValue: (shareByReceipt.get(r.id) ?? 0).toFixed(2),
+    }));
   }
 
   async findUserByEmail(email: string) {

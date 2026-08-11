@@ -371,10 +371,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       
-      const receipts = await storage.getReceipts(userId, {
+      const own = await storage.getReceipts(userId, {
         startDate: startOfMonth,
         endDate: endOfMonth,
       });
+      // Include receipts shared with the user via split folders (their share only)
+      const shared = (await splitFolderStorage.getSharedReceiptsForUser(userId)).filter((r) => {
+        const d = new Date(r.date);
+        return d >= startOfMonth && d <= endOfMonth;
+      });
+      const receipts = [...own, ...shared];
       
       // Aggregate by category
       const categoryTotals: { [key: string]: number } = {};
@@ -454,9 +460,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
-      const receipt = await storage.getReceipt(req.params.id);
-      if (!receipt || receipt.userId !== userId) {
+      let receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
         return res.status(404).json({ error: "Receipt not found" });
+      }
+      let isShared = false;
+      if (receipt.userId !== userId) {
+        // Allow read-only access to active members of the receipt's split folder,
+        // with their own assigned share substituted for the personal-share fields.
+        if (!receipt.splitFolderId) {
+          return res.status(404).json({ error: "Receipt not found" });
+        }
+        const members = await splitFolderStorage.listMembers(receipt.splitFolderId);
+        const me = members.find((m) => m.userId === userId && m.status === "active");
+        if (!me) {
+          return res.status(404).json({ error: "Receipt not found" });
+        }
+        isShared = true;
+        const assignments = await splitFolderStorage.listAssignments(receipt.splitFolderId);
+        const myShare = assignments
+          .filter((a) => a.receiptId === receipt!.id && a.memberId === me.id)
+          .reduce((sum, a) => sum + (parseFloat(a.shareAmount) || 0), 0);
+        receipt = { ...receipt, myShareType: "amount", myShareValue: myShare.toFixed(2) };
       }
 
       const items = await storage.getReceiptItems(receipt.id);
@@ -485,7 +510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ ...receipt, items, splitSuggestedShare });
+      res.json({ ...receipt, items, splitSuggestedShare, isShared });
     } catch (error) {
       console.error("Error fetching receipt:", error);
       res.status(500).json({ error: "Failed to fetch receipt" });
@@ -1105,6 +1130,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!categoryId) {
         return res.status(400).json({ error: "Category ID is required" });
       }
+      const existing = await storage.getReceipt(req.params.id);
+      if (!existing || existing.userId !== req.user?.id) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
 
       const receipt = await storage.updateReceipt(req.params.id, { category: categoryId });
       if (!receipt) {
@@ -1132,6 +1161,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedReceipts = [];
       for (const receiptId of receiptIds) {
+        // Only the receipt's owner can recategorize it (shared receipts are read-only)
+        const existing = await storage.getReceipt(receiptId);
+        if (!existing || existing.userId !== req.user?.id) continue;
         const receipt = await storage.updateReceipt(receiptId, { category: categoryId });
         if (receipt) {
           updatedReceipts.push(receipt);
@@ -1151,6 +1183,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/receipts/:id", async (req, res) => {
     try {
+      // Only the owner can delete a receipt (shared receipts are read-only)
+      const existing = await storage.getReceipt(req.params.id);
+      if (!existing || existing.userId !== req.user?.id) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
       const success = await storage.deleteReceipt(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Receipt not found" });
@@ -1165,7 +1202,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Receipt items routes
   app.get("/api/receipts/:id/items", async (req, res) => {
     try {
-      const items = await storage.getReceiptItems(req.params.id);
+      // Same access policy as receipt detail: owner or active split-folder member
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+      if (receipt.userId !== userId) {
+        if (!receipt.splitFolderId) {
+          return res.status(404).json({ error: "Receipt not found" });
+        }
+        const members = await splitFolderStorage.listMembers(receipt.splitFolderId);
+        const me = members.find((m) => m.userId === userId && m.status === "active");
+        if (!me) {
+          return res.status(404).json({ error: "Receipt not found" });
+        }
+      }
+      const items = await storage.getReceiptItems(receipt.id);
       res.json(items);
     } catch (error) {
       console.error("Error fetching receipt items:", error);
@@ -1775,8 +1831,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Load receipts directly from PostgreSQL (indexed for fast user queries)
     try {
-      const receipts = await storage.getReceipts(userId);
-      res.json(receipts);
+      const [own, shared] = await Promise.all([
+        storage.getReceipts(userId),
+        splitFolderStorage.getSharedReceiptsForUser(userId),
+      ]);
+      const all = [...own, ...shared].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      res.json(all);
     } catch (error) {
       console.error("Error fetching receipts:", error);
       res.status(500).json({ error: "Failed to fetch receipts" });

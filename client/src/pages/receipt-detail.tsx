@@ -110,6 +110,9 @@ export default function ReceiptDetailPage() {
   const [shareValue, setShareValue] = useState("");
 
   const hasShare = !!(receipt?.myShareType && receipt?.myShareValue != null);
+  // Receipt shared with this user via a split folder they're a member of —
+  // share comes from the split, so it's read-only here.
+  const isSharedReceipt = !!(receipt as any)?.isShared;
   const effectiveTotal = receipt ? effectiveReceiptTotal(receipt) : 0;
   // Suggested share derived from the split folder's assignments (total minus
   // what's assigned to others). Offered when it differs from the current share.
@@ -122,7 +125,7 @@ export default function ReceiptDetailPage() {
     hasShare &&
     receipt?.myShareType === "amount" &&
     Math.abs(parseFloat(String(receipt.myShareValue)) - splitSuggested) < 0.005;
-  const showSplitSuggestion = splitSuggested != null && !suggestionMatchesCurrentShare;
+  const showSplitSuggestion = splitSuggested != null && !suggestionMatchesCurrentShare && !(receipt as any)?.isShared;
   const previewShare = (() => {
     const v = parseFloat(shareValue);
     if (!receipt || !Number.isFinite(v)) return 0;
@@ -374,7 +377,7 @@ export default function ReceiptDetailPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-1">
               <div className="font-semibold text-gray-900">My share</div>
-              {hasShare && !shareEditing && (
+              {!isSharedReceipt && hasShare && !shareEditing && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -388,8 +391,9 @@ export default function ReceiptDetailPage() {
               )}
             </div>
             <p className="text-xs text-gray-500 mb-3">
-              If you didn't pay the full amount, set your portion — totals in My Receipts and
-              Analytics will use it instead of the full total.
+              {isSharedReceipt
+                ? "This receipt was shared with you via a split folder — your share comes from the split."
+                : "If you didn't pay the full amount, set your portion — totals in My Receipts and Analytics will use it instead of the full total."}
             </p>
             {showSplitSuggestion && !shareEditing && (
               <div
@@ -438,18 +442,20 @@ export default function ReceiptDetailPage() {
                     <span className="text-gray-500">Full amount — no share set</span>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setShareType((receipt.myShareType as "amount" | "percent") || "percent");
-                    setShareValue(receipt.myShareValue ? String(parseFloat(String(receipt.myShareValue))) : "");
-                    setShareEditing(true);
-                  }}
-                  data-testid="button-edit-share"
-                >
-                  <Edit2 className="w-4 h-4 mr-1" /> {hasShare ? "Edit" : "Set my share"}
-                </Button>
+                {!isSharedReceipt && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShareType((receipt.myShareType as "amount" | "percent") || "percent");
+                      setShareValue(receipt.myShareValue ? String(parseFloat(String(receipt.myShareValue))) : "");
+                      setShareEditing(true);
+                    }}
+                    data-testid="button-edit-share"
+                  >
+                    <Edit2 className="w-4 h-4 mr-1" /> {hasShare ? "Edit" : "Set my share"}
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -523,14 +529,16 @@ export default function ReceiptDetailPage() {
               </div>
               {receipt.splitFolderId ? (
                 <div className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setSplitPickerOpen(true)}
-                    data-testid="button-move-split-folder"
-                  >
-                    Move
-                  </Button>
+                  {!isSharedReceipt && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSplitPickerOpen(true)}
+                      data-testid="button-move-split-folder"
+                    >
+                      Move
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700"
@@ -540,7 +548,7 @@ export default function ReceiptDetailPage() {
                     Open <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
-              ) : (
+              ) : !isSharedReceipt ? (
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
@@ -549,7 +557,7 @@ export default function ReceiptDetailPage() {
                 >
                   Split
                 </Button>
-              )}
+              ) : null}
             </div>
           </CardContent>
         </Card>

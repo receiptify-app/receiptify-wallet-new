@@ -35,6 +35,7 @@ interface Receipt {
   paymentMethod?: string;
   myShareType?: string | null;
   myShareValue?: string | null;
+  isShared?: boolean;
 }
 
 export default function ReceiptsPage() {
@@ -151,6 +152,9 @@ export default function ReceiptsPage() {
       e.stopPropagation();
     }
     
+    // Shared receipts are read-only — they can't be selected for bulk actions
+    if (receipts.find(r => r.id === id)?.isShared) return;
+
     const newSelection = new Set(selectedReceipts);
     if (newSelection.has(id)) {
       newSelection.delete(id);
@@ -181,10 +185,11 @@ export default function ReceiptsPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedReceipts.size === receipts.length) {
+    const selectable = receipts.filter(r => !r.isShared);
+    if (selectedReceipts.size === selectable.length) {
       setSelectedReceipts(new Set());
     } else {
-      setSelectedReceipts(new Set(receipts.map(r => r.id)));
+      setSelectedReceipts(new Set(selectable.map(r => r.id)));
     }
   };
 
@@ -456,7 +461,7 @@ export default function ReceiptsPage() {
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between w-full">
                               <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                {selectionMode && (
+                                {selectionMode && !receipt.isShared && (
                                   <div onClick={(e) => handleReceiptSelect(receipt.id, e)}>
                                     <Checkbox 
                                       checked={selectedReceipts.has(receipt.id)}
@@ -473,6 +478,11 @@ export default function ReceiptsPage() {
                                     title={displayMerchant(receipt.merchantName)}
                                   >
                                     {displayMerchant(receipt.merchantName)}
+                                    {receipt.isShared && (
+                                      <Badge variant="secondary" className="ml-1.5 text-[10px] bg-green-100 text-green-700 align-middle">
+                                        shared
+                                      </Badge>
+                                    )}
                                   </p>
                                   <p className="text-xs text-gray-500 truncate mt-1">
                                     {new Date(receipt.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' })}
@@ -513,7 +523,7 @@ export default function ReceiptsPage() {
                                     <ChevronRight className="h-4 w-4 text-gray-400" />
                                   </div>
                                 )}
-                                {!selectionMode && (
+                                {!selectionMode && !receipt.isShared && (
                                   <button
                                     onClick={(e) => handleDeleteReceipt(receipt.id, e)}
                                     className="text-red-500 hover:text-red-700 p-1 ml-2"
