@@ -89,6 +89,7 @@ export interface ISplitFolderStorage {
   clearReceiptAssignments(folderId: string, receiptId: string): Promise<void>;
   clearMemberAssignments(memberId: string): Promise<void>;
   markMemberSettled(folderId: string, memberId: string): Promise<void>;
+  markMemberUnsettled(folderId: string, memberId: string): Promise<number>;
 
   findUserByEmail(email: string): Promise<typeof users.$inferSelect | undefined>;
 
@@ -247,6 +248,21 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       .where(
         and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.memberId, memberId)),
       );
+  }
+
+  async markMemberUnsettled(folderId: string, memberId: string): Promise<number> {
+    const rows = await db
+      .update(splitAssignments)
+      .set({ status: "pending" })
+      .where(
+        and(
+          eq(splitAssignments.folderId, folderId),
+          eq(splitAssignments.memberId, memberId),
+          eq(splitAssignments.status, "paid"),
+        ),
+      )
+      .returning({ id: splitAssignments.id });
+    return rows.length;
   }
 
   async findUserByEmail(email: string) {

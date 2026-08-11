@@ -27,6 +27,7 @@ import {
   ChevronUp,
   Send,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -617,6 +618,17 @@ export default function SplitFolderPage() {
     onError: (err: any) => toast({ title: "Couldn't mark settled", description: err.message, variant: "destructive" }),
   });
 
+  const unsettleMutation = useMutation({
+    mutationFn: async (memberId: string) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/members/${memberId}/unsettle`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      toast({ title: "Marked as unpaid", description: "Their share is back to pending." });
+    },
+    onError: (err: any) => toast({ title: "Couldn't revert settlement", description: err.message, variant: "destructive" }),
+  });
+
   const resendInviteMutation = useMutation({
     mutationFn: async (memberId: string) => {
       const res = await apiRequest(
@@ -815,7 +827,7 @@ export default function SplitFolderPage() {
                         </div>
                       </div>
                     </div>
-                    {s.role !== "owner" && s.owed > 0 && (
+                    {isOwner && s.role !== "owner" && s.owed > 0 && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -824,6 +836,18 @@ export default function SplitFolderPage() {
                         data-testid={`settle-${s.memberId}`}
                       >
                         <Check className="w-4 h-4 mr-1" /> Mark settled
+                      </Button>
+                    )}
+                    {isOwner && s.role !== "owner" && s.owed === 0 && s.paid > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-gray-500"
+                        onClick={() => unsettleMutation.mutate(s.memberId)}
+                        disabled={unsettleMutation.isPending}
+                        data-testid={`unsettle-${s.memberId}`}
+                      >
+                        <Undo2 className="w-4 h-4 mr-1" /> Mark unpaid
                       </Button>
                     )}
                   </div>

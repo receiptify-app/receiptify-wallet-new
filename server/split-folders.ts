@@ -666,4 +666,27 @@ No action is needed from you.`;
       res.json({ ok: true });
     },
   );
+
+  // --- Revert a member's paid assignments back to pending (owner only) ---
+  app.post(
+    "/api/split-folders/:id/members/:memberId/unsettle",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      const userId = req.user!.id;
+      const folder = await loadFolderForUser(req.params.id, userId);
+      if (!folder) return res.status(404).json({ error: "Folder not found" });
+      if (folder.ownerId !== userId) {
+        return res.status(403).json({ error: "Only the folder owner can mark settlement" });
+      }
+      const member = await splitFolderStorage.getMember(req.params.memberId);
+      if (!member || member.folderId !== folder.id) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      const reverted = await splitFolderStorage.markMemberUnsettled(folder.id, member.id);
+      if (reverted === 0) {
+        return res.status(409).json({ error: "This member has no settled shares to revert" });
+      }
+      res.json({ ok: true });
+    },
+  );
 }
