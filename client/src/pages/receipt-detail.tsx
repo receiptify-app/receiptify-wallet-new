@@ -61,7 +61,7 @@ export default function ReceiptDetailPage() {
   });
 
   const { data: receipt, isLoading } = useQuery<
-    Receipt & { items?: ReceiptItem[] }
+    Receipt & { items?: ReceiptItem[]; splitSuggestedShare?: number | null }
   >({
     queryKey: ["/api/receipts", receiptId],
   });
@@ -111,6 +111,18 @@ export default function ReceiptDetailPage() {
 
   const hasShare = !!(receipt?.myShareType && receipt?.myShareValue != null);
   const effectiveTotal = receipt ? effectiveReceiptTotal(receipt) : 0;
+  // Suggested share derived from the split folder's assignments (total minus
+  // what's assigned to others). Offered when it differs from the current share.
+  const splitSuggested =
+    receipt?.splitSuggestedShare != null && Number.isFinite(receipt.splitSuggestedShare)
+      ? receipt.splitSuggestedShare
+      : null;
+  const suggestionMatchesCurrentShare =
+    splitSuggested != null &&
+    hasShare &&
+    receipt?.myShareType === "amount" &&
+    Math.abs(parseFloat(String(receipt.myShareValue)) - splitSuggested) < 0.005;
+  const showSplitSuggestion = splitSuggested != null && !suggestionMatchesCurrentShare;
   const previewShare = (() => {
     const v = parseFloat(shareValue);
     if (!receipt || !Number.isFinite(v)) return 0;
@@ -379,6 +391,33 @@ export default function ReceiptDetailPage() {
               If you didn't pay the full amount, set your portion — totals in My Receipts and
               Analytics will use it instead of the full total.
             </p>
+            {showSplitSuggestion && !shareEditing && (
+              <div
+                className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3"
+                data-testid="banner-split-suggestion"
+              >
+                <div className="text-xs text-green-800">
+                  From this receipt's split:{" "}
+                  <span className="font-semibold">
+                    {isForeignCurrency
+                      ? formatWithCurrencyCode(splitSuggested!, receiptCurrency)
+                      : formatCurrency(splitSuggested!)}
+                  </span>{" "}
+                  is your portion after friends' assignments.
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 shrink-0"
+                  onClick={() =>
+                    shareMutation.mutate({ myShareType: "amount", myShareValue: splitSuggested! })
+                  }
+                  disabled={shareMutation.isPending}
+                  data-testid="button-use-split-amount"
+                >
+                  Use split amount
+                </Button>
+              </div>
+            )}
             {!shareEditing ? (
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-900" data-testid="text-my-share">

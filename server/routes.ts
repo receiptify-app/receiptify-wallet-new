@@ -21,7 +21,8 @@ import {
   insertKioskSessionSchema,
   insertWarrantyClaimSchema,
 } from "@shared/schema";
-import { effectiveReceiptTotal } from "@shared/receipt-share";
+import { effectiveReceiptTotal, suggestedOwnerShare } from "@shared/receipt-share";
+import { splitFolderStorage } from "./split-folder-storage";
 import multer from "multer";
 import * as fs from "fs";
 import path from "path";
@@ -449,13 +450,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/receipts/:id", async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
       const receipt = await storage.getReceipt(req.params.id);
-      if (!receipt) {
+      if (!receipt || receipt.userId !== userId) {
         return res.status(404).json({ error: "Receipt not found" });
       }
 
       const items = await storage.getReceiptItems(receipt.id);
-      res.json({ ...receipt, items });
+
+      // When the receipt is in a split folder with assignments, derive the
+      // owner's suggested share: total minus what's assigned to other members.
+      let splitSuggestedShare: number | null = null;
+      if (receipt.splitFolderId) {
+        try {
+          const [assignments, members] = await Promise.all([
+            splitFolderStorage.listAssignments(receipt.splitFolderId),
+            splitFolderStorage.listMembers(receipt.splitFolderId),
+          ]);
+          const memberById = new Map(members.map((m) => [m.id, m]));
+          splitSuggestedShare = suggestedOwnerShare(
+            receipt,
+            assignments
+              .filter((a) => a.receiptId === receipt.id)
+              .map((a) => ({
+                shareAmount: a.shareAmount,
+                isOwner: memberById.get(a.memberId)?.userId === receipt.userId,
+              })),
+          );
+        } catch (e) {
+          console.warn("Failed to compute split suggested share:", e);
+        }
+      }
+
+      res.json({ ...receipt, items, splitSuggestedShare });
     } catch (error) {
       console.error("Error fetching receipt:", error);
       res.status(500).json({ error: "Failed to fetch receipt" });
