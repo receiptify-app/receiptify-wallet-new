@@ -517,6 +517,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update the owner's receipt details
+  app.patch("/api/receipts/:id", async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const existing = await storage.getReceipt(req.params.id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+
+      const body = req.body ?? {};
+      const updates: Record<string, unknown> = {};
+      const textFields = [
+        "merchantName",
+        "location",
+        "receiptNumber",
+        "paymentMethod",
+        "category",
+      ];
+
+      for (const field of textFields) {
+        if (body[field] !== undefined) {
+          if (body[field] !== null && typeof body[field] !== "string") {
+            return res.status(400).json({ error: `${field} must be text` });
+          }
+          const value = typeof body[field] === "string" ? body[field].trim() : "";
+          if (field === "merchantName" && !value) {
+            return res.status(400).json({ error: "Merchant is required" });
+          }
+          updates[field] = value || null;
+        }
+      }
+
+      for (const field of ["total", "subtotal", "tax", "serviceCharge"]) {
+        if (body[field] !== undefined) {
+          if (body[field] === null || body[field] === "") {
+            if (field === "total") {
+              return res.status(400).json({ error: "Total is required" });
+            }
+            updates[field] = null;
+            continue;
+          }
+          const value =
+            typeof body[field] === "number"
+              ? body[field]
+              : typeof body[field] === "string" && /^\d+(\.\d{1,2})?$/.test(body[field].trim())
+                ? Number(body[field])
+                : NaN;
+          if (!Number.isFinite(value) || value < 0) {
+            return res.status(400).json({ error: `${field} must be a non-negative amount` });
+          }
+          updates[field] = value.toFixed(2);
+        }
+      }
+
+      if (updates.total !== undefined && existing.myShareType && existing.myShareValue != null) {
+        const newTotal = Number(updates.total);
+        const existingShare = Number(existing.myShareValue);
+        const shareAmount =
+          existing.myShareType === "percent"
+            ? (newTotal * existingShare) / 100
+            : existingShare;
+        if (Number.isFinite(shareAmount) && shareAmount > newTotal) {
+          return res.status(400).json({
+            error: "Total cannot be lower than the saved share amount",
+          });
+        }
+      }
+
+      if (updates.total !== undefined && existing.splitFolderId) {
+        const assignments = await splitFolderStorage.listAssignments(existing.splitFolderId);
+        const assignedTotal = assignments
+          .filter((assignment) => assignment.receiptId === existing.id)
+          .reduce((sum, assignment) => sum + (Number(assignment.shareAmount) || 0), 0);
+        if (Number(updates.total) + 0.005 < assignedTotal) {
+          return res.status(400).json({
+            error: `Total cannot be lower than the ${assignedTotal.toFixed(2)} already assigned in the split`,
+          });
+        }
+      }
+
+      if (body.date !== undefined) {
+        if (
+          typeof body.date !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(body.date.trim())
+        ) {
+          return res.status(400).json({ error: "Date is required" });
+        }
+        const [year, month, day] = body.date.split("-").map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day, 12));
+        if (
+          Number.isNaN(date.getTime()) ||
+          date.getUTCFullYear() !== year ||
+          date.getUTCMonth() !== month - 1 ||
+          date.getUTCDate() !== day
+        ) {
+          return res.status(400).json({ error: "Date is invalid" });
+        }
+        updates.date = date;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No receipt details to update" });
+      }
+
+      const receipt = await storage.updateReceipt(req.params.id, updates);
+      res.json(receipt);
+    } catch (error) {
+      console.error("Error updating receipt details:", error);
+      res.status(500).json({ error: "Failed to update receipt details" });
+    }
+  });
+
   app.post("/api/receipts", async (req, res) => {
     try {
       const userId = req.user?.id;

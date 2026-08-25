@@ -31,7 +31,7 @@ import SplitFolderPicker from "@/components/split-folder-picker";
 import AppHeader from "@/components/app-header";
 import ImageViewer from "@/components/image-viewer";
 import type { Receipt, ReceiptItem, Warranty } from "@shared/schema";
-import { getCategoryByName, getCategoryById } from "@shared/categories";
+import { CATEGORIES, getCategoryByName, getCategoryById } from "@shared/categories";
 import { useCurrency } from "@/hooks/use-currency";
 import { useToast } from "@/hooks/use-toast";
 import { effectiveReceiptTotal } from "@shared/receipt-share";
@@ -52,6 +52,19 @@ export default function ReceiptDetailPage() {
 
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [receiptEditing, setReceiptEditing] = useState(false);
+  const [receiptForm, setReceiptForm] = useState({
+    merchantName: "",
+    location: "",
+    date: "",
+    total: "",
+    subtotal: "",
+    tax: "",
+    serviceCharge: "",
+    receiptNumber: "",
+    paymentMethod: "",
+    category: "other",
+  });
   const [splitPickerOpen, setSplitPickerOpen] = useState(false);
   const [warrantyForm, setWarrantyForm] = useState({
     productName: "",
@@ -61,7 +74,7 @@ export default function ReceiptDetailPage() {
   });
 
   const { data: receipt, isLoading } = useQuery<
-    Receipt & { items?: ReceiptItem[]; splitSuggestedShare?: number | null }
+    Receipt & { items?: ReceiptItem[]; splitSuggestedShare?: number | null; isShared?: boolean }
   >({
     queryKey: ["/api/receipts", receiptId],
   });
@@ -143,6 +156,34 @@ export default function ReceiptDetailPage() {
     },
     onError: async (err: any) => {
       toast({ title: "Couldn't update share", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const receiptMutation = useMutation({
+    mutationFn: async () => {
+      const body = {
+        ...receiptForm,
+        subtotal: receiptForm.subtotal || null,
+        tax: receiptForm.tax || null,
+        serviceCharge: receiptForm.serviceCharge || null,
+        receiptNumber: receiptForm.receiptNumber || null,
+        paymentMethod: receiptForm.paymentMethod || null,
+        location: receiptForm.location || null,
+      };
+      return apiRequest("PATCH", `/api/receipts/${receiptId}`, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      setReceiptEditing(false);
+      toast({ title: "Receipt details updated" });
+    },
+    onError: async (err: any) => {
+      toast({
+        title: "Couldn't update receipt",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -233,6 +274,24 @@ export default function ReceiptDetailPage() {
     }
   };
 
+  const startReceiptEdit = () => {
+    if (!receipt || isSharedReceipt) return;
+    const category = getCategoryByName(receipt.category || "") || getCategoryById(receipt.category || "");
+    setReceiptForm({
+      merchantName: receipt.merchantName || "",
+      location: receipt.location || "",
+      date: new Date(receipt.date).toISOString().slice(0, 10),
+      total: String(receipt.total || ""),
+      subtotal: receipt.subtotal ? String(receipt.subtotal) : "",
+      tax: receipt.tax ? String(receipt.tax) : "",
+      serviceCharge: receipt.serviceCharge ? String(receipt.serviceCharge) : "",
+      receiptNumber: receipt.receiptNumber || "",
+      paymentMethod: receipt.paymentMethod || "",
+      category: category?.id || "other",
+    });
+    setReceiptEditing(true);
+  };
+
   const getWarrantyStatus = (endDate: Date) => {
     const now = new Date();
     const daysRemaining = Math.ceil(
@@ -289,16 +348,175 @@ export default function ReceiptDetailPage() {
 
       <div className="px-6 py-4 space-y-6">
         {/* Store Info */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {!receipt.merchantName || receipt.merchantName === "null" || receipt.merchantName.trim() === ""
-              ? "Unspecified Merchant"
-              : receipt.merchantName}
-          </h1>
-          <p className="text-gray-600">
-            {receiptDate} • {receipt.location}
-          </p>
-        </div>
+        {receiptEditing ? (
+          <Card className="bg-white shadow-sm border-0">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h1 className="text-xl font-bold text-gray-900">Edit receipt details</h1>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setReceiptEditing(false)}
+                  disabled={receiptMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="receipt-merchant">Merchant</Label>
+                  <Input
+                    id="receipt-merchant"
+                    value={receiptForm.merchantName}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, merchantName: e.target.value }))}
+                    data-testid="input-receipt-merchant"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-date">Date</Label>
+                  <Input
+                    id="receipt-date"
+                    type="date"
+                    value={receiptForm.date}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, date: e.target.value }))}
+                    data-testid="input-receipt-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-location">Location</Label>
+                  <Input
+                    id="receipt-location"
+                    value={receiptForm.location}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, location: e.target.value }))}
+                    data-testid="input-receipt-location"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-total">Total ({receiptCurrency})</Label>
+                  <Input
+                    id="receipt-total"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={receiptForm.total}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, total: e.target.value }))}
+                    data-testid="input-receipt-total"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-subtotal">Subtotal ({receiptCurrency})</Label>
+                  <Input
+                    id="receipt-subtotal"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={receiptForm.subtotal}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, subtotal: e.target.value }))}
+                    data-testid="input-receipt-subtotal"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-tax">Tax ({receiptCurrency})</Label>
+                  <Input
+                    id="receipt-tax"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={receiptForm.tax}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, tax: e.target.value }))}
+                    data-testid="input-receipt-tax"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-service-charge">Service charge ({receiptCurrency})</Label>
+                  <Input
+                    id="receipt-service-charge"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={receiptForm.serviceCharge}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, serviceCharge: e.target.value }))}
+                    data-testid="input-receipt-service-charge"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-number">Receipt number</Label>
+                  <Input
+                    id="receipt-number"
+                    value={receiptForm.receiptNumber}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, receiptNumber: e.target.value }))}
+                    data-testid="input-receipt-number"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-payment">Payment method</Label>
+                  <Input
+                    id="receipt-payment"
+                    value={receiptForm.paymentMethod}
+                    onChange={(e) => setReceiptForm((f) => ({ ...f, paymentMethod: e.target.value }))}
+                    data-testid="input-receipt-payment"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt-category">Category</Label>
+                  <Select
+                    value={receiptForm.category}
+                    onValueChange={(value) => setReceiptForm((f) => ({ ...f, category: value }))}
+                  >
+                    <SelectTrigger id="receipt-category" data-testid="select-receipt-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => receiptMutation.mutate()}
+                  disabled={
+                    receiptMutation.isPending ||
+                    !receiptForm.merchantName.trim() ||
+                    !receiptForm.date ||
+                    !receiptForm.total
+                  }
+                  data-testid="button-save-receipt"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" /> Save changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {!receipt.merchantName || receipt.merchantName === "null" || receipt.merchantName.trim() === ""
+                  ? "Unspecified Merchant"
+                  : receipt.merchantName}
+              </h1>
+              <p className="text-gray-600">
+                {receiptDate} • {receipt.location}
+              </p>
+            </div>
+            {!isSharedReceipt && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={startReceiptEdit}
+                data-testid="button-edit-receipt"
+              >
+                <Edit2 className="w-4 h-4 mr-1" /> Edit
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Receipt Image with Zoom, Rotate, Crop */}
         {receipt.imageUrl && (
