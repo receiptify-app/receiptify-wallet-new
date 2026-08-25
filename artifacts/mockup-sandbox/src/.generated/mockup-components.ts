@@ -4,5 +4,9 @@ export const modules: ModuleMap = {
   "./components/mockups/landing-page/EcoMission.tsx": () => import("../components/mockups/landing-page/EcoMission.tsx"),
   "./components/mockups/landing-page/FinanceControl.tsx": () => import("../components/mockups/landing-page/FinanceControl.tsx"),
   "./components/mockups/landing-page/MinimalPremium.tsx": () => import("../components/mockups/landing-page/MinimalPremium.tsx"),
-  "./components/mockups/landing-page/ProductLed.tsx": () => import("../components/mockups/landing-page/ProductLed.tsx")
+  "./components/mockups/landing-page/ProductLed.tsx": () => import("../components/mockups/landing-page/ProductLed.tsx"),
+  "./components/mockups/receiptify-current/Dashboard.tsx": () => import("../components/mockups/receiptify-current/Dashboard.tsx"),
+  "./components/mockups/receiptify-current/ReceiptDetail.tsx": () => import("../components/mockups/receiptify-current/ReceiptDetail.tsx"),
+  "./components/mockups/receiptify-current/Receipts.tsx": () => import("../components/mockups/receiptify-current/Receipts.tsx"),
+  "./components/mockups/receiptify-upgraded/Dashboard.tsx": () => import("../components/mockups/receiptify-upgraded/Dashboard.tsx")
 };

@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+
+.receiptify-upgraded {
+  --paper: #f7f4ee;
+  --paper-deep: #ece8df;
+  --ink: #1e2c2b;
+  --muted: #75807b;
+  --line: #dedbd2;
+  --card: #fffdf9;
+  --sage: #60786d;
+  --sage-soft: #dfe9e0;
+  --coral: #ce725d;
+  --coral-soft: #f4ddd4;
+  --gold: #c89b52;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "DM Sans", sans-serif;
+}
+
+.receiptify-upgraded * { box-sizing: border-box; }
+.receiptify-upgraded button, .receiptify-upgraded select { font: inherit; }
+.receiptify-upgraded button { cursor: pointer; }
+.receiptify-upgraded .display { font-family: "Fraunces", serif; }
+.receiptify-upgraded .mono { font-family: "DM Mono", monospace; letter-spacing: -.03em; }
+
+@keyframes receiptify-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.receiptify-upgraded .rise { animation: receiptify-rise .55s ease both; }
+.receiptify-upgraded .d1 { animation-delay: .06s; }
+.receiptify-upgraded .d2 { animation-delay: .12s; }
+.receiptify-upgraded .d3 { animation-delay: .18s; }
+
+@media (max-width: 760px) {
+  .receiptify-upgraded .desktop-only { display: none; }
+  .receiptify-upgraded .dashboard-grid { grid-template-columns: 1fr !important; }
+  .receiptify-upgraded .topbar { padding: 18px 20px !important; }
+  .receiptify-upgraded .content { padding: 26px 20px !important; }
+}
