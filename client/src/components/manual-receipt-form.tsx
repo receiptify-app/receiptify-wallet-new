@@ -462,10 +462,10 @@ export default function ManualReceiptForm({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
-                      <Label>{t("manual.itemName")} *</Label>
+                      <Label>{t("manual.itemName")}</Label>
                       <Input
                         placeholder={t("manual.itemNamePlaceholder")}
-                        {...register(`items.${index}.name`, { required: true })}
+                        {...register(`items.${index}.name`)}
                       />
                     </div>
 
