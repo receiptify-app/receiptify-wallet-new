@@ -99,8 +99,8 @@ export default function Login() {
         path="/login"
         robots="noindex,follow"
       />
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-0">
+    <div className="receiptify-page receiptify-auth-page min-h-screen flex items-center justify-center p-4">
+      <Card className="receiptify-auth-card w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4">
           <div className="flex flex-col items-center gap-2 mb-4">
             <img

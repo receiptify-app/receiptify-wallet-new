@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown } from "lucide-react";
+import { ArrowDownLeft, BarChart3, ChevronDown, FilePlus2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import AppHeader from "@/components/app-header";
@@ -229,138 +229,144 @@ export default function Home() {
     percentage: cat.percentage
   }));
 
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <AppHeader />
+    <div className="receiptify-page pb-24">
+      <AppHeader visualSystem />
 
-      <div className="px-6 py-4 space-y-6">
-        {/* Header with period selector and total */}
-        <div className="flex items-center justify-between">
-          <Select
-            value={selectedMonthKey ?? ''}
-            onValueChange={(value) => {
-              // value is a YYYY-MM key from monthOptions
-              setSelectedPeriod('custom');
-              setSelectedMonthKey(value);
-            }}
-          >
-            <SelectTrigger className="w-[160px]" data-testid="select-date-range">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(m => (
-                <SelectItem key={m.key} value={m.key}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="text-right">
-            <p className="text-sm text-gray-600">{t('analytics.totalSpent')}</p>
-            <h2 className="text-4xl font-bold text-gray-900" data-testid="text-total-spending">
-              {formatCurrency(analytics.total)}
-            </h2>
+      <main className="receiptify-content">
+        <section className="receiptify-hero receiptify-fade-in">
+          <div>
+            <p className="receiptify-eyebrow">{dateLabel}</p>
+            <h1>Good morning<span><em>.</em></span></h1>
+            <p className="receiptify-subtitle">Here’s the shape of your spending this month.</p>
           </div>
-        </div>
+          <Button
+            className="receiptify-primary-action"
+            onClick={() => navigate("/scan")}
+            data-testid="button-add-receipt"
+          >
+            <FilePlus2 className="h-4 w-4" /> Add receipt
+          </Button>
+        </section>
 
-        {/* Category Breakdown with Donut Chart */}
-        <Card className="bg-white shadow-sm">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('analytics.categories')}</h3>
-            
+        <div className="receiptify-dashboard-grid">
+          <section className="receiptify-total-card receiptify-fade-in" data-testid="card-total-spending">
+            <div className="receiptify-card-content">
+              <div className="flex items-center justify-between gap-3">
+                <span className="receiptify-total-label">{t('analytics.totalSpent')}</span>
+                <Select
+                  value={selectedMonthKey ?? ''}
+                  onValueChange={(value) => {
+                    setSelectedPeriod('custom');
+                    setSelectedMonthKey(value);
+                  }}
+                >
+                  <SelectTrigger className="receiptify-total-select w-[148px] h-8 text-xs" data-testid="select-date-range">
+                    <SelectValue placeholder="This month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map(m => (
+                      <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="receiptify-total-value receiptify-mono" data-testid="text-total-spending">
+                {formatCurrency(analytics.total)}
+              </div>
+              <div className="receiptify-total-meta">
+                <ArrowDownLeft className="h-3.5 w-3.5" />
+                <span>Spending overview</span>
+                <span className="opacity-60">·</span>
+                <span>{analytics.receipts.length} receipt{analytics.receipts.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="receiptify-total-footer">
+                <span>{selectedCategory ? `Filtered to ${selectedCategory}` : "A calm view of your wallet"}</span>
+                <strong>{formatCurrency(analytics.total)}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="receiptify-category-card receiptify-fade-in" style={{ animationDelay: "80ms" }}>
+            <div className="receiptify-card-heading">
+              <div>
+                <h2>{t('analytics.categories')}</h2>
+                <p>A gentle look at your habits</p>
+              </div>
+              <BarChart3 className="h-5 w-5" />
+            </div>
+
             {chartData.length > 0 ? (
-              <div className="flex flex-col items-center">
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                      onClick={handleChartClick}
-                      className="cursor-pointer"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={entry.color}
-                          stroke={selectedCategory === entry.category ? '#000' : 'none'}
-                          strokeWidth={selectedCategory === entry.category ? 3 : 0}
-                          opacity={selectedCategory && selectedCategory !== entry.category ? 0.3 : 1}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-
-                {/* Category legend */}
-                <div className="w-full mt-4 space-y-2">
-                  {analytics.categories.slice(0, 5).map((item) => (
-                    <div 
-                      key={item.category} 
-                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedCategory === item.category ? 'bg-gray-100' : 'hover:bg-gray-50'
-                      }`}
+              <div className="receiptify-category-layout">
+                <div
+                  className="receiptify-donut"
+                  style={{
+                    background: `conic-gradient(${chartData.map((item, index) => {
+                      const start = chartData.slice(0, index).reduce((sum, current) => sum + current.percentage, 0);
+                      return `${item.color} ${start}% ${start + item.percentage}%`;
+                    }).join(", ")})`,
+                  }}
+                  aria-label="Spending by category"
+                >
+                  <div className="receiptify-donut-center">
+                    <span>This month</span>
+                    <strong>{formatCurrency(analytics.total)}</strong>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  {analytics.categories.map((item) => (
+                    <button
+                      key={item.category}
+                      type="button"
+                      className={`receiptify-category-row ${selectedCategory === item.category ? "is-selected" : ""}`}
                       onClick={() => setSelectedCategory(selectedCategory === item.category ? null : item.category)}
                       data-testid={`category-filter-${item.category.toLowerCase()}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-gray-900 font-medium text-sm">{item.category}</span>
-                        <span className="text-xs text-gray-500">({item.count})</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-semibold text-gray-900 text-sm">{formatCurrency(item.amount)}</span>
-                        <span className="text-xs text-gray-500 ml-2">{item.percentage.toFixed(0)}%</span>
-                      </div>
-                    </div>
+                      <span className="receiptify-category-name">
+                        <i style={{ background: item.color }} />{item.category}
+                      </span>
+                      <span className="receiptify-category-percent">{item.percentage.toFixed(0)}%</span>
+                    </button>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="receiptify-empty mt-6 p-8 text-center text-sm">
                 <p>{t('analytics.noData')}</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </section>
+        </div>
 
         {/* Recent Activity */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">
-              {t('analytics.recentActivity')}
-              {selectedCategory && (
-                <span className="text-sm font-normal text-gray-600 ml-2">
-                  ({selectedCategory})
-                </span>
-              )}
-            </h3>
+        <section className="receiptify-fade-in" style={{ animationDelay: "150ms" }}>
+          <div className="receiptify-section-heading">
+            <div>
+              <h2>
+                {t('analytics.recentActivity')}
+              </h2>
+              <p>{selectedCategory ? `Showing your ${selectedCategory.toLowerCase()} receipts` : "The little record of where life happened"}</p>
+            </div>
             {selectedCategory && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setSelectedCategory(null)}
+                className="text-[var(--receiptify-sage)]"
                 data-testid="button-clear-filter"
               >
-                {t('common.filter')}
+                Clear filter
               </Button>
             )}
           </div>
-
           {filteredReceipts.length > 0 ? (
-            <div className="space-y-3">
+            <div className="receiptify-receipt-list">
               {filteredReceipts.map((receipt) => (
                 <AnalyticsReceiptCard
                   key={receipt.id}
@@ -374,14 +380,14 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <Card className="bg-white shadow-sm">
-              <CardContent className="p-8 text-center text-gray-500">
+            <Card className="receiptify-empty border-0 shadow-none">
+              <CardContent className="p-8 text-center text-sm">
                 <p>{t('analytics.noData')}</p>
               </CardContent>
             </Card>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
 
       {/* Category Picker Modal */}
       <CategoryPickerModal

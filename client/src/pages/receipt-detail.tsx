@@ -323,7 +323,7 @@ export default function ReceiptDetailPage() {
 
   if (isLoading || !receipt) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="receiptify-page min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -340,16 +340,17 @@ export default function ReceiptDetailPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="receiptify-page pb-24">
       <AppHeader
         showBackButton={true}
         onBackClick={() => window.history.back()}
+        visualSystem
       />
 
       <div className="px-6 py-4 space-y-6">
         {/* Store Info */}
         {receiptEditing ? (
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="receiptify-panel bg-white shadow-sm border-0">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h1 className="text-xl font-bold text-gray-900">Edit receipt details</h1>
@@ -529,7 +530,7 @@ export default function ReceiptDetailPage() {
         )}
 
         {/* Items List */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="receiptify-panel bg-white shadow-sm border-0">
           <CardContent className="p-6 space-y-4">
             {items.map((item) => (
               <div key={item.id} className="flex items-center justify-between">
@@ -617,7 +618,7 @@ export default function ReceiptDetailPage() {
         </Card>
 
         {/* My share of this receipt */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="receiptify-panel bg-white shadow-sm border-0">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-1">
               <div className="font-semibold text-gray-900">My share</div>
@@ -753,7 +754,7 @@ export default function ReceiptDetailPage() {
         </Card>
 
         {/* Split with friends */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="receiptify-panel bg-white shadow-sm border-0">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1000,7 +1001,7 @@ export default function ReceiptDetailPage() {
 
         {/* Download Receipt */}
         {receipt.imageUrl && (
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="receiptify-panel bg-white shadow-sm border-0">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -1017,7 +1018,7 @@ export default function ReceiptDetailPage() {
         )}
 
         {/* Category */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="receiptify-panel bg-white shadow-sm border-0">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">

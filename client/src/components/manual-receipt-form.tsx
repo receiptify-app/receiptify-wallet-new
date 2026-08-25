@@ -14,6 +14,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -215,12 +216,15 @@ export default function ManualReceiptForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="receiptify-dialog max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-green-600" />
             {t("manual.addManually")}
           </DialogTitle>
+          <DialogDescription>
+            Enter the receipt details below. Required fields are marked with an asterisk.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -565,7 +569,7 @@ export default function ManualReceiptForm({
             <Button
               type="submit"
               disabled={createReceiptMutation.isPending}
-              className="bg-green-600 hover:bg-green-700"
+              className="receiptify-primary-action"
             >
               {createReceiptMutation.isPending
                 ? t("manual.addingReceipt")

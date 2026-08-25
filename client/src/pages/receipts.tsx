@@ -299,7 +299,7 @@ export default function ReceiptsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="receiptify-page min-h-screen p-4">
         <div className="max-w-sm mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded"></div>
@@ -315,10 +315,10 @@ export default function ReceiptsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="receiptify-page min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-sm mx-auto p-4">
+      <div className="receiptify-list-header bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="receiptify-list-header-inner max-w-sm mx-auto p-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-900">
               {selectionMode ? `${selectedReceipts.size} ${t('common.selected').toLowerCase()}` : t('receipts.title')}
@@ -384,9 +384,9 @@ export default function ReceiptsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-sm mx-auto p-4 pb-20">
+      <div className="receiptify-list-content max-w-sm mx-auto p-4 pb-20">
         {receipts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="receiptify-empty flex flex-col items-center justify-center py-12 text-center">
             <Receipt className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">{t('receipts.noReceipts')}</h3>
             <p className="text-gray-500 mb-6">{t('receipts.noReceiptsDesc')}</p>
@@ -398,7 +398,7 @@ export default function ReceiptsPage() {
             </Link>
           </div>
         ) : groupedReceipts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="receiptify-empty flex flex-col items-center justify-center py-12 text-center">
             <Search className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
             <p className="text-gray-500">Try a different search term</p>
@@ -426,7 +426,7 @@ export default function ReceiptsPage() {
                   onOpenChange={() => toggleMonth(monthKey)}
                 >
                   <CollapsibleTrigger asChild>
-                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                      <div className="receiptify-month-group flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-3">
                         <ChevronDown 
                           className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} 
@@ -446,7 +446,7 @@ export default function ReceiptsPage() {
                       {monthReceipts.map((receipt: Receipt) => (
                         <Card 
                           key={receipt.id} 
-                          className={`hover:shadow-md transition-shadow cursor-pointer ${
+                          className={`receiptify-receipt-card hover:shadow-md transition-shadow cursor-pointer ${
                             selectedReceipts.has(receipt.id) ? 'ring-2 ring-primary' : ''
                           }`}
                           onClick={(e) => {
@@ -458,7 +458,7 @@ export default function ReceiptsPage() {
                           }}
                           data-testid={`card-receipt-${receipt.id}`}
                         >
-                          <CardContent className="p-4">
+                          <CardContent className="receiptify-receipt-card-content p-4">
                             <div className="flex items-center justify-between w-full">
                               <div className="flex items-center space-x-3 flex-1 min-w-0">
                                 {selectionMode && !receipt.isShared && (

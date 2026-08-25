@@ -71,25 +71,27 @@ export default function SplitPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <AppHeader />
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="flex items-center gap-2">
-            <Users className="w-6 h-6 text-green-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Split folders</h1>
+    <div className="receiptify-page pb-24">
+      <AppHeader visualSystem />
+      <main className="receiptify-content">
+        <div className="receiptify-hero">
+          <div>
+            <p className="receiptify-eyebrow">Shared spending</p>
+            <div className="flex items-center gap-2">
+              <Users className="w-6 h-6 text-green-600" />
+              <h1>Split folders<em>.</em></h1>
+            </div>
+            <p className="receiptify-subtitle">Group receipts and settle up with friends.</p>
           </div>
           <Button
             onClick={() => setCreateOpen(true)}
-            size="sm"
-            className="bg-green-600 hover:bg-green-700"
+            className="receiptify-primary-action"
             data-testid="button-new-folder"
           >
             <Plus className="w-4 h-4 mr-1" />
             New folder
           </Button>
         </div>
-        <p className="text-sm text-gray-600 mb-6">Group receipts and settle up with friends.</p>
 
         {isLoading && (
           <div className="space-y-3">
@@ -100,7 +102,7 @@ export default function SplitPage() {
         )}
 
         {!isLoading && folders && folders.length === 0 && (
-          <Card className="border-dashed border-2 border-gray-200">
+          <Card className="receiptify-empty border-dashed border-2 border-gray-200">
             <CardContent className="p-8 text-center space-y-3">
               <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
                 <FolderOpen className="w-7 h-7 text-green-600" />
@@ -125,7 +127,7 @@ export default function SplitPage() {
         <div className="space-y-3">
           {folders?.map((f) => (
             <Link key={f.id} href={`/split/${f.id}`}>
-              <Card className="cursor-pointer hover:shadow-md transition" data-testid={`folder-card-${f.id}`}>
+              <Card className="receiptify-panel cursor-pointer hover:shadow-md transition" data-testid={`folder-card-${f.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -174,7 +176,7 @@ export default function SplitPage() {
             </Link>
           ))}
         </div>
-      </div>
+      </main>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">

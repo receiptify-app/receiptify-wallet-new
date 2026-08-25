@@ -371,7 +371,7 @@ function ReceiptSplitter({
     mode === "whole" && wholeMode === "custom" && Math.abs(assignedTotal - total) > 0.01;
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="receiptify-panel overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           {receipt.imageUrl && (
@@ -688,7 +688,7 @@ export default function SplitFolderPage() {
 
   if (isLoading || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="receiptify-page min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -698,8 +698,8 @@ export default function SplitFolderPage() {
   const activeMembers = members.filter((m) => m.status !== "removed");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="px-6 pt-6 pb-2 flex items-center gap-2">
+    <div className="receiptify-page pb-24">
+      <div className="receiptify-detail-header px-6 pt-6 pb-2 flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigate("/split")} data-testid="back-to-split">
           <ArrowLeft className="w-4 h-4" />
         </Button>
@@ -718,8 +718,8 @@ export default function SplitFolderPage() {
         )}
       </div>
 
-      <div className="px-6 space-y-5">
-        <div>
+      <div className="receiptify-detail-content px-6 space-y-5">
+        <div className="receiptify-folder-hero">
           <h1 className="text-2xl font-bold text-gray-900">{folder.name}</h1>
           {folder.description && <p className="text-sm text-gray-600 mt-1">{folder.description}</p>}
           <div className="mt-3 flex items-center justify-between">
@@ -735,7 +735,7 @@ export default function SplitFolderPage() {
         </div>
 
         {/* Members */}
-        <Card>
+        <Card className="receiptify-panel">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -788,7 +788,7 @@ export default function SplitFolderPage() {
             <ReceiptIcon className="w-4 h-4 text-green-600" /> Receipts in this folder
           </h3>
           {folderReceipts.length === 0 ? (
-            <Card className="border-dashed">
+            <Card className="receiptify-empty border-dashed">
               <CardContent className="p-6 text-center text-sm text-gray-500">
                 Open a receipt from <Link href="/receipts" className="text-green-600 underline">My Receipts</Link> and tap Split to add it here.
               </CardContent>
@@ -801,7 +801,7 @@ export default function SplitFolderPage() {
         </div>
 
         {/* Settlement */}
-        <Card>
+        <Card className="receiptify-panel">
           <CardContent className="p-4">
             <h3 className="font-semibold mb-3">Settlement</h3>
             {settlement.length === 0 || settlement.every((s) => s.total === 0) ? (

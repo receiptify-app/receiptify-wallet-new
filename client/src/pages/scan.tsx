@@ -1,34 +1,20 @@
 import { useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Edit, Camera, Upload, Languages, Loader2 } from "lucide-react";
+import { FileText, Edit, Camera, Upload, Loader2 } from "lucide-react";
 import ManualReceiptForm from "@/components/manual-receipt-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import AppHeader from "@/components/app-header";
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
   const [activeSource, setActiveSource] = useState<'camera' | 'gallery' | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { t, i18n } = useTranslation();
-  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  const { t } = useTranslation();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  
-  const handleLanguageChange = (lang: string) => {
-    setSelectedLanguage(lang);
-    i18n.changeLanguage(lang);
-    localStorage.setItem('language', lang);
-  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -136,68 +122,22 @@ export default function Scan() {
   };
 
   return (
-    <div className="px-6 py-4 pb-24">
-      {/* App Title Header */}
-      <div className="mb-6 text-center">
-        <h1 className="text-3xl font-bold text-green-800 mb-1">{t('app.title')}</h1>
-        <p className="text-sm text-gray-600 mb-3">{t('app.subtitle')}</p>
-        
-        {/* Language Selector - Small Dropdown */}
-        <div className="flex justify-center">
-          {/* <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-            <Languages className="w-3.5 h-3.5 text-gray-600" />
-            <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-              <SelectTrigger className="w-[100px] h-6 text-xs border-0 focus:ring-0 p-0" data-testid="select-language-scan">
-                <SelectValue placeholder="Language" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
-                <SelectItem value="de">Deutsch</SelectItem>
-                <SelectItem value="it">Italiano</SelectItem>
-                <SelectItem value="pt">Português</SelectItem>
-                <SelectItem value="nl">Nederlands</SelectItem>
-                <SelectItem value="pl">Polski</SelectItem>
-                <SelectItem value="ru">Русский</SelectItem>
-                <SelectItem value="ja">日本語</SelectItem>
-                <SelectItem value="zh">中文</SelectItem>
-                <SelectItem value="ko">한국어</SelectItem>
-                <SelectItem value="ar">العربية</SelectItem>
-                <SelectItem value="hi">हिन्दी</SelectItem>
-                <SelectItem value="tr">Türkçe</SelectItem>
-                <SelectItem value="sv">Svenska</SelectItem>
-                <SelectItem value="no">Norsk</SelectItem>
-                <SelectItem value="da">Dansk</SelectItem>
-                <SelectItem value="fi">Suomi</SelectItem>
-                <SelectItem value="el">Ελληνικά</SelectItem>
-                <SelectItem value="cs">Čeština</SelectItem>
-                <SelectItem value="hu">Magyar</SelectItem>
-                <SelectItem value="ro">Română</SelectItem>
-                <SelectItem value="th">ไทย</SelectItem>
-                <SelectItem value="vi">Tiếng Việt</SelectItem>
-                <SelectItem value="id">Bahasa Indonesia</SelectItem>
-                <SelectItem value="ms">Bahasa Melayu</SelectItem>
-                <SelectItem value="uk">Українська</SelectItem>
-                <SelectItem value="he">עברית</SelectItem>
-                <SelectItem value="bn">বাংলা</SelectItem>
-              </SelectContent>
-            </Select>
-          </div> */}
+    <div className="receiptify-page pb-24">
+      <AppHeader visualSystem />
+      <main className="receiptify-content">
+        <div className="receiptify-hero receiptify-scan-hero receiptify-fade-in">
+          <div>
+            <p className="receiptify-eyebrow">Receipt capture</p>
+            <h1>{t('scan.addReceipt')}<em>.</em></h1>
+            <p className="receiptify-subtitle">{t('scan.addReceiptDesc')}</p>
+          </div>
         </div>
-      </div>
-
-      {/* Section Header */}
-      <div className="mb-6 text-center">
-        <h2 className="text-xl font-bold text-primary mb-2">{t('scan.addReceipt')}</h2>
-        <p className="text-sm text-gray-600">{t('scan.addReceiptDesc')}</p>
-      </div>
 
       {/* Scan Options */}
-      <div className="space-y-4 mb-8">
+      <div className="receiptify-scan-options receiptify-fade-in" style={{ animationDelay: "70ms" }}>
         {/* Camera Capture Option */}
         <Card
-          className={`hover:shadow-md transition-shadow border-2 ${activeSource === 'camera' ? 'border-primary bg-primary/5' : 'border-primary'}`}
+          className={`receiptify-scan-option ${activeSource === 'camera' ? 'is-active' : ''}`}
           data-testid="card-camera-capture"
         >
           <CardContent className="p-0">
@@ -212,19 +152,19 @@ export default function Scan() {
                 disabled={uploadMutation.isPending}
                 data-testid="input-camera-capture"
               />
-              <div className="flex items-center space-x-4 py-6 px-6 hover:bg-primary/5 rounded-lg transition-colors">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+              <div className="receiptify-scan-option-row flex items-center space-x-4 py-6 px-6 hover:bg-primary/5 rounded-lg transition-colors">
+                <div className="receiptify-scan-icon receiptify-scan-icon-camera w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                   {activeSource === 'camera' && uploadMutation.isPending
                     ? <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     : <Camera className="w-6 h-6 text-primary" />}
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-lg text-gray-900" data-testid="text-camera-title">
+                  <div className="receiptify-scan-option-title font-semibold text-lg text-gray-900" data-testid="text-camera-title">
                     {activeSource === 'camera' && uploadMutation.isPending
                       ? t('scan.processing')
                       : t('scan.takePhoto')}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="receiptify-scan-option-description text-sm text-gray-600">
                     {t('scan.takePhotoDesc')}
                   </div>
                 </div>
@@ -235,7 +175,7 @@ export default function Scan() {
 
         {/* Gallery Upload Option */}
         <Card
-          className={`hover:shadow-md transition-shadow ${activeSource === 'gallery' ? 'border-2 border-green-400 bg-green-50' : ''}`}
+          className={`receiptify-scan-option ${activeSource === 'gallery' ? 'is-active' : ''}`}
           data-testid="card-gallery-upload"
         >
           <CardContent className="p-0">
@@ -249,19 +189,19 @@ export default function Scan() {
                 disabled={uploadMutation.isPending}
                 data-testid="input-gallery-upload"
               />
-              <div className="flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+              <div className="receiptify-scan-option-row flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors">
+                <div className="receiptify-scan-icon receiptify-scan-icon-gallery w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
                   {activeSource === 'gallery' && uploadMutation.isPending
                     ? <Loader2 className="w-6 h-6 text-gray-700 animate-spin" />
                     : <Upload className="w-6 h-6 text-gray-700" />}
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-lg text-gray-900" data-testid="text-upload-title">
+                  <div className="receiptify-scan-option-title font-semibold text-lg text-gray-900" data-testid="text-upload-title">
                     {activeSource === 'gallery' && uploadMutation.isPending
                       ? t('scan.processing')
                       : t('scan.uploadFromGallery')}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="receiptify-scan-option-description text-sm text-gray-600">
                     {t('scan.uploadFromGalleryDesc')}
                   </div>
                 </div>
@@ -271,19 +211,19 @@ export default function Scan() {
         </Card>
 
         {/* Manual Entry Option */}
-        <Card className="hover:shadow-md transition-shadow" data-testid="card-manual-entry">
+        <Card className="receiptify-scan-option hover:shadow-md transition-shadow" data-testid="card-manual-entry">
           <CardContent className="p-0">
             <div
-              className="flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+              className="receiptify-scan-option-row flex items-center space-x-4 py-6 px-6 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
               onClick={() => setShowManualForm(true)}
               data-testid="button-manual-entry"
             >
-              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+              <div className="receiptify-scan-icon receiptify-scan-icon-manual w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
                 <Edit className="w-6 h-6 text-gray-700" />
               </div>
               <div className="text-left">
-                <div className="font-semibold text-lg text-gray-900">{t('scan.importReceipt')}</div>
-                <div className="text-sm text-gray-600">{t('scan.importReceiptDesc')}</div>
+                <div className="receiptify-scan-option-title font-semibold text-lg text-gray-900">{t('scan.importReceipt')}</div>
+                <div className="receiptify-scan-option-description text-sm text-gray-600">{t('scan.importReceiptDesc')}</div>
               </div>
             </div>
           </CardContent>
@@ -291,7 +231,7 @@ export default function Scan() {
       </div>
 
       {/* Information Section */}
-      <Card className="bg-light-green border-accent/20">
+      <Card className="receiptify-scan-info receiptify-fade-in" style={{ animationDelay: "140ms" }}>
         <CardContent className="p-6">
           <div className="flex items-start space-x-3">
             <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1">
@@ -303,9 +243,9 @@ export default function Scan() {
                 {t('scan.smartProcessingDesc')}
               </p>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>✓ {t('scan.featureAutoExtract')}</div>
-                <div>✓ {t('scan.featureSecureStorage')}</div>
-                <div>✓ {t('scan.featureSimplified')}</div>
+                <div className="receiptify-feature-line">{t('scan.featureAutoExtract')}</div>
+                <div className="receiptify-feature-line">{t('scan.featureSecureStorage')}</div>
+                <div className="receiptify-feature-line">{t('scan.featureSimplified')}</div>
               </div>
             </div>
           </div>
@@ -317,7 +257,7 @@ export default function Scan() {
         open={showManualForm} 
         onOpenChange={setShowManualForm}
       />
-
+      </main>
     </div>
   );
 }

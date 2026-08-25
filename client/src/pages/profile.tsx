@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { useTranslation } from 'react-i18next';
 import { 
   Bell, 
@@ -13,7 +12,6 @@ import {
   Receipt,
   LogOut,
   Languages,
-  Shield,
   Pencil
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -45,7 +43,7 @@ export default function Profile() {
   const { currentUser, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
-  const { currency, symbol, updateCurrency } = useCurrency();
+  const { currency, updateCurrency } = useCurrency();
   const [showEditName, setShowEditName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
   const { toast } = useToast();
@@ -158,18 +156,30 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="receiptify-page pb-24">
       <AppHeader 
         showBackButton={true}
         onBackClick={() => navigate('/')}
         title={t('app.title').toUpperCase()}
+        visualSystem
       />
 
-      <div className="px-6 py-6 space-y-8">
+      <main className="receiptify-content receiptify-account-content">
+        <div className="receiptify-hero receiptify-fade-in">
+          <div>
+            <p className="receiptify-eyebrow">Personal space</p>
+            <h1>Account<em>.</em></h1>
+            <p className="receiptify-subtitle">Manage your profile, preferences, and exports.</p>
+          </div>
+        </div>
+
         {/* User Profile Section */}
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="receiptify-panel receiptify-settings-card receiptify-fade-in" style={{ animationDelay: "70ms" }}>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
+              <div className="receiptify-setting-icon receiptify-profile-avatar" aria-hidden="true">
+                {displayUser.name.charAt(0).toUpperCase()}
+              </div>
               {/* Name + email */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -179,7 +189,7 @@ export default function Profile() {
                   }`}>{displayUser.name}</h2>
                   <button
                     onClick={() => { setEditNameValue(displayUser.name); setShowEditName(true); }}
-                    className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    className="receiptify-icon-button flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5 text-gray-500" />
                   </button>
@@ -195,7 +205,7 @@ export default function Profile() {
 
         {/* Edit Display Name Dialog */}
         <Dialog open={showEditName} onOpenChange={setShowEditName}>
-          <DialogContent className="mx-4 rounded-2xl">
+          <DialogContent className="receiptify-dialog mx-4 rounded-2xl">
             <DialogHeader>
               <DialogTitle>Edit Display Name</DialogTitle>
               <DialogDescription>Enter the name you want to show on your profile.</DialogDescription>
@@ -211,7 +221,7 @@ export default function Profile() {
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setShowEditName(false)}>Cancel</Button>
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  className="receiptify-primary-action flex-1 justify-center"
                   disabled={!editNameValue.trim() || updateDisplayNameMutation.isPending}
                   onClick={() => updateDisplayNameMutation.mutate(editNameValue)}
                 >
@@ -223,14 +233,14 @@ export default function Profile() {
         </Dialog>
 
         {/* My Data Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.myData')}</h3>
+        <div className="receiptify-fade-in" style={{ animationDelay: "120ms" }}>
+          <h2 className="receiptify-account-section-title">{t('profile.myData')}</h2>
           <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/receipts')}>
+            <Card className="receiptify-panel receiptify-settings-card cursor-pointer" onClick={() => navigate('/receipts')}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Receipt className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><Receipt /></div>
                     <span className="text-lg font-medium text-gray-900">{t('profile.receiptsOrders')}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -241,14 +251,14 @@ export default function Profile() {
         </div>
 
         {/* App Preferences Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.appPreferences')}</h3>
+        <div className="receiptify-fade-in" style={{ animationDelay: "170ms" }}>
+          <h2 className="receiptify-account-section-title">{t('profile.appPreferences')}</h2>
           <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="receiptify-panel receiptify-settings-card">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Bell className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><Bell /></div>
                     <span className="text-lg font-medium text-gray-900">{t('profile.notifications')}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -256,11 +266,11 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="receiptify-panel receiptify-settings-card">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Euro className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><Euro /></div>
                     <div className="flex-1">
                       <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.currency')}</span>
                       <Select value={currency} onValueChange={handleCurrencyChange}>
@@ -281,11 +291,11 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="receiptify-panel receiptify-settings-card">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Languages className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><Languages /></div>
                     <div className="flex-1">
                       <span className="text-lg font-medium text-gray-900 block mb-2">{t('profile.language')}</span>
                       <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
@@ -331,11 +341,11 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="receiptify-panel receiptify-settings-card">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <RefreshCw className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><RefreshCw /></div>
                     <span className="text-lg font-medium text-gray-900">{t('profile.autoCategorize')}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -371,14 +381,14 @@ export default function Profile() {
         */}
 
         {/* Export (link to dedicated Export page) */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('profile.data')}</h3>
+        <div className="receiptify-fade-in" style={{ animationDelay: "270ms" }}>
+          <h2 className="receiptify-account-section-title">{t('profile.data')}</h2>
           <div className="space-y-3">
-            <Card className="bg-white shadow-sm border-0 cursor-pointer" onClick={() => navigate('/exports')}>
+            <Card className="receiptify-panel receiptify-settings-card cursor-pointer" onClick={() => navigate('/exports')}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Download className="w-6 h-6 text-gray-700" />
+                    <div className="receiptify-setting-icon"><Download /></div>
                     <div>
                       <div className="text-lg font-medium text-gray-900">{t('profile.exportReceipts')}</div>
                       <div className="text-sm text-gray-500">{t('profile.exportReceiptsDesc')}</div>
@@ -392,8 +402,8 @@ export default function Profile() {
         </div>
 
         {/* Logout Section */}
-        <div>
-          <Card className="bg-white shadow-sm border-0">
+        <div className="receiptify-fade-in" style={{ animationDelay: "320ms" }}>
+          <Card className="receiptify-panel receiptify-settings-card">
             <CardContent className="p-6">
               <Button
                 onClick={handleLogout}
@@ -406,7 +416,7 @@ export default function Profile() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
 
     </div>
   );

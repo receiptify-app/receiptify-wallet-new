@@ -198,7 +198,7 @@ export default function Signup() {
         path="/signup"
         robots="noindex,follow"
       />
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 lg:grid lg:grid-cols-[1.05fr_1fr] relative overflow-hidden">
+    <div className="receiptify-page receiptify-auth-page min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 lg:grid lg:grid-cols-[1.05fr_1fr] relative overflow-hidden">
       {/* decorative background blobs */}
       <div
         aria-hidden
@@ -289,7 +289,7 @@ export default function Signup() {
           </div>
 
           <div
-            className="bg-white/95 backdrop-blur rounded-3xl border border-emerald-100/60 shadow-[0_30px_60px_-25px_rgba(16,185,129,0.25)] p-7 sm:p-9 motion-safe:animate-fade-up"
+             className="receiptify-auth-card bg-white/95 backdrop-blur rounded-3xl border border-emerald-100/60 shadow-[0_30px_60px_-25px_rgba(16,185,129,0.25)] p-7 sm:p-9 motion-safe:animate-fade-up"
             style={{ animationDelay: "0.15s" }}
           >
             <div className="text-center">

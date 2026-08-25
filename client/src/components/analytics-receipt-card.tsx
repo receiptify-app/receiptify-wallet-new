@@ -71,13 +71,13 @@ export default function AnalyticsReceiptCard({
 
   return (
     <Card
-      className={`bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+      className={`receiptify-receipt-card bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
         isSelected ? "ring-2 ring-primary" : ""
       }`}
       onClick={handleCardClick}
       data-testid={`card-receipt-${receipt.id}`}
     >
-      <CardContent className="p-4">
+      <CardContent className="receiptify-receipt-card-content p-4">
         <div className="flex items-center gap-3">
           {/* Selection checkbox */}
           {selectionMode && (

@@ -1,0 +1,1 @@
+- [Primary navigation consistency](primary-navigation-consistency.md) — Receiptify’s visual system must cover every primary nav screen, including Scan and Account.
