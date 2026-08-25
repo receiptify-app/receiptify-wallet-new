@@ -37,7 +37,10 @@ import heicConvert from 'heic-convert';
 async function snapshotExchangeRateToGBP(currency: string): Promise<string | null> {
   if (!currency || currency === 'GBP') return '1.00000000';
   try {
-    const res = await fetch(`https://api.frankfurter.app/latest?from=${currency}&to=GBP`);
+    const res = await fetch(
+      `https://api.frankfurter.app/latest?from=${currency}&to=GBP`,
+      { signal: AbortSignal.timeout(5000) },
+    );
     if (!res.ok) return null;
     const data: any = await res.json();
     const rate: number = data.rates?.GBP;
@@ -664,7 +667,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process items if provided
       if (req.body.items && Array.isArray(req.body.items)) {
-        for (const item of req.body.items) {
+        // The manual form starts with one empty item row. Ignore empty rows
+        // instead of rejecting an otherwise valid receipt.
+        const items = req.body.items.filter(
+          (item: any) => typeof item?.name === "string" && item.name.trim().length > 0,
+        );
+
+        for (const item of items) {
           // Convert numeric fields to strings for decimal columns
           const itemData = {
             ...item,

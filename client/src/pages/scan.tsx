@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
 import AppHeader from "@/components/app-header";
+import { getCurrentPositionOrNull } from "@/lib/geolocation";
 
 export default function Scan() {
   const [showManualForm, setShowManualForm] = useState(false);
@@ -24,17 +25,10 @@ export default function Scan() {
       formData.append('receipt', file);
       
       // Get current location if available
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            enableHighAccuracy: true
-          });
-        });
+      const position = await getCurrentPositionOrNull();
+      if (position) {
         formData.append('latitude', position.coords.latitude.toString());
         formData.append('longitude', position.coords.longitude.toString());
-      } catch (error) {
-        console.log('Location not available:', error);
       }
       
       // Get auth token for the request

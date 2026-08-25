@@ -3,8 +3,12 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 let authTokenGetter: (() => Promise<string | null>) | null = null;
 let authReady = false;
 let authReadyResolver: (() => void) | null = null;
+const AUTH_READY_TIMEOUT_MS = 5000;
 const authReadyPromise = new Promise<void>((resolve) => {
   authReadyResolver = resolve;
+});
+const authReadyFallbackPromise = new Promise<void>((resolve) => {
+  setTimeout(resolve, AUTH_READY_TIMEOUT_MS);
 });
 
 export function setAuthTokenGetter(getter: () => Promise<string | null>) {
@@ -27,7 +31,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   
   if (!authReady) {
-    await authReadyPromise;
+    // Auth initialization should normally complete before requests are made,
+    // but a provider or browser callback must not keep every request pending.
+    await Promise.race([authReadyPromise, authReadyFallbackPromise]);
   }
   
   if (authTokenGetter) {
@@ -55,7 +61,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const authHeaders = await getAuthHeaders();
-  
+
   const res = await fetch(url, {
     method,
     headers: {

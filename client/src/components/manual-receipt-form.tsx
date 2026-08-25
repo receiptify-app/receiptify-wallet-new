@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useCurrency } from "@/hooks/use-currency";
 import { CATEGORIES } from "@shared/categories";
+import { getCurrentPositionOrNull } from "@/lib/geolocation";
 
 interface ReceiptItem {
   name: string;
@@ -61,6 +62,27 @@ interface ManualReceiptFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Partial<ManualReceiptForm>;
+}
+
+const MANUAL_RECEIPT_DESCRIPTION_ID = "manual-receipt-description";
+
+function getReceiptErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error) || !error.message) return fallback;
+  if (error instanceof TypeError) {
+    return "We couldn't confirm whether the receipt was saved. Check My Receipts before trying again.";
+  }
+
+  const message = error.message.replace(/^\d+:\s*/, "");
+  try {
+    const body = JSON.parse(message);
+    if (typeof body?.error === "string" && body.error.trim()) {
+      return body.error;
+    }
+  } catch {
+    // Non-JSON errors, such as browser network failures, are already readable.
+  }
+
+  return message || fallback;
 }
 
 export default function ManualReceiptForm({
@@ -138,20 +160,10 @@ export default function ManualReceiptForm({
       let latitude: number | undefined;
       let longitude: number | undefined;
 
-      try {
-        const position = await new Promise<GeolocationPosition>(
-          (resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              enableHighAccuracy: true,
-            });
-          },
-        );
-
+      const position = await getCurrentPositionOrNull();
+      if (position) {
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
-      } catch (error) {
-        console.log("Location not available for manual receipt:", error);
       }
 
       const receiptData = {
@@ -182,9 +194,10 @@ export default function ManualReceiptForm({
       onOpenChange(false);
     },
     onError: (error) => {
+      const fallbackMessage = t("manual.errorDesc");
       toast({
         title: t("manual.error"),
-        description: t("manual.errorDesc"),
+        description: getReceiptErrorMessage(error, fallbackMessage),
         variant: "destructive",
       });
       console.error("Receipt creation error:", error);
@@ -216,13 +229,16 @@ export default function ManualReceiptForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="receiptify-dialog max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="receiptify-dialog max-w-2xl max-h-[90vh] overflow-y-auto"
+        aria-describedby={MANUAL_RECEIPT_DESCRIPTION_ID}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-green-600" />
             {t("manual.addManually")}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={MANUAL_RECEIPT_DESCRIPTION_ID}>
             Enter the receipt details below. Required fields are marked with an asterisk.
           </DialogDescription>
         </DialogHeader>
