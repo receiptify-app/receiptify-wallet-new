@@ -547,7 +547,33 @@ export default function ReceiptDetailPage() {
               </div>
             ))}
 
-            {receipt.tax && (
+            {receipt.subtotal != null && (
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center justify-between text-gray-900">
+                  <span>Subtotal</span>
+                  <span>
+                    {isForeignCurrency
+                      ? formatWithCurrencyCode(parseFloat(receipt.subtotal), receiptCurrency)
+                      : formatCurrency(parseFloat(receipt.subtotal))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {receipt.serviceCharge != null && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-gray-900">
+                  <span>Service charge</span>
+                  <span>
+                    {isForeignCurrency
+                      ? formatWithCurrencyCode(parseFloat(receipt.serviceCharge), receiptCurrency)
+                      : formatCurrency(parseFloat(receipt.serviceCharge))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {receipt.tax != null && (
               <div className="border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between text-gray-900">
                   <span>{t("receiptDetail.tax")}</span>
@@ -561,7 +587,7 @@ export default function ReceiptDetailPage() {
             )}
 
             <div
-              className={`${receipt.tax ? "pt-2" : "border-t border-gray-200 pt-4 mt-4"}`}
+              className={`${receipt.subtotal != null || receipt.serviceCharge != null || receipt.tax != null ? "pt-2" : "border-t border-gray-200 pt-4 mt-4"}`}
             >
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>{t("receiptDetail.total")}</span>
