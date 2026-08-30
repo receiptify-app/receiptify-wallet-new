@@ -75,8 +75,12 @@ type FolderDetail = {
   folder: { id: string; name: string; description: string | null; ownerId: string; ownerContactName?: string | null; ownerContactEmail?: string | null; ownerContactPhone?: string | null; parentFolderId?: string | null };
   members: Member[];
   receipts: FolderReceipt[];
-  settlement: Array<{ memberId: string; displayName: string | null; userId: string | null; inviteEmail: string | null; owed: number; paid: number; total: number; status: string; role: string }>;
+  settlement: Array<{ memberId: string; displayName: string | null; userId: string | null; inviteEmail: string | null; allocated: number; owed: number; paid: number; total: number; paidUpfront: number; personal: number; recoverable: number; recovered: number; outstandingToReceive: number; status: string; role: string }>;
   totalAmount: number;
+  totalSpent: number;
+  allocatedAmount: number;
+  paidAmount: number;
+  personalAmount: number;
   isOwner: boolean;
   permissions?: { read: boolean; add: boolean; edit: boolean; manage: boolean };
   currentRole?: string;
@@ -246,13 +250,13 @@ function ReceiptSplitter({
             assignments.push({ memberId, itemId: null, shareAmount: raw });
           });
         } else {
-          // Custom amounts — validate against receipt total before sending.
+          // Custom amounts may intentionally leave a personal remainder.
           const sum = wholeMembers.reduce(
             (s, id) => s + (parseFloat(customAmounts[id] || "0") || 0),
             0,
           );
-          if (Math.abs(sum - total) > 0.01) {
-            throw new Error(`Custom amounts add up to £${sum.toFixed(2)}, but the bill is £${total.toFixed(2)}.`);
+          if (sum - total > 0.01) {
+            throw new Error(`Custom amounts exceed the £${total.toFixed(2)} receipt total.`);
           }
           wholeMembers.forEach((memberId) => {
             const raw = parseFloat(customAmounts[memberId] || "0") || 0;
@@ -375,7 +379,7 @@ function ReceiptSplitter({
     });
   };
 
-  const activeMembers = members.filter((m) => m.status === "active");
+  const allocatableMembers = members.filter((m) => m.status !== "removed");
 
   // The gap between the sum of all item prices and the receipt total (covers unitemised charges)
   const itemsSubtotal = receipt.items.reduce((s, i) => s + parseFloat(i.price), 0);
@@ -406,8 +410,8 @@ function ReceiptSplitter({
     return itemsAssigned + addAssigned;
   }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, receipt.items, total, additionalMembers, additionalAmount, hasAdditional]);
 
-  const wholeCustomOff =
-    mode === "whole" && wholeMode === "custom" && Math.abs(assignedTotal - total) > 0.01;
+  const wholeCustomOver =
+    mode === "whole" && wholeMode === "custom" && assignedTotal - total > 0.01;
 
   return (
     <Card className="receiptify-panel overflow-hidden">
@@ -477,12 +481,15 @@ function ReceiptSplitter({
                     Custom amounts
                   </button>
                 </div>
-                {activeMembers.map((m) => {
+                {allocatableMembers.map((m) => {
                   const selected = wholeMembers.includes(m.id);
                   return (
                     <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
                       <Checkbox checked={selected} onCheckedChange={() => toggleWhole(m.id)} />
-                      <span className="flex-1 text-sm">{m.displayName}</span>
+                       <span className="flex-1 text-sm">
+                         {m.displayName || m.inviteEmail || "Member"}
+                         {m.status === "invited" ? " (invited)" : ""}
+                       </span>
                       {selected && wholeMode === "equal" && (
                         <span className="text-sm font-medium text-gray-700">£{(total / wholeMembers.length).toFixed(2)}</span>
                       )}
@@ -501,9 +508,11 @@ function ReceiptSplitter({
                     </div>
                   );
                 })}
-                {wholeCustomOff && (
-                  <div className="text-xs text-amber-600">
-                    Custom amounts need to add up to £{total.toFixed(2)} before you can save.
+                {mode === "whole" && wholeMode === "custom" && (
+                  <div className={`text-xs ${wholeCustomOver ? "text-red-600" : "text-gray-500"}`}>
+                    {wholeCustomOver
+                      ? `Custom amounts are £${(assignedTotal - total).toFixed(2)} over the receipt total.`
+                      : `£${Math.max(0, total - assignedTotal).toFixed(2)} remains personal.`}
                   </div>
                 )}
               </div>
@@ -525,7 +534,7 @@ function ReceiptSplitter({
                         <div className="text-sm font-semibold">£{itemPrice.toFixed(2)}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {activeMembers.map((m) => {
+                        {allocatableMembers.map((m) => {
                           const on = assigned.includes(m.id);
                           const shareEntry = shares.find((s) => s.memberId === m.id);
                           return (
@@ -558,7 +567,7 @@ function ReceiptSplitter({
                       Covers service charge, tax, or other charges not listed as items
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {activeMembers.map((m) => {
+                      {allocatableMembers.map((m) => {
                         const on = additionalMembers.includes(m.id);
                         const addShares = computeShares(additionalAmount, additionalMembers);
                         const shareEntry = addShares.find((s) => s.memberId === m.id);
@@ -593,7 +602,7 @@ function ReceiptSplitter({
             <div className="flex gap-2">
               <Button
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || wholeCustomOff}
+                disabled={saveMutation.isPending || wholeCustomOver}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
                 {saveMutation.isPending ? "Saving…" : "Save split"}
@@ -860,8 +869,10 @@ export default function SplitFolderPage() {
     );
   }
 
-  const { folder, members, receipts: folderReceipts, settlement, totalAmount, isOwner, manualExpenses = [], outstandingAmount = totalAmount, subfolders = [], currentMemberId = null } = data;
-  const activeMembers = members.filter((m) => m.status !== "removed");
+  const { folder, members, receipts: folderReceipts, settlement, totalSpent, allocatedAmount, paidAmount, personalAmount, isOwner, manualExpenses = [], outstandingAmount = 0, subfolders = [], currentMemberId = null } = data;
+  const visibleMembers = members.filter((m) => m.status !== "removed");
+  const activeMembers = visibleMembers.filter((m) => m.status === "active");
+  const allocationMembers = visibleMembers;
 
   return (
     <div className="receiptify-page pb-24">
@@ -893,15 +904,22 @@ export default function SplitFolderPage() {
             </div>
             <Badge className="bg-[#dfe9e0] text-[#1e2c2b] hover:bg-[#dfe9e0] shrink-0">{data.currentRole || (isOwner ? "Owner" : "Member")}</Badge>
           </div>
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-4">
+            {[
+              ["Total spent", totalSpent],
+              ["Shared", allocatedAmount],
+              ["Personal", personalAmount],
+              ["Paid", paidAmount],
+              ["Outstanding", outstandingAmount],
+            ].map(([label, value]) => (
+              <div key={String(label)}>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</div>
+                <div className="text-lg font-bold text-gray-900">£{Number(value).toFixed(2)}</div>
+              </div>
+            ))}
             <div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Total</div>
-              <div className="text-2xl font-bold text-gray-900">£{totalAmount.toFixed(2)}</div>
-              <div className="text-xs text-gray-500 mt-2">Outstanding <strong className="text-[#f4ddd4]">£{Number(outstandingAmount).toFixed(2)}</strong></div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide text-right">Receipts</div>
-              <div className="text-2xl font-bold text-gray-900 text-right">{folderReceipts.length}</div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-wide">Receipts</div>
+              <div className="text-lg font-bold text-gray-900">{folderReceipts.length}</div>
             </div>
           </div>
         </div>
@@ -919,14 +937,14 @@ export default function SplitFolderPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-green-600" />
-                <h3 className="font-semibold">Members ({activeMembers.length})</h3>
+                <h3 className="font-semibold">Members ({visibleMembers.length})</h3>
               </div>
               <Button size="sm" variant="outline" disabled={!canManage} onClick={() => setInviteOpen(true)} data-testid="button-invite">
                 <UserPlus className="w-4 h-4 mr-1" /> Invite
               </Button>
             </div>
             <div className="space-y-1">
-              {activeMembers.map((m) => (
+              {visibleMembers.map((m) => (
                 <div key={m.id} className="flex items-center gap-2 py-1.5">
                   <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 text-xs font-semibold flex items-center justify-center">
                     {initials(m.displayName)}
@@ -1049,13 +1067,14 @@ export default function SplitFolderPage() {
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{s.displayName}</div>
                         <div className="text-xs text-gray-500">
-                          {s.role === "owner"
-                            ? `paid for £${s.total.toFixed(2)}`
-                            : s.owed > 0
-                            ? `owes you £${s.owed.toFixed(2)} · ${s.status}`
-                            : s.total > 0
-                            ? `settled · £${s.paid.toFixed(2)}`
-                            : "no share yet"}
+                          {[
+                            s.paidUpfront > 0
+                              ? `Paid upfront £${s.paidUpfront.toFixed(2)} · Personal £${s.personal.toFixed(2)}`
+                              : null,
+                            s.allocated > 0
+                              ? `Allocated £${s.allocated.toFixed(2)} · Paid £${s.paid.toFixed(2)} · Outstanding £${s.owed.toFixed(2)}`
+                              : null,
+                          ].filter(Boolean).join(" · ") || "No share yet"}
                         </div>
                       </div>
                     </div>
@@ -1100,8 +1119,8 @@ export default function SplitFolderPage() {
           <div className="space-y-3">
             <div><Label>Description</Label><Input value={expense.description} onChange={e=>setExpense({...expense,description:e.target.value})} placeholder="Taxi to dinner" /></div>
             <div className="grid grid-cols-2 gap-3"><div><Label>Amount</Label><Input inputMode="decimal" value={expense.amount} onChange={e=>setExpense({...expense,amount:e.target.value})} placeholder="0.00" /></div><div><Label>Date</Label><Input type="date" value={expense.expenseDate} onChange={e=>setExpense({...expense,expenseDate:e.target.value})} /></div></div>
-            <div className="grid grid-cols-2 gap-3"><div><Label>Paid by</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.payerMemberId} onChange={e=>setExpense({...expense,payerMemberId:e.target.value})}><option value="">Not specified</option>{activeMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail}</option>)}</select></div><div><Label>Subfolder</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.subfolderId} onChange={e=>setExpense({...expense,subfolderId:e.target.value})}><option value="">None</option>{subfolders.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div>
-            <div className="space-y-2 border rounded-xl p-3"><Label>Allocate to members</Label>{activeMembers.filter(m=>m.status==="active").map(m=><div key={m.id} className="flex items-center gap-2"><span className="flex-1 text-sm truncate">{m.displayName || m.inviteEmail}</span><Input className="w-24" inputMode="decimal" value={expense.allocations[m.id] || ""} onChange={e=>setExpense({...expense,allocations:{...expense.allocations,[m.id]:e.target.value}})} placeholder="0.00" /></div>)}{(() => { const allocated=Object.values(expense.allocations).reduce((sum, value)=>sum+(Number(value)||0),0); const remainder=(Number(expense.amount)||0)-allocated; return <p className={remainder < -0.01 ? "text-xs text-red-600" : "text-xs text-gray-500"}>Allocated £{allocated.toFixed(2)} · {remainder < 0 ? `£${Math.abs(remainder).toFixed(2)} over` : `£${remainder.toFixed(2)} personal remainder`}</p>; })()}</div>
+            <div className="grid grid-cols-2 gap-3"><div><Label>Paid by</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.payerMemberId} onChange={e=>setExpense({...expense,payerMemberId:e.target.value})}><option value="">Not specified</option>{activeMembers.map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail}</option>)}</select></div><div><Label>Subfolder</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.subfolderId} onChange={e=>setExpense({...expense,subfolderId:e.target.value})}><option value="">None</option>{subfolders.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div>
+            <div className="space-y-2 border rounded-xl p-3"><Label>Allocate to members</Label>{allocationMembers.map(m=><div key={m.id} className="flex items-center gap-2"><span className="flex-1 text-sm truncate">{m.displayName || m.inviteEmail}{m.status === "invited" ? " (invited)" : ""}</span><Input className="w-24" inputMode="decimal" value={expense.allocations[m.id] || ""} onChange={e=>setExpense({...expense,allocations:{...expense.allocations,[m.id]:e.target.value}})} placeholder="0.00" /></div>)}{(() => { const allocated=Object.values(expense.allocations).reduce((sum, value)=>sum+(Number(value)||0),0); const remainder=(Number(expense.amount)||0)-allocated; return <p className={remainder < -0.01 ? "text-xs text-red-600" : "text-xs text-gray-500"}>Allocated £{allocated.toFixed(2)} · {remainder < 0 ? `£${Math.abs(remainder).toFixed(2)} over` : `£${remainder.toFixed(2)} personal remainder`}</p>; })()}</div>
             <div><Label>Note (optional)</Label><Textarea value={expense.notes} onChange={e=>setExpense({...expense,notes:e.target.value})} placeholder="Who paid, or any useful context" /></div>
             <Button className="w-full receiptify-primary-action" disabled={!expense.description.trim() || !Number(expense.amount) || Object.values(expense.allocations).reduce((sum, value)=>sum+(Number(value)||0),0) > Number(expense.amount) + .01 || expenseMutation.isPending} onClick={()=>expenseMutation.mutate()}>{expenseMutation.isPending ? "Saving…" : editingExpenseId ? "Save expense" : "Add expense"}</Button>
           </div>

@@ -23,6 +23,11 @@ type FolderSummary = {
   name: string;
   description: string | null;
   totalAmount: number;
+  totalSpent: number;
+  allocatedAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  personalAmount: number;
   memberCount: number;
   receiptCount: number;
   members: Array<{ id: string; displayName: string | null; userId: string | null; profileImageUrl?: string | null }>;
@@ -212,7 +217,8 @@ export default function SplitPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-lg font-bold text-gray-900">£{f.totalAmount.toFixed(2)}</div>
+                      <div className="text-lg font-bold text-gray-900">£{f.totalSpent.toFixed(2)}</div>
+                      <div className="text-[11px] text-gray-500">£{f.outstandingAmount.toFixed(2)} outstanding</div>
                       <ArrowUpRight className="w-4 h-4 ml-auto mt-1 text-gray-400" />
                     </div>
                   </div>
@@ -240,7 +246,7 @@ export default function SplitPage() {
           <section className="receiptify-recent-strip">
             <div><p className="receiptify-eyebrow">Recent shared spending</p><h2>A quick look back</h2></div>
             <div className="receiptify-recent-items">
-              {folders.filter(f=>f.workspaceType !== "one_off").slice(0, 3).map((f) => <Link key={f.id} href={`/split/${f.id}`} className="receiptify-recent-item"><span>{f.name}</span><strong>£{f.totalAmount.toFixed(2)}</strong><ArrowUpRight className="w-4 h-4" /></Link>)}
+              {folders.filter(f=>f.workspaceType !== "one_off").slice(0, 3).map((f) => <Link key={f.id} href={`/split/${f.id}`} className="receiptify-recent-item"><span>{f.name}</span><strong>£{f.totalSpent.toFixed(2)}</strong><ArrowUpRight className="w-4 h-4" /></Link>)}
               {oneOffBills.slice(0,3).map(b=><Link key={b.id} href={`/split/${b.folderId}`} className="receiptify-recent-item"><span>{b.title} <small>One-off</small></span><strong>£{Number(b.amount).toFixed(2)}</strong><ArrowUpRight className="w-4 h-4" /></Link>)}
             </div>
           </section>

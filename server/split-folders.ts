@@ -12,7 +12,7 @@ import {
   type ReceiptItem,
 } from "@shared/schema";
 import { requireAuth, type AuthenticatedRequest } from "./auth-middleware";
-import { allocationSummary, billStatus, canSplit, canUpdateBillParticipantStatus, money, normalizeSplitRole, validateAllocations } from "./split-utils";
+import { allocationSummary, billStatus, calculateSplitBalances, canSplit, canUpdateBillParticipantStatus, money, normalizeSplitRole, validateAllocations } from "./split-utils";
 
 function newToken() {
   return randomBytes(24).toString("base64url");
@@ -90,29 +90,28 @@ function sanitizeMember(m: SplitFolderMember) {
 }
 
 async function buildFolderSummary(folder: SplitFolder) {
-  const [members, folderReceipts, assignments, bills] = await Promise.all([
+  const [members, folderReceipts, assignments, bills, manualExpenses] = await Promise.all([
     splitFolderStorage.listMembers(folder.id),
     splitFolderStorage.listFolderReceipts(folder.id),
     splitFolderStorage.listAssignments(folder.id),
     splitFolderStorage.listBills(folder.id),
+    splitFolderStorage.listManualExpenses(folder.id),
   ]);
-  // A folder is a ledger: only assigned receipt amounts are owed. Receipt
-  // totals remain factual source data and any unassigned remainder is personal.
-  const billParticipants = bills.flatMap((bill) => bill.participants);
-  const totalAmount =
-    assignments.reduce((s, a) => s + money(a.shareAmount), 0) +
-    billParticipants.reduce((s, participant) => s + money(participant.shareAmount), 0);
-  const outstandingAmount =
-    assignments.filter((a) => a.status === "pending").reduce((s, a) => s + money(a.shareAmount), 0) +
-    billParticipants.filter((participant) => participant.status === "pending").reduce((s, participant) => s + money(participant.shareAmount), 0);
+  const balance = calculateSplitBalances({
+    members,
+    receipts: folderReceipts,
+    expenses: manualExpenses,
+    assignments,
+    bills,
+  });
   return {
     ...folder,
-    totalAmount,
-    outstandingAmount,
+    ...balance,
+    totalAmount: balance.totalSpent,
+    sharedAmount: balance.allocatedAmount,
     memberCount: members.filter((m) => m.status !== "removed").length,
-    receiptCount: folderReceipts.length,
     members: members.filter((m) => m.status !== "removed").map(sanitizeMember),
-    status: outstandingAmount === 0 ? "settled" : "pending",
+    status: balance.outstandingAmount === 0 ? "settled" : "pending",
   };
 }
 
@@ -303,30 +302,35 @@ export function registerSplitFolderRoutes(
       assignmentsByReceipt.set(a.receiptId, arr);
     });
 
+    const balance = calculateSplitBalances({
+      members,
+      receipts: folderReceipts,
+      expenses: manualExpenses,
+      assignments,
+      bills,
+    });
+
     // Per-member settlement is always computed, never stored.
     const settlement = members
       .filter((m) => m.status !== "removed")
       .map((m) => {
-        const mine = assignments.filter((a) => a.memberId === m.id);
-        const myBillShares = bills.flatMap((bill) => bill.participants).filter((participant) => participant.memberId === m.id);
-        const pending = mine
-          .filter((a) => a.status === "pending")
-          .reduce((s, a) => s + num(a.shareAmount), 0) +
-          myBillShares.filter((participant) => participant.status === "pending").reduce((s, participant) => s + num(participant.shareAmount), 0);
-        const paid = mine
-          .filter((a) => a.status === "paid")
-          .reduce((s, a) => s + num(a.shareAmount), 0) +
-          myBillShares.filter((participant) => participant.status === "paid").reduce((s, participant) => s + num(participant.shareAmount), 0);
+        const memberBalance = balance.memberBalances.find((entry) => entry.memberId === m.id)!;
         return {
           memberId: m.id,
           displayName: m.displayName,
           userId: m.userId,
           inviteEmail: m.inviteEmail,
           role: m.role,
-          owed: pending,
-          paid,
-          total: pending + paid,
-          status: pending === 0 && (paid > 0 || mine.length === 0) ? "settled" : "pending",
+          allocated: memberBalance.allocatedAmount,
+          owed: memberBalance.outstandingAmount,
+          paid: memberBalance.paidAmount,
+          total: memberBalance.allocatedAmount,
+          paidUpfront: memberBalance.paidUpfrontAmount,
+          personal: memberBalance.personalAmount,
+          recoverable: memberBalance.recoverableAmount,
+          recovered: memberBalance.recoveredAmount,
+          outstandingToReceive: memberBalance.outstandingToReceive,
+          status: memberBalance.outstandingAmount === 0 ? "settled" : "pending",
         };
       });
 
@@ -349,12 +353,16 @@ export function registerSplitFolderRoutes(
         allocations: assignments.filter((assignment) => assignment.sourceType === "expense" && assignment.sourceId === expense.id),
       })),
       subfolders,
-      totalAmount:
-        assignments.reduce((s, a) => s + money(a.shareAmount), 0) +
-        bills.flatMap((bill) => bill.participants).reduce((s, participant) => s + money(participant.shareAmount), 0),
-      outstandingAmount:
-        assignments.filter((a) => a.status === "pending").reduce((s, a) => s + money(a.shareAmount), 0) +
-        bills.flatMap((bill) => bill.participants).filter((participant) => participant.status === "pending").reduce((s, participant) => s + money(participant.shareAmount), 0),
+      balance,
+      totalSpent: balance.totalSpent,
+      allocatedAmount: balance.allocatedAmount,
+      sharedAmount: balance.allocatedAmount,
+      paidAmount: balance.paidAmount,
+      outstandingAmount: balance.outstandingAmount,
+      personalAmount: balance.personalAmount,
+      receiptCount: balance.receiptCount,
+      // Compatibility alias for existing clients; this now means source spend.
+      totalAmount: balance.totalSpent,
       isOwner: folder.ownerId === userId,
       currentMemberId: members.find((member) => member.userId === userId && member.status === "active")?.id ?? null,
       currentRole,
@@ -386,7 +394,10 @@ export function registerSplitFolderRoutes(
         if (oldAssignments.some((assignment) => assignment.receiptId === receiptId && assignment.status === "paid")) {
           return res.status(409).json({ error: "Mark paid assignments as unpaid before moving this receipt" });
         }
-        await splitFolderStorage.clearReceiptAssignments(receipt.splitFolderId, receiptId);
+        const cleared = await splitFolderStorage.clearReceiptAssignments(receipt.splitFolderId, receiptId);
+        if (!cleared) {
+          return res.status(409).json({ error: "Mark paid assignments as unpaid before moving this receipt" });
+        }
       }
       const updated = await splitFolderStorage.attachReceipt(receiptId, folder.id);
       await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "receipt.attached", metadata: { receiptId } });
@@ -411,7 +422,10 @@ export function registerSplitFolderRoutes(
       if (assignments.some((assignment) => assignment.receiptId === receipt.id && assignment.status === "paid")) {
         return res.status(409).json({ error: "Mark paid assignments as unpaid before removing this receipt" });
       }
-      await splitFolderStorage.clearReceiptAssignments(folder.id, receipt.id);
+      const cleared = await splitFolderStorage.clearReceiptAssignments(folder.id, receipt.id);
+      if (!cleared) {
+        return res.status(409).json({ error: "Mark paid assignments as unpaid before removing this receipt" });
+      }
       await splitFolderStorage.detachReceipt(receipt.id, folder.id);
       res.json({ ok: true });
     },
@@ -445,7 +459,12 @@ export function registerSplitFolderRoutes(
         }
       }
 
-      await splitFolderStorage.deleteFolder(folder.id);
+      const deleted = await splitFolderStorage.deleteFolderIfUnsettled(folder.id);
+      if (!deleted) {
+        return res.status(409).json({
+          error: "Mark all paid receipt, expense, and bill shares as unpaid before deleting this folder",
+        });
+      }
       res.json({ ok: true });
 
       // Notify members after responding — email failures shouldn't block deletion.
@@ -591,12 +610,12 @@ No action is needed from you.`;
       if (member.role === "owner") {
         return res.status(400).json({ error: "Cannot remove the folder owner" });
       }
-      const memberAssignments = await splitFolderStorage.listAssignments(folder.id);
-      if (memberAssignments.some((assignment) => assignment.memberId === member.id && assignment.status === "paid")) {
-        return res.status(409).json({ error: "Mark this member's paid assignments as unpaid before removing them" });
+      const removal = await splitFolderStorage.removeMemberFinancials(folder.id, member.id);
+      if (removal.paidConflict) {
+        return res.status(409).json({
+          error: "Mark this member's paid receipt, expense, and bill shares as unpaid before removing them",
+        });
       }
-      await splitFolderStorage.clearMemberAssignments(member.id);
-      await splitFolderStorage.updateMember(member.id, { status: "removed" });
       res.json({ ok: true });
     },
   );
@@ -791,7 +810,7 @@ Open Receiptify to view the folder.`;
         const memberIds = new Set(body.assignments.map((a) => a.memberId));
         if (memberIds.size > 0) {
           const folderMembers = await splitFolderStorage.listMembers(folder.id);
-          const validIds = new Set(folderMembers.map((m) => m.id));
+          const validIds = new Set(folderMembers.filter((member) => member.status !== "removed").map((m) => m.id));
           for (const id of Array.from(memberIds)) {
             if (!validIds.has(id)) {
               return res.status(400).json({ error: "Invalid member references" });
@@ -831,10 +850,13 @@ Open Receiptify to view the folder.`;
         return res.status(403).json({ error: "Only the folder owner can mark settlement" });
       }
       const member = await splitFolderStorage.getMember(req.params.memberId);
-      if (!member || member.folderId !== folder.id) {
+      if (!member || member.folderId !== folder.id || member.status === "removed") {
         return res.status(404).json({ error: "Member not found" });
       }
-      await splitFolderStorage.markMemberSettled(folder.id, member.id);
+      const settled = await splitFolderStorage.markMemberSettled(folder.id, member.id);
+      if (!settled) {
+        return res.status(409).json({ error: "This member was removed before settlement completed" });
+      }
       await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "member.settled", metadata: { memberId: member.id } });
       res.json({ ok: true });
     },
@@ -852,7 +874,7 @@ Open Receiptify to view the folder.`;
         return res.status(403).json({ error: "Only the folder owner can mark settlement" });
       }
       const member = await splitFolderStorage.getMember(req.params.memberId);
-      if (!member || member.folderId !== folder.id) {
+      if (!member || member.folderId !== folder.id || member.status === "removed") {
         return res.status(404).json({ error: "Member not found" });
       }
       const reverted = await splitFolderStorage.markMemberUnsettled(folder.id, member.id);
@@ -903,7 +925,10 @@ Open Receiptify to view the folder.`;
     const body = z.object({ description: z.string().trim().min(1), amount: z.union([z.string(), z.number()]), notes: z.string().optional(), expenseDate: z.coerce.date().optional(), payerMemberId: z.string().optional(), subfolderId: z.string().nullable().optional(), allocations: z.array(assignmentInput).optional() }).parse(req.body);
     if (money(body.amount) <= 0) return res.status(400).json({ error: "Amount must be positive" });
     const members = await splitFolderStorage.listMembers(folder.id);
-    if ((body.payerMemberId && !members.some((m) => m.id === body.payerMemberId && m.status === "active")) || body.allocations?.some((a) => !members.some((m) => m.id === a.memberId && m.status === "active"))) return res.status(400).json({ error: "Invalid expense member reference" });
+    if (
+      (body.payerMemberId && !members.some((m) => m.id === body.payerMemberId && m.status === "active")) ||
+      body.allocations?.some((a) => !members.some((m) => m.id === a.memberId && m.status !== "removed"))
+    ) return res.status(400).json({ error: "Invalid expense member reference" });
     if (body.subfolderId && !(await splitFolderStorage.listSubfolders(folder.id)).some((s) => s.id === body.subfolderId)) return res.status(400).json({ error: "Invalid subfolder" });
     const issue = validateAllocations(body.amount, body.allocations || []);
     if (issue) return res.status(400).json({ error: issue });
@@ -925,7 +950,7 @@ Open Receiptify to view the folder.`;
     const members = await splitFolderStorage.listMembers(folder.id);
     if (
       (body.payerMemberId && !members.some((member) => member.id === body.payerMemberId && member.status === "active")) ||
-      body.allocations?.some((allocation) => !members.some((member) => member.id === allocation.memberId && member.status === "active"))
+      body.allocations?.some((allocation) => !members.some((member) => member.id === allocation.memberId && member.status !== "removed"))
     ) {
       return res.status(400).json({ error: "Invalid expense member reference" });
     }
@@ -953,7 +978,10 @@ Open Receiptify to view the folder.`;
     if (expenseAssignments.some((assignment) => assignment.sourceType === "expense" && assignment.sourceId === expense.id && assignment.status === "paid")) {
       return res.status(409).json({ error: "Mark paid assignments as unpaid before deleting this expense" });
     }
-    await splitFolderStorage.deleteManualExpense(folder.id, expense.id);
+    const deleted = await splitFolderStorage.deleteManualExpense(folder.id, expense.id);
+    if (!deleted) {
+      return res.status(409).json({ error: "Mark paid assignments as unpaid before deleting this expense" });
+    }
     res.json({ ok: true });
   });
 
@@ -984,11 +1012,11 @@ Open Receiptify to view the folder.`;
       })).optional(),
     }).parse(req.body);
     const members = await splitFolderStorage.listMembers(folder.id);
-    const activeMemberIds = new Set(members.filter((member) => member.status === "active").map((member) => member.id));
+    const allocatableMemberIds = new Set(members.filter((member) => member.status !== "removed").map((member) => member.id));
     if (body.subfolderId && !(await splitFolderStorage.listSubfolders(folder.id)).some((subfolder) => subfolder.id === body.subfolderId)) {
       return res.status(400).json({ error: "Invalid subfolder" });
     }
-    if (body.participants.some((participant) => !activeMemberIds.has(participant.memberId))) {
+    if (body.participants.some((participant) => !allocatableMemberIds.has(participant.memberId))) {
       return res.status(400).json({ error: "Invalid bill participant" });
     }
     const total = money(body.amount);
@@ -1010,7 +1038,7 @@ Open Receiptify to view the folder.`;
       for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
         const item = items[itemIndex];
         if (money(item.amount) < 0) return res.status(400).json({ error: "Item amounts must be non-negative" });
-        if (item.memberIds.some((memberId: string) => !activeMemberIds.has(memberId))) {
+        if (item.memberIds.some((memberId: string) => !allocatableMemberIds.has(memberId))) {
           return res.status(400).json({ error: "Invalid member assigned to a bill item" });
         }
         billItems.push({ billId: "", itemKey: item.key, label: item.label, amount: money(item.amount).toFixed(2) });
@@ -1092,9 +1120,16 @@ Open Receiptify to view the folder.`;
       nextStatus,
     });
     if (!permitted) return res.status(403).json({ error: "Only the folder owner can mark bill shares paid or pending" });
-    const updated = await splitFolderStorage.updateBillParticipant(participant.id, nextStatus);
+    const updated = await splitFolderStorage.updateBillParticipant(
+      participant.id,
+      nextStatus,
+      participant.status || "pending",
+    );
+    if (!updated) {
+      return res.status(409).json({ error: "This member was removed before the payment status changed" });
+    }
     const all = await splitFolderStorage.listBills(folder.id); const current = all.find((b) => b.id === bill.id)!;
-    const status = billStatus(current.participants.map((p) => p.id === participant.id ? { ...p, status: updated!.status } : p));
+    const status = billStatus(current.participants.map((p) => p.id === participant.id ? { ...p, status: updated.status } : p));
     await splitFolderStorage.updateBillStatus(bill.id, status);
     res.json({ participant: updated, status });
   });

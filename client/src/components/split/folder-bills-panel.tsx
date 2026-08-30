@@ -58,7 +58,10 @@ export default function FolderBillsPanel({
   canManage: boolean;
 }) {
   const { toast } = useToast();
-  const activeMembers = useMemo(() => members.filter((member) => member.status === "active"), [members]);
+  const allocatableMembers = useMemo(
+    () => members.filter((member) => member.status !== "removed"),
+    [members],
+  );
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -294,7 +297,7 @@ export default function FolderBillsPanel({
             {mode !== "items" ? (
               <div className="space-y-2 rounded-xl border p-3">
                 <Label>Participants</Label>
-                {activeMembers.map((member) => {
+                {allocatableMembers.map((member) => {
                   const selected = selectedMemberIds.includes(member.id);
                   return (
                     <div key={member.id} className="flex items-center gap-2">
@@ -337,7 +340,7 @@ export default function FolderBillsPanel({
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {activeMembers.map((member) => {
+                      {allocatableMembers.map((member) => {
                         const selected = item.memberIds.includes(member.id);
                         return (
                           <button

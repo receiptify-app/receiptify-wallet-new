@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 import express from "express";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db, pool } from "../server/db";
 import { storage } from "../server/storage";
 import { splitFolderStorage } from "../server/split-folder-storage";
@@ -85,6 +85,28 @@ async function test(name: string, fn: () => Promise<void>) {
     console.error(`FAIL - ${name}`);
     throw error;
   }
+}
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+async function queueFinancialRace(
+  memberId: string,
+  first: () => Promise<ApiResult>,
+  second: () => Promise<ApiResult>,
+): Promise<[ApiResult, ApiResult]> {
+  let results!: Promise<[ApiResult, ApiResult]>;
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select id from split_folder_members where id = ${memberId} for update`,
+    );
+    const firstRequest = first();
+    await delay(100);
+    const secondRequest = second();
+    await delay(150);
+    results = Promise.all([firstRequest, secondRequest]);
+  });
+  return results;
 }
 
 async function startServer() {
@@ -204,6 +226,14 @@ async function main() {
   });
   folderIds.push(folderB.id);
 
+  const balanceFolder = await splitFolderStorage.createFolder({
+    ownerId: users.owner,
+    name: `Split route balances ${runId}`,
+    description: "Disposable canonical balance fixture",
+    workspaceType: "ongoing",
+  });
+  folderIds.push(balanceFolder.id);
+
   const ownerMember = await splitFolderStorage.createMember({
     folderId: folderA.id,
     userId: users.owner,
@@ -243,6 +273,62 @@ async function main() {
     inviteToken: `split-route-foreign-owner-${runId}`,
     status: "active",
     role: "owner",
+  });
+  const balanceOwner = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    userId: users.owner,
+    displayName: "Balance Owner",
+    inviteToken: `split-route-balance-owner-${runId}`,
+    status: "active",
+    role: "owner",
+  });
+  const balanceInvited = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Invited Friend",
+    inviteEmail: `split-route-balance-invited-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-invited-${runId}`,
+    status: "invited",
+    role: "viewer",
+  });
+  const balancePaidMember = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Paid Bill Friend",
+    inviteEmail: `split-route-balance-paid-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-paid-${runId}`,
+    status: "invited",
+    role: "viewer",
+  });
+  const balanceDeclinedMember = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Declined Bill Friend",
+    inviteEmail: `split-route-balance-declined-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-declined-${runId}`,
+    status: "invited",
+    role: "viewer",
+  });
+  const balanceRaceMember = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Concurrent Friend",
+    inviteEmail: `split-route-balance-race-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-race-${runId}`,
+    status: "invited",
+    role: "viewer",
+  });
+  const balanceDeclineRaceMember = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Decline Race Friend",
+    inviteEmail: `split-route-balance-decline-race-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-decline-race-${runId}`,
+    status: "invited",
+    role: "viewer",
+  });
+  const balancePendingRaceMember = await splitFolderStorage.createMember({
+    folderId: balanceFolder.id,
+    displayName: "Pending Race Friend",
+    inviteEmail: `split-route-balance-pending-race-${runId}@example.invalid`,
+    inviteToken: `split-route-balance-pending-race-${runId}`,
+    status: "invited",
+    role: "viewer",
   });
 
   const receiptA = await storage.createReceipt({
@@ -310,7 +396,307 @@ async function main() {
   });
   receiptIds.push(contributorReceipt.id);
 
+  const balanceReceipt = await storage.createReceipt({
+    userId: users.owner,
+    merchantName: `Screwfix balance fixture ${runId}`,
+    total: "23.68",
+    currency: "GBP",
+    exchangeRateToGBP: "1",
+    date: new Date(),
+    splitFolderId: balanceFolder.id,
+  });
+  receiptIds.push(balanceReceipt.id);
+
   let protectedExpenseId = "";
+
+  await test("Canonical summaries count source spend once and permit invited allocations", async () => {
+    const initial = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assertStatus(initial, 200, "initial balance detail");
+    assert.deepEqual(
+      {
+        totalSpent: initial.data.totalSpent,
+        allocatedAmount: initial.data.allocatedAmount,
+        paidAmount: initial.data.paidAmount,
+        outstandingAmount: initial.data.outstandingAmount,
+        personalAmount: initial.data.personalAmount,
+        receiptCount: initial.data.receiptCount,
+      },
+      {
+        totalSpent: 23.68,
+        allocatedAmount: 0,
+        paidAmount: 0,
+        outstandingAmount: 0,
+        personalAmount: 23.68,
+        receiptCount: 1,
+      },
+    );
+
+    assertStatus(
+      await api(users.owner, "PUT", `/api/split-folders/${balanceFolder.id}/receipts/${balanceReceipt.id}/assignments`, {
+        mode: "whole",
+        assignments: [{ memberId: balanceInvited.id, itemId: null, shareAmount: "6.69" }],
+      }),
+      200,
+      "invited receipt allocation",
+    );
+    const screwfix = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(screwfix.data.totalSpent, 23.68);
+    assert.equal(screwfix.data.allocatedAmount, 6.69);
+    assert.equal(screwfix.data.paidAmount, 0);
+    assert.equal(screwfix.data.outstandingAmount, 6.69);
+    assert.equal(screwfix.data.personalAmount, 16.99);
+    assert.equal(screwfix.data.totalAmount, 23.68, "compatibility total must now mean source spend");
+
+    const list = await api(users.owner, "GET", "/api/split-folders");
+    assertStatus(list, 200, "folder summaries");
+    const listSummary = list.data.find((folder: any) => folder.id === balanceFolder.id);
+    assert.equal(listSummary.totalSpent, 23.68);
+    assert.equal(listSummary.allocatedAmount, 6.69);
+    assert.equal(listSummary.personalAmount, 16.99);
+
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balanceInvited.id}/settle`),
+      200,
+      "settle invited receipt share",
+    );
+    const settled = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(settled.data.totalSpent, 23.68);
+    assert.equal(settled.data.allocatedAmount, 6.69);
+    assert.equal(settled.data.paidAmount, 6.69);
+    assert.equal(settled.data.outstandingAmount, 0);
+    assert.equal(settled.data.personalAmount, 16.99);
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balanceInvited.id}/unsettle`),
+      200,
+      "reopen invited receipt share",
+    );
+
+    const expense = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/expenses`, {
+      description: "Party Food",
+      amount: "120.00",
+      payerMemberId: balanceOwner.id,
+      allocations: [{ memberId: balanceInvited.id, shareAmount: "50.00" }],
+    });
+    assertStatus(expense, 201, "invited expense allocation");
+
+    const bill = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/bills`, {
+      title: "One-off-style bill",
+      amount: "10.00",
+      splitMode: "custom",
+      participants: [
+        { memberId: balanceOwner.id, shareAmount: "4.00" },
+        { memberId: balanceInvited.id, shareAmount: "6.00" },
+      ],
+    });
+    assertStatus(bill, 201, "invited bill allocation");
+    billIds.push(bill.data.id);
+
+    const combined = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(combined.data.totalSpent, 153.68);
+    assert.equal(combined.data.allocatedAmount, 62.69);
+    assert.equal(combined.data.paidAmount, 0);
+    assert.equal(combined.data.outstandingAmount, 62.69);
+    assert.equal(combined.data.personalAmount, 90.99);
+    const ownerSettlement = combined.data.settlement.find((entry: any) => entry.memberId === balanceOwner.id);
+    assert.equal(ownerSettlement.paidUpfront, 153.68);
+    assert.equal(ownerSettlement.personal, 90.99);
+    assert.equal(ownerSettlement.outstandingToReceive, 62.69);
+
+    assertStatus(
+      await api(users.owner, "DELETE", `/api/split-folders/${balanceFolder.id}/expenses/${expense.data.id}`),
+      200,
+      "delete pending expense",
+    );
+    const afterDelete = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(afterDelete.data.totalSpent, 33.68);
+    assert.equal(afterDelete.data.allocatedAmount, 12.69);
+    assert.equal(afterDelete.data.outstandingAmount, 12.69);
+    assert.equal(afterDelete.data.personalAmount, 20.99);
+
+    assertStatus(
+      await api(users.owner, "DELETE", `/api/split-folders/${balanceFolder.id}/members/${balanceInvited.id}`),
+      200,
+      "remove member with pending receipt and bill shares",
+    );
+    const afterPendingRemoval = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(afterPendingRemoval.data.totalSpent, 33.68);
+    assert.equal(afterPendingRemoval.data.allocatedAmount, 0);
+    assert.equal(afterPendingRemoval.data.paidAmount, 0);
+    assert.equal(afterPendingRemoval.data.outstandingAmount, 0);
+    assert.equal(afterPendingRemoval.data.personalAmount, 33.68);
+    assert.equal(
+      afterPendingRemoval.data.settlement.some((entry: any) => entry.memberId === balanceInvited.id),
+      false,
+    );
+    const billsAfterRemoval = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}/bills`);
+    const removedParticipant = billsAfterRemoval.data
+      .flatMap((entry: any) => entry.participants)
+      .find((participant: any) => participant.memberId === balanceInvited.id);
+    assert.equal(removedParticipant.status, "declined");
+
+    const paidBill = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/bills`, {
+      title: "Paid removal guard",
+      amount: "5.00",
+      splitMode: "equal",
+      participants: [{ memberId: balancePaidMember.id }],
+    });
+    assertStatus(paidBill, 201, "paid removal bill setup");
+    billIds.push(paidBill.data.id);
+    const paidParticipant = paidBill.data.participants[0];
+    assertStatus(
+      await api(
+        users.owner,
+        "PATCH",
+        `/api/split-folders/${balanceFolder.id}/bills/${paidBill.data.id}/participants/${paidParticipant.id}`,
+        { status: "paid" },
+      ),
+      200,
+      "paid removal participant setup",
+    );
+    assertStatus(
+      await api(users.owner, "DELETE", `/api/split-folders/${balanceFolder.id}/members/${balancePaidMember.id}`),
+      409,
+      "paid bill share blocks member removal",
+    );
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balancePaidMember.id}/unsettle`),
+      200,
+      "explicitly reopen paid bill share",
+    );
+    assertStatus(
+      await api(users.owner, "DELETE", `/api/split-folders/${balanceFolder.id}/members/${balancePaidMember.id}`),
+      200,
+      "member removal after bill share reopened",
+    );
+    const afterPaidRemoval = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(afterPaidRemoval.data.totalSpent, 38.68);
+    assert.equal(afterPaidRemoval.data.allocatedAmount, 0);
+    assert.equal(afterPaidRemoval.data.paidAmount, 0);
+    assert.equal(afterPaidRemoval.data.outstandingAmount, 0);
+    assert.equal(afterPaidRemoval.data.personalAmount, 38.68);
+
+    const declinedBill = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/bills`, {
+      title: "Declined share stays declined",
+      amount: "4.00",
+      splitMode: "equal",
+      participants: [{ memberId: balanceDeclinedMember.id }],
+    });
+    assertStatus(declinedBill, 201, "declined bill setup");
+    billIds.push(declinedBill.data.id);
+    const declinedParticipant = declinedBill.data.participants[0];
+    assertStatus(
+      await api(
+        users.owner,
+        "PATCH",
+        `/api/split-folders/${balanceFolder.id}/bills/${declinedBill.data.id}/participants/${declinedParticipant.id}`,
+        { status: "declined" },
+      ),
+      200,
+      "decline bill share",
+    );
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balanceDeclinedMember.id}/settle`),
+      200,
+      "bulk settle after decline",
+    );
+    const billsAfterDeclinedSettlement = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}/bills`);
+    const stillDeclined = billsAfterDeclinedSettlement.data
+      .flatMap((entry: any) => entry.participants)
+      .find((participant: any) => participant.id === declinedParticipant.id);
+    assert.equal(stillDeclined.status, "declined");
+    const afterDeclinedSettlement = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);
+    assert.equal(afterDeclinedSettlement.data.totalSpent, 42.68);
+    assert.equal(afterDeclinedSettlement.data.allocatedAmount, 0);
+    assert.equal(afterDeclinedSettlement.data.paidAmount, 0);
+    assert.equal(afterDeclinedSettlement.data.outstandingAmount, 0);
+    assert.equal(afterDeclinedSettlement.data.personalAmount, 42.68);
+
+    assertStatus(
+      await api(users.owner, "PUT", `/api/split-folders/${balanceFolder.id}/receipts/${balanceReceipt.id}/assignments`, {
+        mode: "whole",
+        assignments: [{ memberId: balanceRaceMember.id, itemId: null, shareAmount: "2.00" }],
+      }),
+      200,
+      "concurrent settlement fixture",
+    );
+    const [settleRace, removeRace] = await Promise.all([
+      api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balanceRaceMember.id}/settle`),
+      api(users.owner, "DELETE", `/api/split-folders/${balanceFolder.id}/members/${balanceRaceMember.id}`),
+    ]);
+    assert.equal(
+      [settleRace.status, removeRace.status].filter((status) => status === 200).length,
+      1,
+      `settle/remove race must have exactly one winner: ${settleRace.status}/${removeRace.status}`,
+    );
+    const raceMember = await splitFolderStorage.getMember(balanceRaceMember.id);
+    const raceAssignments = (await splitFolderStorage.listAssignments(balanceFolder.id))
+      .filter((assignment) => assignment.memberId === balanceRaceMember.id);
+    if (removeRace.status === 200) {
+      assert.equal(raceMember?.status, "removed");
+      assert.deepEqual(raceAssignments, []);
+      assert.ok([404, 409].includes(settleRace.status));
+    } else {
+      assert.notEqual(raceMember?.status, "removed");
+      assert.equal(settleRace.status, 200);
+      assert.equal(removeRace.status, 409);
+      assert.equal(raceAssignments.length, 1);
+      assert.equal(raceAssignments[0].status, "paid");
+    }
+
+    const declineRaceBill = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/bills`, {
+      title: "Settle versus decline race",
+      amount: "3.00",
+      splitMode: "equal",
+      participants: [{ memberId: balanceDeclineRaceMember.id }],
+    });
+    assertStatus(declineRaceBill, 201, "decline race bill setup");
+    billIds.push(declineRaceBill.data.id);
+    const declineRaceParticipant = declineRaceBill.data.participants[0];
+    const [settleBeforeDecline, staleDecline] = await queueFinancialRace(
+      balanceDeclineRaceMember.id,
+      () => api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balanceDeclineRaceMember.id}/settle`),
+      () => api(
+        users.owner,
+        "PATCH",
+        `/api/split-folders/${balanceFolder.id}/bills/${declineRaceBill.data.id}/participants/${declineRaceParticipant.id}`,
+        { status: "declined" },
+      ),
+    );
+    assertStatus(settleBeforeDecline, 200, "settlement queued before stale decline");
+    assertStatus(staleDecline, 409, "stale decline must conflict");
+    const declineRaceBills = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}/bills`);
+    const declineRaceFinal = declineRaceBills.data
+      .flatMap((entry: any) => entry.participants)
+      .find((participant: any) => participant.id === declineRaceParticipant.id);
+    assert.equal(declineRaceFinal.status, "paid");
+
+    const pendingRaceBill = await api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/bills`, {
+      title: "Settle versus pending race",
+      amount: "2.00",
+      splitMode: "equal",
+      participants: [{ memberId: balancePendingRaceMember.id }],
+    });
+    assertStatus(pendingRaceBill, 201, "pending race bill setup");
+    billIds.push(pendingRaceBill.data.id);
+    const pendingRaceParticipant = pendingRaceBill.data.participants[0];
+    const [settleBeforePending, stalePending] = await queueFinancialRace(
+      balancePendingRaceMember.id,
+      () => api(users.owner, "POST", `/api/split-folders/${balanceFolder.id}/members/${balancePendingRaceMember.id}/settle`),
+      () => api(
+        users.owner,
+        "PATCH",
+        `/api/split-folders/${balanceFolder.id}/bills/${pendingRaceBill.data.id}/participants/${pendingRaceParticipant.id}`,
+        { status: "pending" },
+      ),
+    );
+    assertStatus(settleBeforePending, 200, "settlement queued before stale pending");
+    assertStatus(stalePending, 409, "stale pending update must conflict");
+    const pendingRaceBills = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}/bills`);
+    const pendingRaceFinal = pendingRaceBills.data
+      .flatMap((entry: any) => entry.participants)
+      .find((participant: any) => participant.id === pendingRaceParticipant.id);
+    assert.equal(pendingRaceFinal.status, "paid");
+  });
 
   await test("Viewer can read but cannot add, edit, or manage", async () => {
     assertStatus(await api(users.viewer, "GET", `/api/split-folders/${folderA.id}`), 200, "viewer read");

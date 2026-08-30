@@ -24,7 +24,7 @@ import {
   type SplitSubfolder, type SplitFolderReceiptMetadata, type InsertSplitSubfolder,
   type SplitBillItem, type InsertSplitBillItem,
 } from "@shared/schema";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 function normShare(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return "0";
@@ -106,13 +106,13 @@ export interface ISplitFolderStorage {
   listManualExpenses(folderId: string): Promise<SplitManualExpense[]>;
   createManualExpense(expense: InsertSplitManualExpense): Promise<SplitManualExpense>;
   updateManualExpense(id: string, updates: Partial<InsertSplitManualExpense>): Promise<SplitManualExpense | undefined>;
-  deleteManualExpense(folderId: string, id: string): Promise<void>;
+  deleteManualExpense(folderId: string, id: string): Promise<boolean>;
   listActivity(folderId: string): Promise<SplitActivityEvent[]>;
   createActivity(event: InsertSplitActivityEvent): Promise<SplitActivityEvent>;
   listBills(folderId: string): Promise<Array<SplitBill & { participants: SplitBillParticipant[]; items: SplitBillItem[] }>>;
   createBill(bill: InsertSplitBill, participants: InsertSplitBillParticipant[], items?: InsertSplitBillItem[]): Promise<SplitBill>;
   updateBillStatus(id: string, status: string): Promise<void>;
-  updateBillParticipant(id: string, status: string): Promise<SplitBillParticipant | undefined>;
+  updateBillParticipant(id: string, status: string, expectedStatus: string): Promise<SplitBillParticipant | undefined>;
   listPaymentRequests(folderId: string): Promise<SplitPaymentRequest[]>;
   createPaymentRequest(request: InsertSplitPaymentRequest): Promise<SplitPaymentRequest>;
   updatePaymentRequest(id: string, updates: Partial<InsertSplitPaymentRequest>): Promise<SplitPaymentRequest | undefined>;
@@ -120,15 +120,17 @@ export interface ISplitFolderStorage {
 
   listAssignments(folderId: string): Promise<SplitAssignment[]>;
   replaceReceiptAssignments(folderId: string, receiptId: string, rows: InsertSplitAssignment[]): Promise<SplitAssignment[]>;
-  clearReceiptAssignments(folderId: string, receiptId: string): Promise<void>;
+  clearReceiptAssignments(folderId: string, receiptId: string): Promise<boolean>;
   clearMemberAssignments(memberId: string): Promise<void>;
-  markMemberSettled(folderId: string, memberId: string): Promise<void>;
+  removeMemberFinancials(folderId: string, memberId: string): Promise<{ paidConflict: boolean }>;
+  markMemberSettled(folderId: string, memberId: string): Promise<boolean>;
   markMemberUnsettled(folderId: string, memberId: string): Promise<number>;
   getSharedReceiptsForUser(userId: string): Promise<Array<Receipt & { isShared: true }>>;
 
   findUserByEmail(email: string): Promise<typeof users.$inferSelect | undefined>;
 
   deleteFolder(folderId: string): Promise<void>;
+  deleteFolderIfUnsettled(folderId: string): Promise<boolean>;
 }
 
 class SplitFolderDbStorage implements ISplitFolderStorage {
@@ -283,7 +285,24 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
     const [row] = await db.update(splitManualExpenses).set({ ...updates, updatedAt: new Date() }).where(eq(splitManualExpenses.id, id)).returning(); return row;
   }
   async deleteManualExpense(folderId: string, id: string) {
-    await db.transaction(async (tx) => {
+    return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from split_assignments
+            where folder_id = ${folderId} and source_type = 'expense' and source_id = ${id}
+            for update`,
+      );
+      const paid = await tx
+        .select({ id: splitAssignments.id })
+        .from(splitAssignments)
+        .where(
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.sourceType, "expense"),
+            eq(splitAssignments.sourceId, id),
+            eq(splitAssignments.status, "paid"),
+          ),
+        );
+      if (paid.length) return false;
       await tx
         .delete(splitAssignments)
         .where(
@@ -296,6 +315,7 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       await tx
         .delete(splitManualExpenses)
         .where(and(eq(splitManualExpenses.folderId, folderId), eq(splitManualExpenses.id, id)));
+      return true;
     });
   }
   async listActivity(folderId: string) {
@@ -333,8 +353,38 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       return created;
     });
   }
-  async updateBillParticipant(id: string, status: string) {
-    const [row] = await db.update(splitBillParticipants).set({ status, paidAt: status === "paid" ? new Date() : null }).where(eq(splitBillParticipants.id, id)).returning(); return row;
+  async updateBillParticipant(id: string, status: string, expectedStatus: string) {
+    return db.transaction(async (tx) => {
+      const [participant] = await tx
+        .select()
+        .from(splitBillParticipants)
+        .where(eq(splitBillParticipants.id, id));
+      if (!participant) return undefined;
+      await tx.execute(
+        sql`select id from split_folder_members where id = ${participant.memberId} for update`,
+      );
+      const [member] = await tx
+        .select()
+        .from(splitFolderMembers)
+        .where(eq(splitFolderMembers.id, participant.memberId));
+      if (!member || member.status === "removed") return undefined;
+      const [current] = await tx
+        .select()
+        .from(splitBillParticipants)
+        .where(eq(splitBillParticipants.id, id));
+      if (!current || current.status !== expectedStatus) return undefined;
+      const [row] = await tx
+        .update(splitBillParticipants)
+        .set({ status, paidAt: status === "paid" ? new Date() : null })
+        .where(
+          and(
+            eq(splitBillParticipants.id, id),
+            eq(splitBillParticipants.status, expectedStatus),
+          ),
+        )
+        .returning();
+      return row;
+    });
   }
   async updateBillStatus(id: string, status: string) {
     await db.update(splitBills).set({ status, updatedAt: new Date() }).where(eq(splitBills.id, id));
@@ -357,6 +407,11 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
     // so already-"paid" assignments don't get reset to "pending" when the owner
     // edits the split (e.g. adds another friend).
     return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from split_assignments
+            where folder_id = ${folderId} and receipt_id = ${receiptId}
+            for update`,
+      );
       const existing = await tx.select().from(splitAssignments).where(and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.receiptId, receiptId)));
       const { toDeleteIds, toInsertIndexes, paidConflictIds } = diffReceiptAssignments(existing, rows.map((r) => ({ memberId: r.memberId, itemId: r.itemId ?? null, shareAmount: String(r.shareAmount) })));
       if (paidConflictIds.length) {
@@ -368,38 +423,193 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
     });
   }
 
-  async clearReceiptAssignments(folderId: string, receiptId: string): Promise<void> {
-    await db
-      .delete(splitAssignments)
-      .where(
-        and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.receiptId, receiptId)),
+  async clearReceiptAssignments(folderId: string, receiptId: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from split_assignments
+            where folder_id = ${folderId} and receipt_id = ${receiptId}
+            for update`,
       );
+      const paid = await tx
+        .select({ id: splitAssignments.id })
+        .from(splitAssignments)
+        .where(
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.receiptId, receiptId),
+            eq(splitAssignments.status, "paid"),
+          ),
+        );
+      if (paid.length) return false;
+      await tx
+        .delete(splitAssignments)
+        .where(
+          and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.receiptId, receiptId)),
+        );
+      return true;
+    });
   }
 
   async clearMemberAssignments(memberId: string): Promise<void> {
     await db.delete(splitAssignments).where(eq(splitAssignments.memberId, memberId));
   }
 
-  async markMemberSettled(folderId: string, memberId: string): Promise<void> {
-    await db.transaction(async (tx) => {
+  async removeMemberFinancials(
+    folderId: string,
+    memberId: string,
+  ): Promise<{ paidConflict: boolean }> {
+    return db.transaction(async (tx) => {
+      // Serialize removal with other member-state transitions.
+      await tx.execute(
+        sql`select id from split_folder_members where id = ${memberId} for update`,
+      );
+      const [member] = await tx
+        .select()
+        .from(splitFolderMembers)
+        .where(and(eq(splitFolderMembers.id, memberId), eq(splitFolderMembers.folderId, folderId)));
+      if (!member) return { paidConflict: false };
+
+      const bills = await tx
+        .select({ id: splitBills.id })
+        .from(splitBills)
+        .where(eq(splitBills.folderId, folderId));
+      const billIds = bills.map((bill) => bill.id);
+      const [paidAssignments, paidBillParticipants] = await Promise.all([
+        tx
+          .select({ id: splitAssignments.id })
+          .from(splitAssignments)
+          .where(
+            and(
+              eq(splitAssignments.folderId, folderId),
+              eq(splitAssignments.memberId, memberId),
+              eq(splitAssignments.status, "paid"),
+            ),
+          ),
+        billIds.length
+          ? tx
+              .select({ id: splitBillParticipants.id })
+              .from(splitBillParticipants)
+              .where(
+                and(
+                  inArray(splitBillParticipants.billId, billIds),
+                  eq(splitBillParticipants.memberId, memberId),
+                  eq(splitBillParticipants.status, "paid"),
+                ),
+              )
+          : Promise.resolve([]),
+      ]);
+      if (paidAssignments.length || paidBillParticipants.length) {
+        return { paidConflict: true };
+      }
+
+      await tx
+        .delete(splitAssignments)
+        .where(
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.memberId, memberId),
+          ),
+        );
+      if (billIds.length) {
+        await tx
+          .update(splitBillParticipants)
+          .set({ status: "declined", paidAt: null })
+          .where(
+            and(
+              inArray(splitBillParticipants.billId, billIds),
+              eq(splitBillParticipants.memberId, memberId),
+            ),
+          );
+
+        for (const billId of billIds) {
+          const participants = await tx
+            .select({ status: splitBillParticipants.status })
+            .from(splitBillParticipants)
+            .where(eq(splitBillParticipants.billId, billId));
+          const status =
+            participants.length > 0 && participants.every((participant) => participant.status === "paid")
+              ? "settled"
+              : participants.some((participant) => participant.status === "paid")
+                ? "partially_paid"
+                : "unpaid";
+          await tx
+            .update(splitBills)
+            .set({ status, updatedAt: new Date() })
+            .where(eq(splitBills.id, billId));
+        }
+      }
+      await tx
+        .update(splitFolderMembers)
+        .set({ status: "removed" })
+        .where(eq(splitFolderMembers.id, memberId));
+      return { paidConflict: false };
+    });
+  }
+
+  async markMemberSettled(folderId: string, memberId: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from split_folder_members where id = ${memberId} for update`,
+      );
+      const [member] = await tx
+        .select()
+        .from(splitFolderMembers)
+        .where(and(eq(splitFolderMembers.id, memberId), eq(splitFolderMembers.folderId, folderId)));
+      if (!member || member.status === "removed") return false;
       await tx
         .update(splitAssignments)
         .set({ status: "paid" })
         .where(
-          and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.memberId, memberId)),
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.memberId, memberId),
+            eq(splitAssignments.status, "pending"),
+          ),
         );
       const bills = await tx.select({ id: splitBills.id }).from(splitBills).where(eq(splitBills.folderId, folderId));
       if (bills.length) {
+        const billIds = bills.map((bill) => bill.id);
         await tx
           .update(splitBillParticipants)
           .set({ status: "paid", paidAt: new Date() })
-          .where(and(inArray(splitBillParticipants.billId, bills.map((bill) => bill.id)), eq(splitBillParticipants.memberId, memberId)));
+          .where(
+            and(
+              inArray(splitBillParticipants.billId, billIds),
+              eq(splitBillParticipants.memberId, memberId),
+              eq(splitBillParticipants.status, "pending"),
+            ),
+          );
+        for (const billId of billIds) {
+          const participants = await tx
+            .select({ status: splitBillParticipants.status })
+            .from(splitBillParticipants)
+            .where(eq(splitBillParticipants.billId, billId));
+          const status =
+            participants.length > 0 && participants.every((participant) => participant.status === "paid")
+              ? "settled"
+              : participants.some((participant) => participant.status === "paid")
+                ? "partially_paid"
+                : "unpaid";
+          await tx
+            .update(splitBills)
+            .set({ status, updatedAt: new Date() })
+            .where(eq(splitBills.id, billId));
+        }
       }
+      return true;
     });
   }
 
   async markMemberUnsettled(folderId: string, memberId: string): Promise<number> {
     return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from split_folder_members where id = ${memberId} for update`,
+      );
+      const [member] = await tx
+        .select()
+        .from(splitFolderMembers)
+        .where(and(eq(splitFolderMembers.id, memberId), eq(splitFolderMembers.folderId, folderId)));
+      if (!member || member.status === "removed") return 0;
       const rows = await tx
         .update(splitAssignments)
         .set({ status: "pending" })
@@ -412,13 +622,30 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
         )
         .returning({ id: splitAssignments.id });
       const bills = await tx.select({ id: splitBills.id }).from(splitBills).where(eq(splitBills.folderId, folderId));
-      const billRows = bills.length
+      const billIds = bills.map((bill) => bill.id);
+      const billRows = billIds.length
         ? await tx
             .update(splitBillParticipants)
             .set({ status: "pending", paidAt: null })
-            .where(and(inArray(splitBillParticipants.billId, bills.map((bill) => bill.id)), eq(splitBillParticipants.memberId, memberId), eq(splitBillParticipants.status, "paid")))
+            .where(and(inArray(splitBillParticipants.billId, billIds), eq(splitBillParticipants.memberId, memberId), eq(splitBillParticipants.status, "paid")))
             .returning({ id: splitBillParticipants.id })
         : [];
+      for (const billId of billIds) {
+        const participants = await tx
+          .select({ status: splitBillParticipants.status })
+          .from(splitBillParticipants)
+          .where(eq(splitBillParticipants.billId, billId));
+        const status =
+          participants.length > 0 && participants.every((participant) => participant.status === "paid")
+            ? "settled"
+            : participants.some((participant) => participant.status === "paid")
+              ? "partially_paid"
+              : "unpaid";
+        await tx
+          .update(splitBills)
+          .set({ status, updatedAt: new Date() })
+          .where(eq(splitBills.id, billId));
+      }
       return rows.length + billRows.length;
     });
   }
@@ -486,6 +713,58 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       await tx.delete(splitPaymentRequests).where(eq(splitPaymentRequests.folderId, folderId));
       await tx.delete(splitFolderMembers).where(eq(splitFolderMembers.folderId, folderId));
       await tx.delete(splitFolders).where(eq(splitFolders.id, folderId));
+    });
+  }
+
+  async deleteFolderIfUnsettled(folderId: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      // Settlement/status transitions lock these same rows first.
+      await tx.execute(
+        sql`select id from split_folder_members
+            where folder_id = ${folderId}
+            order by id
+            for update`,
+      );
+      const paidAssignments = await tx
+        .select({ id: splitAssignments.id })
+        .from(splitAssignments)
+        .where(and(eq(splitAssignments.folderId, folderId), eq(splitAssignments.status, "paid")));
+      const bills = await tx
+        .select({ id: splitBills.id })
+        .from(splitBills)
+        .where(eq(splitBills.folderId, folderId));
+      const paidParticipants = bills.length
+        ? await tx
+            .select({ id: splitBillParticipants.id })
+            .from(splitBillParticipants)
+            .where(
+              and(
+                inArray(splitBillParticipants.billId, bills.map((bill) => bill.id)),
+                eq(splitBillParticipants.status, "paid"),
+              ),
+            )
+        : [];
+      if (paidAssignments.length || paidParticipants.length) return false;
+
+      await tx
+        .update(receipts)
+        .set({ splitFolderId: null })
+        .where(eq(receipts.splitFolderId, folderId));
+      await tx.delete(splitAssignments).where(eq(splitAssignments.folderId, folderId));
+      await tx.delete(splitFolderReceiptMetadata).where(eq(splitFolderReceiptMetadata.folderId, folderId));
+      await tx.delete(splitSubfolders).where(eq(splitSubfolders.folderId, folderId));
+      await tx.delete(splitManualExpenses).where(eq(splitManualExpenses.folderId, folderId));
+      await tx.delete(splitActivityEvents).where(eq(splitActivityEvents.folderId, folderId));
+      if (bills.length) {
+        await tx
+          .delete(splitBillParticipants)
+          .where(inArray(splitBillParticipants.billId, bills.map((bill) => bill.id)));
+      }
+      await tx.delete(splitBills).where(eq(splitBills.folderId, folderId));
+      await tx.delete(splitPaymentRequests).where(eq(splitPaymentRequests.folderId, folderId));
+      await tx.delete(splitFolderMembers).where(eq(splitFolderMembers.folderId, folderId));
+      await tx.delete(splitFolders).where(eq(splitFolders.id, folderId));
+      return true;
     });
   }
 }
