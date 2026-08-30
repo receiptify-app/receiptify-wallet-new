@@ -41,6 +41,9 @@ const folderIds: string[] = [];
 const receiptIds: string[] = [];
 const itemIds: string[] = [];
 const billIds: string[] = [];
+const deliveredEmails: Array<{ to: string; subject: string; text?: string; html?: string }> = [];
+let failNextEmail = false;
+let throwNextEmail = false;
 
 let server: Server | undefined;
 let baseUrl = "";
@@ -98,7 +101,20 @@ async function startServer() {
     }
     next();
   });
-  registerSplitFolderRoutes(app);
+  registerSplitFolderRoutes(app, {
+    sendEmail: async (message) => {
+      deliveredEmails.push(message);
+      if (throwNextEmail) {
+        throwNextEmail = false;
+        throw new Error("Intentional route-test sender exception");
+      }
+      if (failNextEmail) {
+        failNextEmail = false;
+        return { sent: false, reason: "Intentional route-test delivery failure" };
+      }
+      return { sent: true };
+    },
+  });
   server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -175,6 +191,7 @@ async function main() {
     ownerId: users.owner,
     name: `Split route permissions ${runId}`,
     description: "Disposable route-level authorization fixture",
+    ownerContactEmail: `split-route-owner-${runId}@example.invalid`,
     workspaceType: "ongoing",
   });
   folderIds.push(folderA.id);
@@ -614,6 +631,196 @@ async function main() {
     const afterSettlement = await api(users.owner, "GET", `/api/split-folders/${folderA.id}/bills`);
     assert.equal(afterSettlement.data[0].participants[0].status, "paid");
     assert.equal(afterSettlement.data[0].status, "settled");
+  });
+
+  await test("Invite acceptance notifies the owner and records the join exactly once", async () => {
+    const joiningUserId = `split-route-joiner-${runId}`;
+    const invited = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: joiningUserId,
+      inviteEmail: `${joiningUserId}@example.invalid`,
+      displayName: "Joined Friend",
+      inviteToken: `split-route-join-once-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    const emailCount = deliveredEmails.length;
+
+    const accepted = await api(
+      joiningUserId,
+      "POST",
+      `/api/split-folders/invites/${invited.inviteToken}/accept`,
+    );
+    assertStatus(accepted, 200, "first invite acceptance");
+
+    const activated = await splitFolderStorage.getMember(invited.id);
+    assert.equal(activated?.status, "active");
+    assert.equal(activated?.userId, joiningUserId);
+    assert.ok(activated?.joinedAt, "accepted invite did not record joinedAt");
+    assert.equal(deliveredEmails.length, emailCount + 1);
+    assert.equal(
+      deliveredEmails.at(-1)?.to,
+      `split-route-owner-${runId}@example.invalid`,
+    );
+    assert.match(deliveredEmails.at(-1)?.subject || "", /joined/i);
+    assert.match(deliveredEmails.at(-1)?.text || "", new RegExp(runId));
+
+    const joinedEvents = (await splitFolderStorage.listActivity(folderA.id)).filter(
+      (event) =>
+        event.eventType === "member.joined" &&
+        (event.metadata as { memberId?: string } | null)?.memberId === invited.id,
+    );
+    assert.equal(joinedEvents.length, 1);
+
+    assertStatus(
+      await api(joiningUserId, "POST", `/api/split-folders/invites/${invited.inviteToken}/accept`),
+      200,
+      "repeat invite acceptance",
+    );
+    assert.equal(deliveredEmails.length, emailCount + 1, "repeat acceptance sent another owner email");
+    const repeatedEvents = (await splitFolderStorage.listActivity(folderA.id)).filter(
+      (event) =>
+        event.eventType === "member.joined" &&
+        (event.metadata as { memberId?: string } | null)?.memberId === invited.id,
+    );
+    assert.equal(repeatedEvents.length, 1, "repeat acceptance created another join event");
+  });
+
+  await test("Concurrent acceptance produces one owner notification", async () => {
+    const joiningUserId = `split-route-concurrent-joiner-${runId}`;
+    const invited = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: joiningUserId,
+      inviteEmail: `${joiningUserId}@example.invalid`,
+      displayName: "Concurrent Friend",
+      inviteToken: `split-route-concurrent-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    const emailCount = deliveredEmails.length;
+    const path = `/api/split-folders/invites/${invited.inviteToken}/accept`;
+    const results = await Promise.all([
+      api(joiningUserId, "POST", path),
+      api(joiningUserId, "POST", path),
+    ]);
+    results.forEach((result, index) =>
+      assertStatus(result, 200, `concurrent invite acceptance ${index + 1}`),
+    );
+    assert.equal(deliveredEmails.length, emailCount + 1);
+    const joinedEvents = (await splitFolderStorage.listActivity(folderA.id)).filter(
+      (event) =>
+        event.eventType === "member.joined" &&
+        (event.metadata as { memberId?: string } | null)?.memberId === invited.id,
+    );
+    assert.equal(joinedEvents.length, 1);
+  });
+
+  await test("Wrong-account and revoked invite attempts never notify the owner", async () => {
+    const expectedUserId = `split-route-expected-joiner-${runId}`;
+    const invited = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: expectedUserId,
+      inviteEmail: `${expectedUserId}@example.invalid`,
+      displayName: "Expected Friend",
+      inviteToken: `split-route-wrong-account-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    const revoked = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: `split-route-revoked-${runId}`,
+      inviteEmail: `split-route-revoked-${runId}@example.invalid`,
+      displayName: "Revoked Friend",
+      inviteToken: `split-route-revoked-${runId}`,
+      status: "removed",
+      role: "viewer",
+    });
+    const emailCount = deliveredEmails.length;
+    assertStatus(
+      await api(users.outsider, "POST", `/api/split-folders/invites/${invited.inviteToken}/accept`),
+      403,
+      "wrong-account invite acceptance",
+    );
+    assertStatus(
+      await api(revoked.userId!, "POST", `/api/split-folders/invites/${revoked.inviteToken}/accept`),
+      410,
+      "revoked invite acceptance",
+    );
+    assert.equal(deliveredEmails.length, emailCount);
+    assert.equal((await splitFolderStorage.getMember(invited.id))?.status, "invited");
+  });
+
+  await test("Notification failure never rolls back a successful join", async () => {
+    const joiningUserId = `split-route-failed-email-joiner-${runId}`;
+    const invited = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: joiningUserId,
+      inviteEmail: `${joiningUserId}@example.invalid`,
+      displayName: "Failure-safe Friend",
+      inviteToken: `split-route-failed-email-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    const emailCount = deliveredEmails.length;
+    failNextEmail = true;
+    assertStatus(
+      await api(joiningUserId, "POST", `/api/split-folders/invites/${invited.inviteToken}/accept`),
+      200,
+      "invite acceptance with failed owner email",
+    );
+    assert.equal(deliveredEmails.length, emailCount + 1);
+    assert.equal((await splitFolderStorage.getMember(invited.id))?.status, "active");
+    assert.equal(
+      (await splitFolderStorage.listActivity(folderA.id)).filter(
+        (event) =>
+          event.eventType === "member.joined" &&
+          (event.metadata as { memberId?: string } | null)?.memberId === invited.id,
+      ).length,
+      1,
+    );
+
+    const throwingUserId = `split-route-throwing-email-joiner-${runId}`;
+    const throwingInvite = await splitFolderStorage.createMember({
+      folderId: folderA.id,
+      userId: throwingUserId,
+      inviteEmail: `${throwingUserId}@example.invalid`,
+      displayName: "Exception-safe Friend",
+      inviteToken: `split-route-throwing-email-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    throwNextEmail = true;
+    assertStatus(
+      await api(
+        throwingUserId,
+        "POST",
+        `/api/split-folders/invites/${throwingInvite.inviteToken}/accept`,
+      ),
+      200,
+      "invite acceptance with thrown owner email error",
+    );
+    assert.equal((await splitFolderStorage.getMember(throwingInvite.id))?.status, "active");
+  });
+
+  await test("A missing owner email does not prevent invite acceptance", async () => {
+    const joiningUserId = `split-route-no-owner-email-${runId}`;
+    const invited = await splitFolderStorage.createMember({
+      folderId: folderB.id,
+      userId: joiningUserId,
+      inviteEmail: `${joiningUserId}@example.invalid`,
+      displayName: "No-email Friend",
+      inviteToken: `split-route-no-owner-email-${runId}`,
+      status: "invited",
+      role: "viewer",
+    });
+    const emailCount = deliveredEmails.length;
+    assertStatus(
+      await api(joiningUserId, "POST", `/api/split-folders/invites/${invited.inviteToken}/accept`),
+      200,
+      "invite acceptance without owner email",
+    );
+    assert.equal(deliveredEmails.length, emailCount);
+    assert.equal((await splitFolderStorage.getMember(invited.id))?.status, "active");
   });
 
   assert.equal(ownerMember.role, "owner");

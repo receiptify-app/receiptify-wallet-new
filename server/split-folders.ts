@@ -218,6 +218,7 @@ async function sendInviteEmail(
   folder: SplitFolder,
   inviteToken: string,
   origin: string,
+  emailSender: typeof sendEmail = sendEmail,
 ) {
   const link = `${origin}/split/invite/${inviteToken}`;
   const folderReceipts = await splitFolderStorage.listFolderReceipts(folder.id);
@@ -227,7 +228,7 @@ async function sendInviteEmail(
     date: r.date,
   }));
   const { text, html } = inviteEmailBody(folder.name, inviterName, link, receiptsForEmail);
-  return sendEmail({
+  return emailSender({
     to: toEmail,
     subject: `${inviterName} invited you to split a Receiptify folder`,
     text,
@@ -235,7 +236,11 @@ async function sendInviteEmail(
   });
 }
 
-export function registerSplitFolderRoutes(app: Express) {
+export function registerSplitFolderRoutes(
+  app: Express,
+  dependencies: { sendEmail?: typeof sendEmail } = {},
+) {
+  const emailSender = dependencies.sendEmail ?? sendEmail;
   // --- List folders the user belongs to ---
   app.get("/api/split-folders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const folders = await splitFolderStorage.listFoldersForUser(req.user!.id);
@@ -456,7 +461,7 @@ No action is needed from you.`;
 <p style="color:#666;font-size:12px">No action is needed from you.</p>`;
 
       const results = await Promise.allSettled(
-        Array.from(emails).map((to) => sendEmail({ to, subject, text, html })),
+        Array.from(emails).map((to) => emailSender({ to, subject, text, html })),
       );
       results.forEach((r, i) => {
         if (r.status === "rejected" || (r.status === "fulfilled" && !r.value.sent)) {
@@ -514,6 +519,7 @@ No action is needed from you.`;
             folder,
             member.inviteToken,
             inviteOrigin(req),
+            emailSender,
           );
           emailSent = result.sent;
           emailError = result.reason;
@@ -555,6 +561,7 @@ No action is needed from you.`;
         folder,
         member.inviteToken,
         inviteOrigin(req),
+        emailSender,
       );
       if (!result.sent) {
         return res.status(502).json({
@@ -618,23 +625,86 @@ No action is needed from you.`;
       const emailMatches = !!(userEmail && inviteEmailLc && userEmail === inviteEmailLc);
       const storedIdMatches = !!(member.userId && possibleIds.has(member.userId));
 
-      if (!member.userId || emailMatches || storedIdMatches) {
-        // Normalize the stored userId to the Firebase UID on every accept so
-        // future lookups (listFoldersForUser, etc.) work consistently.
-        if (member.userId !== userId || member.status !== "active") {
-          await splitFolderStorage.updateMember(member.id, {
-            userId,
-            status: "active",
-            joinedAt: member.joinedAt ?? new Date(),
-          });
+      if (member.status === "active") {
+        if (!storedIdMatches) {
+          return res.status(403).json({ error: "This invite has already been accepted by another account" });
         }
-      } else {
-        console.warn(
-          `[invite] reject accept: token=${req.params.token} memberUserId=${member.userId} ` +
-            `currentUid=${userId} currentDbId=${currentDbUser?.id ?? "none"} ` +
-            `memberEmail=${inviteEmailLc} userEmail=${userEmail}`,
-        );
+        return res.json({ folderId: member.folderId });
+      }
+
+      if (member.userId && !emailMatches && !storedIdMatches) {
+        console.warn("[invite] rejected acceptance by a non-matching account");
         return res.status(403).json({ error: "This invite belongs to another account" });
+      }
+
+      const activation = await splitFolderStorage.activateMemberIfInvited(
+        member.id,
+        userId,
+        member.joinedAt ?? new Date(),
+      );
+      if (!activation) return res.status(404).json({ error: "Invite not found" });
+      if (activation.member.status === "removed") {
+        return res.status(410).json({ error: "Invite revoked" });
+      }
+      if (!activation.activated) {
+        if (activation.member.userId !== userId) {
+          return res.status(403).json({ error: "This invite has already been accepted by another account" });
+        }
+        return res.json({ folderId: activation.member.folderId });
+      }
+
+      const joinerName =
+        req.user!.name ||
+        activation.member.displayName ||
+        req.user!.email ||
+        "An invited friend";
+      try {
+        await splitFolderStorage.createActivity({
+          folderId: activation.member.folderId,
+          actorUserId: userId,
+          eventType: "member.joined",
+          metadata: {
+            memberId: activation.member.id,
+            displayName: joinerName,
+          },
+        });
+      } catch (error) {
+        console.warn("[member-joined] failed to record folder activity:", error);
+      }
+
+      try {
+        const folder = await splitFolderStorage.getFolder(activation.member.folderId);
+        if (folder) {
+        const owner =
+          (await storage.getUserByProviderId("firebase", folder.ownerId)) ||
+          (await storage.getUser(folder.ownerId));
+        const ownerEmail = owner?.email || folder.ownerContactEmail;
+        if (
+          ownerEmail &&
+          ownerEmail.toLowerCase() !== req.user!.email?.toLowerCase()
+        ) {
+          const subject = `${joinerName} joined "${folder.name}" on Receiptify`;
+          const text = `${joinerName} accepted your invitation and joined the shared split folder "${folder.name}".
+
+Open Receiptify to view the folder.`;
+          const html = `<p><strong>${escapeHtml(joinerName)}</strong> accepted your invitation and joined the shared split folder <strong>"${escapeHtml(folder.name)}"</strong>.</p>
+<p>Open Receiptify to view the folder.</p>`;
+          const result = await emailSender({
+            to: ownerEmail,
+            subject,
+            text,
+            html,
+          });
+          if (!result.sent) {
+            console.warn(
+              "[member-joined] owner notification was not delivered:",
+              result.reason,
+            );
+          }
+        }
+      }
+      } catch (error) {
+        console.warn("[member-joined] failed to notify folder owner:", error);
       }
       res.json({ folderId: member.folderId });
     },

@@ -95,6 +95,7 @@ export interface ISplitFolderStorage {
   getMemberByToken(token: string): Promise<SplitFolderMember | undefined>;
   createMember(member: InsertSplitFolderMember): Promise<SplitFolderMember>;
   updateMember(id: string, updates: Partial<InsertSplitFolderMember> & { status?: string; joinedAt?: Date | null }): Promise<SplitFolderMember | undefined>;
+  activateMemberIfInvited(id: string, userId: string, joinedAt: Date): Promise<{ member: SplitFolderMember; activated: boolean } | undefined>;
 
   isUserActiveInFolder(folderId: string, userId: string): Promise<boolean>;
 
@@ -217,6 +218,17 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       .where(eq(splitFolderMembers.id, id))
       .returning();
     return row;
+  }
+
+  async activateMemberIfInvited(id: string, userId: string, joinedAt: Date) {
+    const [activated] = await db
+      .update(splitFolderMembers)
+      .set({ userId, status: "active", joinedAt })
+      .where(and(eq(splitFolderMembers.id, id), eq(splitFolderMembers.status, "invited")))
+      .returning();
+    if (activated) return { member: activated, activated: true };
+    const current = await this.getMember(id);
+    return current ? { member: current, activated: false } : undefined;
   }
 
   async isUserActiveInFolder(folderId: string, userId: string): Promise<boolean> {
