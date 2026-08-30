@@ -16,7 +16,7 @@ export default function SplitInvitePage() {
   const { currentUser } = useAuth();
   const { toast } = useToast();
 
-  const { data: preview, isLoading } = useQuery<{ folderName: string; folderDescription?: string | null; alreadyActive: boolean }>({
+  const { data: preview, isLoading } = useQuery<{ folderName: string; alreadyActive: boolean }>({
     queryKey: ["/api/split-folders/invites", token],
   });
 
@@ -74,7 +74,6 @@ export default function SplitInvitePage() {
               <p className="text-sm text-gray-700">
                 You're invited to <span className="font-semibold">{preview.folderName}</span>.
               </p>
-              {preview.folderDescription && <p className="text-xs text-gray-500">{preview.folderDescription}</p>}
             </>
           ) : (
             <p className="text-sm text-red-600">This invite link is no longer valid.</p>

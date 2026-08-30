@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Mail, Link as LinkIcon } from "lucide-react";
+import { Copy, Check, Mail, Link as LinkIcon, Share2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { copySplitLink, shareOrCopySplitLink, type SplitSharePayload } from "@/lib/split-sharing";
 
 interface Props {
   folderId: string;
@@ -27,7 +28,7 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
       const res = await apiRequest("POST", `/api/split-folders/${folderId}/members`, body);
       return res.json();
     },
-    onSuccess: (member: any) => {
+    onSuccess: async (member: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
       if (tab === "email" && member.inviteEmail) {
         if (member.emailSent) {
@@ -48,13 +49,20 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
           onOpenChange(false);
           setEmail("");
         }
-      } else if (member.inviteToken && (tab === "link" || !member.userId)) {
-        const url = `${window.location.origin}/split/invite/${member.inviteToken}`;
-        setLinkUrl(url);
-        navigator.clipboard?.writeText(url).catch(() => {});
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        toast({ title: "Invite link copied", description: "Share it with your friend." });
+      } else if (member.share && (tab === "link" || !member.userId)) {
+        const payload = member.share as SplitSharePayload;
+        setLinkUrl(payload.url);
+        try {
+          const outcome = await shareOrCopySplitLink(payload);
+          setCopied(outcome === "copied");
+          if (outcome === "copied") setTimeout(() => setCopied(false), 2000);
+          toast({
+            title: outcome === "shared" ? "Invite shared securely" : "Invite link copied",
+            description: "The public preview hides private folder details.",
+          });
+        } catch (error: any) {
+          toast({ title: "Invite created", description: error?.message || "Copy the link below to share it." });
+        }
       } else {
         toast({ title: "Invited", description: `Added ${member.displayName} to the folder.` });
         onOpenChange(false);
@@ -155,10 +163,28 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
               <>
                 <div className="flex items-center gap-2 bg-gray-50 border rounded-lg p-2">
                   <code className="text-xs flex-1 break-all">{linkUrl}</code>
-                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(linkUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+                  <Button size="sm" variant="outline" aria-label="Copy invite link" onClick={async () => { try { await copySplitLink(linkUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (error: any) { toast({ title: "Couldn't copy link", description: error?.message, variant: "destructive" }); } }}>
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
+                <Button
+                  className="w-full"
+                  onClick={async () => {
+                    const payload = {
+                      title: "Join my Receiptify Split folder",
+                      text: "You have been invited to a private Receiptify Split folder.",
+                      url: linkUrl,
+                    };
+                    try {
+                      const outcome = await shareOrCopySplitLink(payload);
+                      toast({ title: outcome === "shared" ? "Invite shared securely" : "Invite link copied" });
+                    } catch (error: any) {
+                      toast({ title: "Couldn't share", description: error?.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Share2 className="mr-2 h-4 w-4" /> Share invite
+                </Button>
                 <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Done</Button>
               </>
             )}

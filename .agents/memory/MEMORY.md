@@ -4,3 +4,4 @@
 - [Split receipt currency edits](split-receipt-currency-edits.md) — edit source items in their original currency and derive GBP only for Split display and allocation.
 - [Email import data contract](email-import-data-contract.md) — keep pending email/OCR data on the active storage model and preserve it through reprocess and acceptance.
 - [Split balance ledger](split-balance-ledger.md) — count source spend once; derive shared debt separately and serialize member financial transitions.
+- [Split share privacy](split-share-privacy.md) — public Split links are narrow bearer previews; never expose private folder, member, receipt, or activity data.

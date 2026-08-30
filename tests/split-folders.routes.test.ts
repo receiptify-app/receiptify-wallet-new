@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 import express from "express";
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db, pool } from "../server/db";
 import { storage } from "../server/storage";
 import { splitFolderStorage } from "../server/split-folder-storage";
@@ -20,6 +20,7 @@ import {
   splitFolders,
   splitManualExpenses,
   splitPaymentRequests,
+  splitShareLinks,
   splitSubfolders,
 } from "../shared/schema";
 
@@ -177,6 +178,7 @@ async function cleanup() {
       db.select({ id: splitActivityEvents.id }).from(splitActivityEvents).where(inArray(splitActivityEvents.folderId, folderIds)),
       db.select({ id: splitBills.id }).from(splitBills).where(inArray(splitBills.folderId, folderIds)),
       db.select({ id: splitPaymentRequests.id }).from(splitPaymentRequests).where(inArray(splitPaymentRequests.folderId, folderIds)),
+      db.select({ id: splitShareLinks.id }).from(splitShareLinks).where(inArray(splitShareLinks.folderId, folderIds)),
       db.select({ id: splitSubfolders.id }).from(splitSubfolders).where(inArray(splitSubfolders.folderId, folderIds)),
       db.select({ id: splitFolderReceiptMetadata.id }).from(splitFolderReceiptMetadata).where(inArray(splitFolderReceiptMetadata.folderId, folderIds)),
     ]);
@@ -408,6 +410,113 @@ async function main() {
   receiptIds.push(balanceReceipt.id);
 
   let protectedExpenseId = "";
+
+  await test("Secure share links use hashed tokens, scoped metadata, revocation, and safe failures", async () => {
+    const forbidden = await api(users.outsider, "POST", `/api/split-folders/${folderA.id}/shares`, {
+      entityType: "receipt",
+      entityId: receiptA.id,
+    });
+    assertStatus(forbidden, 403, "outsider cannot share a private folder");
+
+    const created = await api(users.owner, "POST", `/api/split-folders/${folderA.id}/shares`, {
+      entityType: "receipt",
+      entityId: receiptA.id,
+    });
+    assertStatus(created, 201, "owner creates receipt share");
+    assert.equal(created.data.title.includes(receiptA.merchantName), true);
+    assert.equal(created.data.url.includes("/split/share/"), true);
+    const sharePath = new URL(created.data.url).pathname;
+    const token = sharePath.split("/").pop()!;
+
+    const [stored] = await db.select().from(splitShareLinks).where(eq(splitShareLinks.id, created.data.id));
+    assert.ok(stored);
+    assert.equal(stored.tokenHash.length, 64);
+    assert.notEqual(stored.tokenHash, token, "raw bearer token must never be stored");
+
+    const listed = await api(users.owner, "GET", `/api/split-folders/${folderA.id}/shares`);
+    assertStatus(listed, 200, "owner lists active share links");
+    const listedShare = listed.data.find((candidate: any) => candidate.id === created.data.id);
+    assert.ok(listedShare, "created link remains manageable after its raw URL response is gone");
+    assert.equal(listedShare.label, receiptA.merchantName);
+    assert.equal("tokenHash" in listedShare, false);
+    assert.equal("url" in listedShare, false);
+    const outsiderList = await api(users.outsider, "GET", `/api/split-folders/${folderA.id}/shares`);
+    assertStatus(outsiderList, 403, "outsider cannot list active share links");
+
+    const previewResponse = await fetch(`${baseUrl}${sharePath}`);
+    const previewHtml = await previewResponse.text();
+    assert.equal(previewResponse.status, 200);
+    assert.equal(previewResponse.headers.get("cache-control"), "private, no-store");
+    assert.match(previewHtml, /property="og:title"/);
+    assert.match(previewHtml, /rel="canonical"/);
+    assert.match(previewHtml, /twitter:card/);
+    assert.match(previewHtml, new RegExp(receiptA.merchantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(previewHtml, /£23\.68/);
+    assert.doesNotMatch(previewHtml, /Folder A item/, "public preview must not expose receipt line items");
+    assert.doesNotMatch(previewHtml, new RegExp(folderA.description!), "public preview must not expose folder description");
+    assert.doesNotMatch(previewHtml, /example\.invalid/, "public preview must not expose member emails");
+
+    const tamperedToken = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+    const tampered = await fetch(`${baseUrl}/split/share/${tamperedToken}`);
+    const tamperedHtml = await tampered.text();
+    assert.equal(tampered.status, 404);
+    assert.doesNotMatch(tamperedHtml, new RegExp(receiptA.merchantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(tamperedHtml, /£23\.68/);
+
+    const outsiderRevoke = await api(users.outsider, "DELETE", `/api/split-folders/${folderA.id}/shares/${listedShare.id}`);
+    assertStatus(outsiderRevoke, 403, "outsider cannot revoke share links");
+    const revoked = await api(users.owner, "DELETE", `/api/split-folders/${folderA.id}/shares/${listedShare.id}`);
+    assertStatus(revoked, 200, "owner revokes share");
+    const revokedResponse = await fetch(`${baseUrl}${sharePath}`);
+    const revokedHtml = await revokedResponse.text();
+    assert.equal(revokedResponse.status, 410);
+    assert.doesNotMatch(revokedHtml, new RegExp(receiptA.merchantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+    const expiredToken = `expired-share-${runId}`;
+    await splitFolderStorage.createShareLink({
+      folderId: folderA.id,
+      entityType: "receipt",
+      entityId: receiptA.id,
+      token: expiredToken,
+      createdBy: users.owner,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    const expiredResponse = await fetch(`${baseUrl}/split/share/${expiredToken}`);
+    const expiredHtml = await expiredResponse.text();
+    assert.equal(expiredResponse.status, 410);
+    assert.doesNotMatch(expiredHtml, new RegExp(receiptA.merchantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+    const missing = await fetch(`${baseUrl}/split/share/${"missing-secure-share-token-000"}`);
+    assert.equal(missing.status, 404);
+  });
+
+  await test("Generated folder invites return a native-share payload without exposing the token field", async () => {
+    const generated = await api(users.owner, "POST", `/api/split-folders/${folderA.id}/members`, {
+      displayName: "Share Link Friend",
+      generateLinkOnly: true,
+    });
+    assertStatus(generated, 201, "generate invite share");
+    assert.equal("inviteToken" in generated.data, false);
+    assert.equal(typeof generated.data.share?.title, "string");
+    assert.equal(typeof generated.data.share?.text, "string");
+    assert.equal(generated.data.share?.url.includes("/split/share/"), true);
+
+    const previewPath = new URL(generated.data.share.url).pathname;
+    const token = previewPath.split("/").pop()!;
+    const response = await fetch(`${baseUrl}${previewPath}`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /Join Split route permissions/);
+    assert.match(html, /property="og:title"/);
+    assert.doesNotMatch(html, /Disposable route-level authorization fixture/);
+    assert.doesNotMatch(html, /Share Link Friend/);
+
+    const legacyApi = await fetch(`${baseUrl}/api/split-folders/invites/${token}`);
+    const legacyPreview = await legacyApi.json();
+    assert.equal(legacyApi.status, 200);
+    assert.deepEqual(Object.keys(legacyPreview).sort(), ["alreadyActive", "folderName"]);
+    assert.equal(JSON.stringify(legacyPreview).includes("Disposable route-level authorization fixture"), false);
+  });
 
   await test("Canonical summaries count source spend once and permit invited allocations", async () => {
     const initial = await api(users.owner, "GET", `/api/split-folders/${balanceFolder.id}`);

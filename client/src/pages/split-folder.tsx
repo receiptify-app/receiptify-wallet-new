@@ -36,12 +36,14 @@ import {
   Settings2,
   Activity,
   FolderOpen,
+  Link2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import SplitInviteDialog from "@/components/split-invite-dialog";
 import FolderBillsPanel from "@/components/split/folder-bills-panel";
+import { SplitShareButton } from "@/components/split-share-button";
 
 type Member = {
   id: string;
@@ -186,12 +188,14 @@ function ReceiptSplitter({
   members,
   folderId,
   canEdit,
+  canManage,
   subfolders,
 }: {
   receipt: FolderReceipt;
   members: Member[];
   folderId: string;
   canEdit: boolean;
+  canManage: boolean;
   subfolders: Array<{ id: string; name: string }>;
 }) {
   const { toast } = useToast();
@@ -549,6 +553,9 @@ function ReceiptSplitter({
 
         {expanded && (
           <div className="mt-4 space-y-3">
+            {canManage && (
+              <SplitShareButton folderId={folderId} entityType="receipt" entityId={receipt.id} label="Share safe preview" />
+            )}
             <div className="flex gap-2">
               <Button disabled={!canEdit} size="sm" variant={mode === "whole" ? "default" : "outline"} className={mode === "whole" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("whole")}>
                 Entire bill
@@ -802,8 +809,10 @@ export default function SplitFolderPage() {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentStep, setPaymentStep] = useState<1 | 2 | 3>(1);
+  const [savedPaymentRequestId, setSavedPaymentRequestId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [sharesOpen, setSharesOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [subfolderOpen, setSubfolderOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -846,8 +855,9 @@ export default function SplitFolderPage() {
   });
   const paymentMutation = useMutation({
     mutationFn: async () => { const r = await apiRequest("POST", `/api/split-folders/${folderId}/payment-requests`, { memberId: payment.memberId, amount: Number(payment.amount), currency:"GBP", context: payment.context.trim() || undefined, message: payment.message.trim() || undefined, subfolderId: payment.subfolderId || undefined }); return r.json(); },
-    onSuccess: () => {
+    onSuccess: (created: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "payment-requests"] });
+      setSavedPaymentRequestId(created.id);
       setPaymentStep(3);
       toast({ title:"Payment request saved as draft", description:"Nothing has been sent." });
     },
@@ -874,6 +884,25 @@ export default function SplitFolderPage() {
   });
   const { data: activity = [] } = useQuery<any[]>({ queryKey: ["/api/split-folders", folderId, "activity"], enabled: activityOpen });
   const { data: paymentRequests = [] } = useQuery<any[]>({ queryKey: ["/api/split-folders", folderId, "payment-requests"], enabled: paymentOpen });
+  const { data: activeShareLinks = [], isLoading: sharesLoading } = useQuery<Array<{
+    id: string;
+    entityType: "bill" | "receipt" | "payment_request";
+    entityId: string;
+    label: string;
+    expiresAt: string;
+    createdAt: string;
+  }>>({
+    queryKey: ["/api/split-folders", folderId, "shares"],
+    enabled: sharesOpen && canManage,
+  });
+  const revokeShareMutation = useMutation({
+    mutationFn: async (shareId: string) => apiRequest("DELETE", `/api/split-folders/${folderId}/shares/${shareId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "shares"] });
+      toast({ title: "Share link revoked", description: "That public preview can no longer be opened." });
+    },
+    onError: (error: any) => toast({ title: "Couldn't revoke link", description: error?.message, variant: "destructive" }),
+  });
   const subfolderMutation = useMutation({
     mutationFn: async (body: { name?: string; monthlyKey?: string }) =>
       apiRequest("POST", `/api/split-folders/${folderId}/subfolders`, body),
@@ -1197,7 +1226,7 @@ export default function SplitFolderPage() {
             </Card>
           ) : (
             folderReceipts.map((r) => (
-              <ReceiptSplitter key={r.id} receipt={r} members={members} folderId={folderId} canEdit={canEdit} subfolders={subfolders} />
+              <ReceiptSplitter key={r.id} receipt={r} members={members} folderId={folderId} canEdit={canEdit} canManage={canManage} subfolders={subfolders} />
             ))
           )}
         </div>
@@ -1262,6 +1291,7 @@ export default function SplitFolderPage() {
         </Card>
         <div className="receiptify-secondary-actions">
           <Button variant="outline" onClick={() => setActivityOpen(true)}><Activity className="w-4 h-4 mr-2" /> Activity</Button>
+          <Button variant="outline" disabled={!canManage} onClick={() => setSharesOpen(true)}><Link2 className="w-4 h-4 mr-2" /> Share links</Button>
           <Button variant="outline" disabled={!canManage} onClick={() => setSettingsOpen(true)}><Settings2 className="w-4 h-4 mr-2" /> Folder details</Button>
         </div>
         </>}
@@ -1314,13 +1344,14 @@ export default function SplitFolderPage() {
         setPaymentOpen(open);
         if (!open) {
           setPaymentStep(1);
+          setSavedPaymentRequestId(null);
           setPayment({memberId:"",amount:"",context:"",message:"",subfolderId:""});
         }
       }}>
         <DialogContent className="receiptify-dialog max-w-md">
           <DialogHeader><DialogTitle>{paymentStep === 1 ? "Request payment" : paymentStep === 2 ? "Review request" : "Saved as draft"}</DialogTitle><DialogDescription>{paymentStep === 1 ? "Request one person’s outstanding share." : paymentStep === 2 ? "Check the details before saving." : "The request is saved, but nothing has been sent."}</DialogDescription></DialogHeader>
           <div className="receiptify-flow-steps">{["Details","Review","Saved draft"].map((label,index)=><span key={label} className={index + 1 <= paymentStep ? "is-active" : ""}><i>{index + 1}</i>{label}</span>)}</div>
-          {paymentStep === 3 ? <div className="receiptify-created-summary"><div className="receiptify-success-mark">✓</div><h2>Saved as draft</h2><p className="text-sm">No payment request was sent.</p><div className="mt-4 text-left border-t pt-3 text-sm"><p><strong>Amount</strong> · £{Number(payment.amount).toFixed(2)}</p><p className="mt-1"><strong>For</strong> · {payment.context || folder.name}</p>{payment.message && <p className="mt-1"><strong>Message</strong> · {payment.message}</p>}</div><Button className="w-full receiptify-primary-action mt-5" onClick={() => setPaymentOpen(false)}>Done</Button></div> : <div className="space-y-3">
+          {paymentStep === 3 ? <div className="receiptify-created-summary"><div className="receiptify-success-mark">✓</div><h2>Saved as draft</h2><p className="text-sm">No payment request was sent.</p><div className="mt-4 text-left border-t pt-3 text-sm"><p><strong>Amount</strong> · £{Number(payment.amount).toFixed(2)}</p><p className="mt-1"><strong>For</strong> · {payment.context || folder.name}</p>{payment.message && <p className="mt-1"><strong>Message</strong> · {payment.message}</p>}</div>{savedPaymentRequestId && <SplitShareButton className="mt-4 w-full" folderId={folderId} entityType="payment_request" entityId={savedPaymentRequestId} label="Share request preview" />}<Button className="w-full receiptify-primary-action mt-3" onClick={() => setPaymentOpen(false)}>Done</Button></div> : <div className="space-y-3">
             {paymentStep === 1 ? <><div><Label>Request from</Label><select className="w-full h-10 rounded-md border bg-transparent px-3 text-sm" value={payment.memberId} onChange={e=>{ const memberId=e.target.value; const balance=settlement.find(s=>s.memberId===memberId); setPayment({...payment,memberId,amount:balance && balance.owed > 0 ? balance.owed.toFixed(2) : payment.amount}); }}><option value="">Choose a member</option>{visibleMembers.filter(m=>m.role!=="owner").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail || "Member"}{m.status === "invited" ? " (invited)" : ""}</option>)}</select></div>
             <div><Label>Amount</Label><Input inputMode="decimal" value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} placeholder="0.00" /></div>
             <div><Label>For (optional)</Label><Input value={payment.context} onChange={e=>setPayment({...payment,context:e.target.value})} placeholder={folder.name} /></div>
@@ -1328,7 +1359,7 @@ export default function SplitFolderPage() {
             <div><Label>Message (optional)</Label><Textarea value={payment.message} onChange={e=>setPayment({...payment,message:e.target.value})} placeholder="Please can you settle this when you can?" /></div></> : <div className="rounded-xl border p-4 space-y-3 text-sm"><p><span className="text-gray-500">Recipient</span><br/><strong>{members.find(m=>m.id===payment.memberId)?.displayName || "Member"}</strong></p><p><span className="text-gray-500">Amount</span><br/><strong className="receiptify-mono">£{Number(payment.amount).toFixed(2)}</strong></p><p><span className="text-gray-500">For</span><br/><strong>{payment.context || folder.name}{payment.subfolderId ? ` · ${subfolders.find(s=>s.id===payment.subfolderId)?.name || ""}` : ""}</strong></p><p><span className="text-gray-500">Message</span><br/>{payment.message || "No message"}</p></div>}
             <Button className="w-full receiptify-primary-action" disabled={!payment.memberId || !Number(payment.amount) || paymentMutation.isPending} onClick={()=>paymentStep === 1 ? setPaymentStep(2) : paymentMutation.mutate()}>{paymentMutation.isPending ? "Saving…" : paymentStep === 1 ? "Next" : "Save draft"}</Button>
             {paymentStep === 2 && <Button variant="ghost" className="w-full" onClick={() => setPaymentStep(1)}>Back to details</Button>}
-            {paymentRequests.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Existing requests</p>{paymentRequests.map((r:any)=><div key={r.id} className="rounded-lg border p-2"><div className="flex justify-between gap-2 text-sm"><span className="capitalize">{r.status}</span><strong>£{Number(r.amount).toFixed(2)}</strong></div><div className="mt-2 flex flex-wrap gap-2">{canManage && r.status === "draft" && <Button size="sm" variant="outline" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"send"})}><Send className="mr-1 h-3 w-3" />Send</Button>}{canManage && !["cancelled","paid","declined"].includes(r.status) && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"cancel"})}>Cancel</Button>}{currentMemberId === r.memberId && r.status === "pending" && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"decline"})}>Decline</Button>}</div></div>)}</div>}
+            {paymentRequests.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Existing requests</p>{paymentRequests.map((r:any)=><div key={r.id} className="rounded-lg border p-2"><div className="flex justify-between gap-2 text-sm"><span className="capitalize">{r.status}</span><strong>£{Number(r.amount).toFixed(2)}</strong></div><div className="mt-2 flex flex-wrap gap-2">{canManage && !["cancelled","paid","declined","failed"].includes(r.status) && <SplitShareButton folderId={folderId} entityType="payment_request" entityId={r.id} label="Share" />}{canManage && r.status === "draft" && <Button size="sm" variant="outline" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"send"})}><Send className="mr-1 h-3 w-3" />Send</Button>}{canManage && !["cancelled","paid","declined"].includes(r.status) && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"cancel"})}>Cancel</Button>}{currentMemberId === r.memberId && r.status === "pending" && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"decline"})}>Decline</Button>}</div></div>)}</div>}
             <p className="text-xs text-gray-500">Sending is unavailable until Stripe Connect is configured. Receiptify will never pretend a payment was sent.</p>
           </div>}
         </DialogContent>
@@ -1348,6 +1379,35 @@ export default function SplitFolderPage() {
       <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
         <DialogContent className="receiptify-dialog max-w-md"><DialogHeader><DialogTitle>Folder activity</DialogTitle><DialogDescription>A quiet record of changes and shared moments.</DialogDescription></DialogHeader>
           <div className="max-h-80 overflow-y-auto space-y-3">{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : activity.map((a:any)=><div key={a.id} className="flex gap-3 border-b pb-3"><div className="w-2 h-2 mt-2 rounded-full bg-[#ce725d]" /><div><p className="text-sm">{String(a.eventType).replaceAll(".", " ")}</p><p className="text-xs text-gray-500">{a.createdAt ? new Date(a.createdAt).toLocaleString("en-GB") : ""}</p></div></div>)}</div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sharesOpen} onOpenChange={setSharesOpen}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader>
+            <DialogTitle>Active share links</DialogTitle>
+            <DialogDescription>These safe public previews expire automatically after 30 days. Revoke any link you no longer want shared.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {sharesLoading && <p className="py-4 text-center text-sm text-gray-500">Loading links…</p>}
+            {!sharesLoading && activeShareLinks.length === 0 && <p className="rounded-xl border border-dashed p-4 text-center text-sm text-gray-500">There are no active bill, receipt, or payment-request links.</p>}
+            {activeShareLinks.map((share) => (
+              <div key={share.id} className="flex items-center gap-3 rounded-xl border p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{share.label}</p>
+                  <p className="text-xs capitalize text-gray-500">{share.entityType.replace("_", " ")} · expires {new Date(share.expiresAt).toLocaleDateString("en-GB")}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={revokeShareMutation.isPending}
+                  onClick={() => revokeShareMutation.mutate(share.id)}
+                >
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
 

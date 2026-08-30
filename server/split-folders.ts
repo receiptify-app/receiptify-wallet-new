@@ -18,6 +18,15 @@ function newToken() {
   return randomBytes(24).toString("base64url");
 }
 
+const RECEIPTIFY_ORIGIN = "https://www.receiptify.co.uk";
+
+function trustedAppOrigin() {
+  if (process.env.NODE_ENV === "production") return RECEIPTIFY_ORIGIN;
+  const devDomain = process.env.REPLIT_DEV_DOMAIN?.trim();
+  if (devDomain && /^[a-z0-9.-]+$/i.test(devDomain)) return `https://${devDomain}`;
+  return `http://localhost:${process.env.PORT || "5000"}`;
+}
+
 function num(n: string | number | null | undefined): number {
   if (n === null || n === undefined) return 0;
   return typeof n === "number" ? n : parseFloat(n);
@@ -207,10 +216,6 @@ ${receiptsHtml}
   return { text, html };
 }
 
-function inviteOrigin(req: { headers: any; protocol: string; get: (k: string) => string | undefined }) {
-  return req.headers.origin?.toString() || `${req.protocol}://${req.get("host")}`;
-}
-
 async function sendInviteEmail(
   toEmail: string,
   inviterName: string,
@@ -235,11 +240,197 @@ async function sendInviteEmail(
   });
 }
 
+type PublicSharePreview = {
+  kind: "invite" | "bill" | "receipt" | "payment_request";
+  title: string;
+  description: string;
+  amount?: string;
+  ctaLabel: string;
+  ctaUrl: string;
+};
+
+function publicShareHtml(preview: PublicSharePreview, canonicalUrl: string) {
+  const origin = trustedAppOrigin();
+  const title = `${preview.title} | Receiptify`;
+  const image = `${origin}/split-share-preview.svg`;
+  const amount = preview.amount
+    ? `<div style="font:700 34px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;margin:22px 0">${escapeHtml(preview.amount)}</div>`
+    : "";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(preview.description)}">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <link rel="canonical" href="${escapeHtml(canonicalUrl)}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Receiptify">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(preview.description)}">
+  <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
+  <meta property="og:image" content="${escapeHtml(image)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(preview.description)}">
+  <meta name="twitter:image" content="${escapeHtml(image)}">
+  <style>
+    :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f7f3ea;color:#1e2c2b;font-family:Inter,ui-sans-serif,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
+    main{width:min(100%,520px);background:#fffdf8;border:1px solid #ddd8cd;border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(30,44,43,.1)}
+    .brand{font:700 26px Georgia,serif;border-bottom:1px solid #e6e1d7;padding-bottom:18px;margin-bottom:24px}.eyebrow{text-transform:uppercase;letter-spacing:.15em;color:#60786d;font-size:12px;font-weight:700}
+    h1{font:700 clamp(30px,8vw,44px)/1.05 Georgia,serif;margin:10px 0 14px}p{line-height:1.6;color:#52605e}.privacy{font-size:13px;border-top:1px solid #e6e1d7;padding-top:18px;margin-top:24px}
+    a{display:block;text-align:center;background:#1e2c2b;color:#fff;text-decoration:none;border-radius:999px;padding:14px 18px;font-weight:700;margin-top:24px}
+  </style>
+</head>
+<body><main>
+  <div class="brand">Receiptify</div>
+  <div class="eyebrow">Secure Split preview</div>
+  <h1>${escapeHtml(preview.title)}</h1>
+  ${amount}
+  <p>${escapeHtml(preview.description)}</p>
+  <p class="privacy">Private member details, receipt images, and full folder activity are never shown on this public page.</p>
+  <a href="${escapeHtml(preview.ctaUrl)}">${escapeHtml(preview.ctaLabel)}</a>
+</main></body></html>`;
+}
+
 export function registerSplitFolderRoutes(
   app: Express,
   dependencies: { sendEmail?: typeof sendEmail } = {},
 ) {
   const emailSender = dependencies.sendEmail ?? sendEmail;
+
+  // Public, server-rendered bearer previews. The token grants access only to
+  // this deliberately minimal card; it never grants API access to a folder.
+  app.get("/split/share/:token", async (req, res: Response) => {
+    const token = String(req.params.token || "");
+    const origin = trustedAppOrigin();
+    const canonicalUrl = `${origin}/split/share/${encodeURIComponent(token)}`;
+    const sendPage = (status: number, preview: PublicSharePreview) =>
+      res
+        .status(status)
+        .set({
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "Referrer-Policy": "no-referrer",
+          "X-Robots-Tag": "noindex, nofollow, noarchive",
+          "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+        })
+        .send(publicShareHtml(preview, canonicalUrl));
+
+    if (!/^[A-Za-z0-9_-]{20,200}$/.test(token)) {
+      return sendPage(404, {
+        kind: "invite",
+        title: "This secure link is unavailable",
+        description: "The link is missing, invalid, expired, or has been revoked.",
+        ctaLabel: "Open Receiptify",
+        ctaUrl: origin,
+      });
+    }
+
+    const link = await splitFolderStorage.getShareLinkByToken(token);
+    if (!link) {
+      const member = await splitFolderStorage.getMemberByToken(token);
+      if (!member || member.status === "removed") {
+        return sendPage(404, {
+          kind: "invite",
+          title: "This secure link is unavailable",
+          description: "The link is missing, invalid, expired, or has been revoked.",
+          ctaLabel: "Open Receiptify",
+          ctaUrl: origin,
+        });
+      }
+      const folder = await splitFolderStorage.getFolder(member.folderId);
+      if (!folder) {
+        return sendPage(404, {
+          kind: "invite",
+          title: "This secure link is unavailable",
+          description: "The link is missing, invalid, expired, or has been revoked.",
+          ctaLabel: "Open Receiptify",
+          ctaUrl: origin,
+        });
+      }
+      return sendPage(200, {
+        kind: "invite",
+        title: `Join ${folder.name}`,
+        description: "You have been invited to a private Receiptify Split folder. Sign in to accept the invitation.",
+        ctaLabel: member.status === "active" ? "Open folder invitation" : "Review invitation",
+        ctaUrl: `${origin}/split/invite/${encodeURIComponent(token)}`,
+      });
+    }
+
+    if (link.revokedAt || link.expiresAt.getTime() <= Date.now()) {
+      return sendPage(410, {
+        kind: link.entityType as PublicSharePreview["kind"],
+        title: "This secure link is unavailable",
+        description: "The link is missing, invalid, expired, or has been revoked.",
+        ctaLabel: "Open Receiptify",
+        ctaUrl: origin,
+      });
+    }
+
+    const folder = await splitFolderStorage.getFolder(link.folderId);
+    if (!folder) {
+      return sendPage(404, {
+        kind: link.entityType as PublicSharePreview["kind"],
+        title: "This secure link is unavailable",
+        description: "The shared item no longer exists.",
+        ctaLabel: "Open Receiptify",
+        ctaUrl: origin,
+      });
+    }
+
+    let preview: PublicSharePreview | null = null;
+    if (link.entityType === "bill") {
+      const bill = (await splitFolderStorage.listBills(folder.id)).find((candidate) => candidate.id === link.entityId);
+      if (bill) {
+        preview = {
+          kind: "bill",
+          title: bill.title,
+          amount: `£${money(bill.amount).toFixed(2)}`,
+          description: `A shared bill in ${folder.name}. Sign in to Receiptify to see private participant details.`,
+          ctaLabel: "Open Receiptify Split",
+          ctaUrl: `${origin}/split`,
+        };
+      }
+    } else if (link.entityType === "receipt") {
+      const receipt = (await splitFolderStorage.listFolderReceipts(folder.id)).find((candidate) => candidate.id === link.entityId);
+      if (receipt) {
+        preview = {
+          kind: "receipt",
+          title: receipt.merchantName,
+          amount: `£${totalInGBP(receipt).toFixed(2)}`,
+          description: `A receipt shared in ${folder.name}. The receipt image and line items remain private.`,
+          ctaLabel: "Open Receiptify Split",
+          ctaUrl: `${origin}/split`,
+        };
+      }
+    } else if (link.entityType === "payment_request") {
+      const request = (await splitFolderStorage.listPaymentRequests(folder.id)).find((candidate) => candidate.id === link.entityId);
+      if (request && !["cancelled", "declined", "paid", "failed"].includes(request.status || "")) {
+        preview = {
+          kind: "payment_request",
+          title: request.context || "Payment request",
+          amount: `£${money(request.amount).toFixed(2)}`,
+          description: "A Receiptify Split payment request preview. No payment is collected on this public page.",
+          ctaLabel: "Open Receiptify Split",
+          ctaUrl: `${origin}/split`,
+        };
+      }
+    }
+
+    if (!preview) {
+      return sendPage(410, {
+        kind: link.entityType as PublicSharePreview["kind"],
+        title: "This secure link is unavailable",
+        description: "The shared item is no longer available.",
+        ctaLabel: "Open Receiptify",
+        ctaUrl: origin,
+      });
+    }
+    return sendPage(200, preview);
+  });
+
   // --- List folders the user belongs to ---
   app.get("/api/split-folders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const folders = await splitFolderStorage.listFoldersForUser(req.user!.id);
@@ -538,14 +729,25 @@ No action is needed from you.`;
             inviter,
             folder,
             member.inviteToken,
-            inviteOrigin(req),
+            trustedAppOrigin(),
             emailSender,
           );
           emailSent = result.sent;
           emailError = result.reason;
         }
 
-        res.status(201).json({ ...member, emailSent, emailError });
+        const { inviteToken, ...safeMember } = member;
+        const origin = trustedAppOrigin();
+        res.status(201).json({
+          ...safeMember,
+          emailSent,
+          emailError,
+          share: {
+            title: `Join ${folder.name} on Receiptify`,
+            text: `You've been invited to the private Split folder “${folder.name}”.`,
+            url: `${origin}/split/share/${encodeURIComponent(inviteToken)}`,
+          },
+        });
       } catch (err: any) {
         res.status(400).json({ error: err?.message || "Failed to invite" });
       }
@@ -580,7 +782,7 @@ No action is needed from you.`;
         inviter,
         folder,
         member.inviteToken,
-        inviteOrigin(req),
+        trustedAppOrigin(),
         emailSender,
       );
       if (!result.sent) {
@@ -740,7 +942,6 @@ Open Receiptify to view the folder.`;
     if (!folder) return res.status(404).json({ error: "Invite not found" });
     res.json({
       folderName: folder.name,
-      folderDescription: folder.description,
       alreadyActive: member.status === "active",
     });
   });
@@ -1177,6 +1378,92 @@ Open Receiptify to view the folder.`;
     });
     await splitFolderStorage.createPaymentEvent({ paymentRequestId: request.id, eventType: "created" });
     res.status(201).json(request);
+  });
+  app.post("/api/split-folders/:id/shares", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const body = z.object({
+      entityType: z.enum(["bill", "receipt", "payment_request"]),
+      entityId: z.string().min(1),
+    }).parse(req.body);
+
+    let title = "";
+    let text = "";
+    if (body.entityType === "bill") {
+      const bill = (await splitFolderStorage.listBills(folder.id)).find((candidate) => candidate.id === body.entityId);
+      if (!bill) return res.status(404).json({ error: "Bill not found" });
+      title = `${bill.title} · Receiptify Split`;
+      text = `£${money(bill.amount).toFixed(2)} shared bill in “${folder.name}”.`;
+    } else if (body.entityType === "receipt") {
+      const receipt = (await splitFolderStorage.listFolderReceipts(folder.id)).find((candidate) => candidate.id === body.entityId);
+      if (!receipt) return res.status(404).json({ error: "Receipt not found" });
+      title = `${receipt.merchantName} receipt · Receiptify Split`;
+      text = `£${totalInGBP(receipt).toFixed(2)} receipt shared in “${folder.name}”.`;
+    } else {
+      const request = (await splitFolderStorage.listPaymentRequests(folder.id)).find((candidate) => candidate.id === body.entityId);
+      if (!request) return res.status(404).json({ error: "Payment request not found" });
+      if (["cancelled", "declined", "paid", "failed"].includes(request.status || "")) {
+        return res.status(409).json({ error: "This payment request can no longer be shared" });
+      }
+      title = `${request.context || "Payment request"} · Receiptify Split`;
+      text = `Payment request for £${money(request.amount).toFixed(2)}. No payment is collected on the public preview.`;
+    }
+
+    const token = newToken();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const share = await splitFolderStorage.createShareLink({
+      folderId: folder.id,
+      entityType: body.entityType,
+      entityId: body.entityId,
+      token,
+      createdBy: req.user!.id,
+      expiresAt,
+    });
+    const url = `${trustedAppOrigin()}/split/share/${encodeURIComponent(token)}`;
+    res.status(201).json({ id: share.id, title, text, url, expiresAt });
+  });
+  app.get("/api/split-folders/:id/shares", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const now = Date.now();
+    const links = (await splitFolderStorage.listShareLinks(folder.id))
+      .filter((link) => !link.revokedAt && link.expiresAt.getTime() > now);
+    const [bills, receipts, requests] = await Promise.all([
+      splitFolderStorage.listBills(folder.id),
+      splitFolderStorage.listFolderReceipts(folder.id),
+      splitFolderStorage.listPaymentRequests(folder.id),
+    ]);
+    const summaries = links.flatMap((link) => {
+      let label: string | undefined;
+      if (link.entityType === "bill") {
+        label = bills.find((candidate) => candidate.id === link.entityId)?.title;
+      } else if (link.entityType === "receipt") {
+        label = receipts.find((candidate) => candidate.id === link.entityId)?.merchantName;
+      } else if (link.entityType === "payment_request") {
+        label = requests.find((candidate) => candidate.id === link.entityId)?.context || "Payment request";
+      }
+      return label
+        ? [{
+            id: link.id,
+            entityType: link.entityType,
+            entityId: link.entityId,
+            label,
+            expiresAt: link.expiresAt,
+            createdAt: link.createdAt,
+          }]
+        : [];
+    });
+    res.json(summaries);
+  });
+  app.delete("/api/split-folders/:id/shares/:shareId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const revoked = await splitFolderStorage.revokeShareLink(folder.id, req.params.shareId);
+    if (!revoked) return res.status(404).json({ error: "Share link not found" });
+    res.json({ ok: true });
   });
   app.post("/api/split-folders/:id/payment-requests/:requestId/send", requireAuth, async (req: AuthenticatedRequest, res) => {
     const folder = await splitFolderStorage.getFolder(req.params.id);

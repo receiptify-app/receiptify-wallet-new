@@ -1,6 +1,7 @@
 // Storage layer for the split-folders feature. Keeps route handlers thin and
 // confines every database access for split folders to this module.
 
+import { createHash } from "crypto";
 import { db } from "./db";
 import {
   splitFolders,
@@ -9,7 +10,7 @@ import {
   receipts,
   receiptItems,
   users,
-  splitManualExpenses, splitActivityEvents, splitBills, splitBillParticipants, splitBillItems, splitPaymentRequests, splitPaymentEvents, splitSubfolders, splitFolderReceiptMetadata,
+  splitManualExpenses, splitActivityEvents, splitBills, splitBillParticipants, splitBillItems, splitPaymentRequests, splitPaymentEvents, splitShareLinks, splitSubfolders, splitFolderReceiptMetadata,
   type SplitFolder,
   type SplitFolderMember,
   type SplitAssignment,
@@ -19,7 +20,7 @@ import {
   type Receipt,
   type ReceiptItem,
   type SplitManualExpense, type SplitActivityEvent, type SplitBill, type SplitBillParticipant,
-  type SplitPaymentRequest, type InsertSplitManualExpense, type InsertSplitActivityEvent,
+  type SplitPaymentRequest, type SplitShareLink, type InsertSplitManualExpense, type InsertSplitActivityEvent,
   type InsertSplitBill, type InsertSplitBillParticipant, type InsertSplitPaymentRequest,
   type SplitSubfolder, type SplitFolderReceiptMetadata, type InsertSplitSubfolder,
   type SplitBillItem, type InsertSplitBillItem, type InsertReceiptItem,
@@ -136,6 +137,17 @@ export interface ISplitFolderStorage {
   createPaymentRequest(request: InsertSplitPaymentRequest): Promise<SplitPaymentRequest>;
   updatePaymentRequest(id: string, updates: Partial<InsertSplitPaymentRequest>): Promise<SplitPaymentRequest | undefined>;
   createPaymentEvent(event: { paymentRequestId: string; eventType: string; stripeEventId?: string | null; metadata?: unknown }): Promise<void>;
+  createShareLink(row: {
+    folderId: string;
+    entityType: "bill" | "receipt" | "payment_request";
+    entityId: string;
+    token: string;
+    createdBy: string;
+    expiresAt: Date;
+  }): Promise<SplitShareLink>;
+  getShareLinkByToken(token: string): Promise<SplitShareLink | undefined>;
+  listShareLinks(folderId: string): Promise<SplitShareLink[]>;
+  revokeShareLink(folderId: string, id: string): Promise<SplitShareLink | undefined>;
 
   listAssignments(folderId: string): Promise<SplitAssignment[]>;
   replaceReceiptAssignments(folderId: string, receiptId: string, rows: InsertSplitAssignment[]): Promise<SplitAssignment[]>;
@@ -490,6 +502,45 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
   async createPaymentEvent(event: { paymentRequestId: string; eventType: string; stripeEventId?: string | null; metadata?: unknown }) {
     await db.insert(splitPaymentEvents).values({ ...event, metadata: event.metadata as any });
   }
+  async createShareLink(row: {
+    folderId: string;
+    entityType: "bill" | "receipt" | "payment_request";
+    entityId: string;
+    token: string;
+    createdBy: string;
+    expiresAt: Date;
+  }) {
+    const tokenHash = createHash("sha256").update(row.token).digest("hex");
+    const [created] = await db.insert(splitShareLinks).values({
+      folderId: row.folderId,
+      entityType: row.entityType,
+      entityId: row.entityId,
+      tokenHash,
+      createdBy: row.createdBy,
+      expiresAt: row.expiresAt,
+    }).returning();
+    return created;
+  }
+  async getShareLinkByToken(token: string) {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const [row] = await db.select().from(splitShareLinks).where(eq(splitShareLinks.tokenHash, tokenHash));
+    return row;
+  }
+  async listShareLinks(folderId: string) {
+    return db
+      .select()
+      .from(splitShareLinks)
+      .where(eq(splitShareLinks.folderId, folderId))
+      .orderBy(desc(splitShareLinks.createdAt));
+  }
+  async revokeShareLink(folderId: string, id: string) {
+    const [row] = await db
+      .update(splitShareLinks)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(splitShareLinks.id, id), eq(splitShareLinks.folderId, folderId)))
+      .returning();
+    return row;
+  }
 
   async listAssignments(folderId: string): Promise<SplitAssignment[]> {
     return db.select().from(splitAssignments).where(eq(splitAssignments.folderId, folderId));
@@ -803,6 +854,7 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
       const bills = await tx.select({ id: splitBills.id }).from(splitBills).where(eq(splitBills.folderId, folderId));
       if (bills.length) await tx.delete(splitBillParticipants).where(inArray(splitBillParticipants.billId, bills.map((b) => b.id)));
       await tx.delete(splitBills).where(eq(splitBills.folderId, folderId));
+      await tx.delete(splitShareLinks).where(eq(splitShareLinks.folderId, folderId));
       await tx.delete(splitPaymentRequests).where(eq(splitPaymentRequests.folderId, folderId));
       await tx.delete(splitFolderMembers).where(eq(splitFolderMembers.folderId, folderId));
       await tx.delete(splitFolders).where(eq(splitFolders.id, folderId));
@@ -854,6 +906,7 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
           .where(inArray(splitBillParticipants.billId, bills.map((bill) => bill.id)));
       }
       await tx.delete(splitBills).where(eq(splitBills.folderId, folderId));
+      await tx.delete(splitShareLinks).where(eq(splitShareLinks.folderId, folderId));
       await tx.delete(splitPaymentRequests).where(eq(splitPaymentRequests.folderId, folderId));
       await tx.delete(splitFolderMembers).where(eq(splitFolderMembers.folderId, folderId));
       await tx.delete(splitFolders).where(eq(splitFolders.id, folderId));

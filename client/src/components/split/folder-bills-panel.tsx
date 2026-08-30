@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { SplitShareButton } from "@/components/split-share-button";
 
 type Member = {
   id: string;
@@ -220,6 +221,11 @@ export default function FolderBillsPanel({
                       <Badge variant="outline">{bill.status.replace("_", " ")}</Badge>
                     </div>
                   </div>
+                  {canManage && (
+                    <div className="mt-3">
+                      <SplitShareButton folderId={folderId} entityType="bill" entityId={bill.id} label="Share bill" />
+                    </div>
+                  )}
                   <div className="mt-3 space-y-2">
                     {bill.participants.map((participant) => (
                       <div key={participant.id} className="flex flex-wrap items-center gap-2 text-xs">

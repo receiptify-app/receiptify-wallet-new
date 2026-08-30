@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Receiptify Split</title>
+  <desc id="description">A safe branded preview for shared Receiptify Split links.</desc>
+  <rect width="1200" height="630" fill="#f7f3ea"/>
+  <circle cx="1045" cy="112" r="220" fill="#dce9df"/>
+  <circle cx="125" cy="610" r="250" fill="#e9dfc8"/>
+  <rect x="130" y="92" width="940" height="446" rx="48" fill="#fffdf8" stroke="#ddd8cd" stroke-width="4"/>
+  <path d="M215 192h70m-70 34h140m-140 34h102" stroke="#789182" stroke-width="14" stroke-linecap="round"/>
+  <text x="215" y="372" fill="#1e2c2b" font-family="Georgia,serif" font-size="94" font-weight="700">Receiptify</text>
+  <text x="220" y="442" fill="#53635e" font-family="Arial,sans-serif" font-size="42" font-weight="700" letter-spacing="8">SPLIT SECURELY</text>
+  <circle cx="928" cy="216" r="70" fill="#1e2c2b"/>
+  <path d="M898 216h60m-30-30v60" stroke="#fffdf8" stroke-width="13" stroke-linecap="round"/>
+</svg>

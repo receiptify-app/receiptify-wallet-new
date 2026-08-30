@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, jsonb, integer, boolean, uuid, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, jsonb, integer, boolean, uuid, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -346,6 +346,23 @@ export const splitPaymentEvents = pgTable("split_payment_events", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [index("split_payment_events_request_idx").on(table.paymentRequestId)]);
 
+// Bearer links for narrowly scoped public previews. Raw tokens are returned
+// once and never persisted; only their SHA-256 digests are stored.
+export const splitShareLinks = pgTable("split_share_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  entityType: text("entity_type").notNull(), // bill, receipt, payment_request
+  entityId: varchar("entity_id").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+  createdBy: varchar("created_by").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("split_share_links_token_hash_idx").on(table.tokenHash),
+  index("split_share_links_entity_idx").on(table.folderId, table.entityType, table.entityId),
+]);
+
 // Session storage table for authentication
 export const sessions = pgTable("sessions", {
   sid: varchar("sid").primaryKey(),
@@ -656,6 +673,7 @@ export const insertSplitBillParticipantSchema = createInsertSchema(splitBillPart
 export const insertSplitBillItemSchema = createInsertSchema(splitBillItems).omit({ id: true, createdAt: true });
 export const insertSplitPaymentRequestSchema = createInsertSchema(splitPaymentRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSplitPaymentEventSchema = createInsertSchema(splitPaymentEvents).omit({ id: true, createdAt: true });
+export const insertSplitShareLinkSchema = createInsertSchema(splitShareLinks).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -712,6 +730,8 @@ export type SplitBillItem = typeof splitBillItems.$inferSelect;
 export type InsertSplitBillItem = z.infer<typeof insertSplitBillItemSchema>;
 export type SplitPaymentRequest = typeof splitPaymentRequests.$inferSelect;
 export type InsertSplitPaymentRequest = z.infer<typeof insertSplitPaymentRequestSchema>;
+export type SplitShareLink = typeof splitShareLinks.$inferSelect;
+export type InsertSplitShareLink = z.infer<typeof insertSplitShareLinkSchema>;
 export type SplitPaymentEvent = typeof splitPaymentEvents.$inferSelect;
 export type InsertSplitPaymentEvent = z.infer<typeof insertSplitPaymentEventSchema>;
 
