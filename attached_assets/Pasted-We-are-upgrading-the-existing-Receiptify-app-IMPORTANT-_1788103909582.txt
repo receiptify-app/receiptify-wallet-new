@@ -1,0 +1,1605 @@
+We are upgrading the existing Receiptify app.
+
+IMPORTANT:
+Do NOT rebuild the whole app.
+Do NOT change the existing Receiptify visual identity, colours, typography, bottom navigation, Scan tab, Analytics tab, My Receipts tab or Account tab unless required for integration.
+
+Keep the current Receiptify design language consistent.
+
+The main change is to completely upgrade the existing “Split” section.
+
+==================================================
+1. CURRENT PROBLEM
+==================================================
+
+At the moment, the Split section is too basic.
+
+A current Split Folder only shows things like:
+- folder/person name
+- project name
+- total
+- receipt count
+- members
+- invite/remove member
+- receipts inside the folder
+
+There are almost no useful actions.
+
+We want to turn Split into a proper shared expense and bill-splitting workspace.
+
+The Split feature should support:
+
+1. Ongoing shared expenses using Shared Folders
+2. One-off bill splitting
+3. Item-level assignment from scanned receipts
+4. Custom amounts
+5. Subfolders
+6. People and permissions
+7. Payment requests
+8. Stripe Connect-ready payment architecture
+
+==================================================
+2. KEEP THE BOTTOM NAVIGATION NAME: SPLIT
+==================================================
+
+The bottom navigation must remain:
+
+Scan
+Analytics
+My Receipts
+Split
+Account
+
+Do not rename Split.
+
+When the user presses Split, they should land on a new Split Hub.
+
+==================================================
+3. NEW SPLIT HUB
+==================================================
+
+The Split landing page should contain two main options.
+
+A. NEW SHARED FOLDER
+
+Description:
+“Track receipts and expenses with someone over time.”
+
+Use cases:
+- landlord and property manager
+- builder and customer
+- business partners
+- renovation project
+- shared household expenses
+- holiday/travel expenses
+- ongoing business expenses
+
+Button:
+“Create folder”
+
+B. SPLIT A BILL
+
+Description:
+“Upload one bill and choose how much each person pays.”
+
+Use cases:
+- restaurant
+- taxi
+- hotel
+- group purchase
+- activity
+- one-off expense
+
+Button:
+“Start split”
+
+Under these options show:
+
+Recent
+
+This should list both recent:
+- Shared Folders
+- Split Bills
+
+Keep the UI clean and minimal.
+
+==================================================
+4. CREATE NEW SHARED FOLDER
+==================================================
+
+When the user selects New Shared Folder:
+
+Fields:
+
+Folder name
+Example:
+Holborn Project
+
+Project / note
+Example:
+Bathroom renovation
+
+Shared with:
+- Name
+- Email
+
+Example:
+Jason
+jason@example.com
+
+Allow:
++ Add another person
+
+Allow creating the folder without adding anyone yet.
+
+Also allow:
+
+Start with:
+- Create empty folder
+- Add first receipt
+
+Then:
+Continue / Create
+
+==================================================
+5. SHARED FOLDER MAIN PAGE
+==================================================
+
+Once created, the Shared Folder becomes a proper workspace.
+
+Example:
+
+Holborn Project
+Bathroom renovation
+
+People:
+Ramadan — Owner
+Jason — Viewer
+
+Allow:
++ Add person
+
+Show a simple summary:
+
+Total spent
+£50
+
+Paid
+£20
+
+Outstanding
+£30
+
+Receipts
+2
+
+Keep numbers simple and easy to scan.
+
+Do not make this look like accounting software.
+
+==================================================
+6. MAIN ACTIONS INSIDE SHARED FOLDER
+==================================================
+
+Show four primary actions:
+
+Add receipt
+Add expense
+New subfolder
+Request payment
+
+Anything secondary goes under:
+
+••• More
+
+Do not overload the main screen.
+
+==================================================
+7. ADD RECEIPT
+==================================================
+
+Allow users to:
+
+- scan a receipt
+- upload a receipt image
+- select an existing Receiptify receipt
+
+Reuse the current Receiptify receipt scanning/OCR flow wherever possible.
+
+When a receipt is added, extract:
+
+Merchant
+Date
+Total amount
+VAT if available
+Individual line items if available
+
+Each receipt should remain editable.
+
+Fields:
+
+Receipt name
+Merchant
+Date
+Total amount
+Subfolder
+Category
+Paid by
+Notes
+
+IMPORTANT:
+The receipt/image name must be editable.
+
+Example:
+
+Instead of:
+IMG_4837.jpg
+
+Allow:
+Screwfix - Tape and AdBlue
+
+Receiptify may suggest a name automatically, but user can overwrite it.
+
+==================================================
+8. NEW FEATURE: ITEM-LEVEL RECEIPT ASSIGNMENT
+==================================================
+
+This is an important new feature.
+
+When Receiptify scans a receipt with multiple items, the user must be able to decide who each individual item belongs to.
+
+Example receipt:
+
+Screwfix
+Total: £23.68
+
+Line items:
+
+AdBlue 10L
+£16.99
+
+Double-sided tape
+£6.69
+
+The user may want:
+
+AdBlue 10L → Me
+
+Double-sided tape → Landlord
+
+Receiptify must therefore NOT assume the whole receipt belongs to one person.
+
+After scanning a receipt, if line items are detected, show a screen called:
+
+“Assign items”
+
+or:
+
+“Who’s paying for what?”
+
+Preferred UI label:
+“Assign items”
+
+==================================================
+9. ASSIGN ITEMS SCREEN
+==================================================
+
+Show every detected line item separately.
+
+Example:
+
+Screwfix
+£23.68
+
+AdBlue 10L
+£16.99
+Assigned to: Me
+
+Double-sided tape
+£6.69
+Assigned to: Jason
+
+Each line item should allow:
+
+- Assign to me
+- Assign to another folder member
+- Split item
+- Ignore / Personal
+- Edit item name
+- Edit item amount
+
+User must be able to correct OCR errors.
+
+==================================================
+10. ITEM ASSIGNMENT OPTIONS
+==================================================
+
+For each receipt line item allow:
+
+A. ME
+
+This item belongs entirely to the current user.
+
+B. PERSON / MEMBER
+
+Example:
+Jason
+Landlord
+Darlington
+
+This item belongs entirely to that person.
+
+C. SPLIT ITEM
+
+The item itself can be shared.
+
+Example:
+
+Item:
+£20
+
+Split:
+Ramadan £5
+Jason £15
+
+or:
+
+50/50
+
+D. IGNORE / PERSONAL
+
+The item remains on the source receipt but does not contribute to the shared amount for this folder/split.
+
+==================================================
+11. ITEM-LEVEL TOTAL CALCULATION
+==================================================
+
+Receiptify must calculate the shared amount based only on assigned items.
+
+Example:
+
+Receipt total:
+£23.68
+
+AdBlue:
+£16.99
+Assigned to Me
+
+Double-sided tape:
+£6.69
+Assigned to Landlord
+
+Then display:
+
+Your share:
+£16.99
+
+Landlord owes:
+£6.69
+
+The folder outstanding amount should increase by:
+£6.69
+
+NOT:
+£23.68
+
+This is critical.
+
+==================================================
+12. ITEM-LEVEL SPLITTING
+==================================================
+
+If the user selects:
+
+Split item
+
+Allow:
+
+Equal split
+
+or:
+
+Custom split
+
+Example:
+
+Item:
+Dinner platter
+£30
+
+Equal:
+Ramadan £15
+Jason £15
+
+Custom:
+Ramadan £10
+Jason £20
+
+Validate that allocations equal the item amount.
+
+==================================================
+13. WHOLE RECEIPT VS ITEM-LEVEL SPLIT
+==================================================
+
+Receiptify should support both.
+
+OPTION A:
+Assign/split the whole receipt
+
+OPTION B:
+Assign/split individual items
+
+If line items are detected, recommend item-level assignment.
+
+Example prompt:
+
+“We found 4 items. Assign them individually?”
+
+Buttons:
+Assign items
+Split total instead
+
+Keep the user in control.
+
+==================================================
+14. SOURCE RECEIPT MUST REMAIN INTACT
+==================================================
+
+Important data rule:
+
+Do not destroy or rewrite the original receipt total.
+
+The original receipt should still show:
+
+Merchant
+Full total
+All line items
+Original image
+
+The shared calculation is a separate allocation layer.
+
+Example:
+
+Original receipt:
+£23.68
+
+Shared amount:
+£6.69
+
+Personal amount:
+£16.99
+
+This distinction must be preserved.
+
+==================================================
+15. DATA MODEL FOR RECEIPT LINE ITEMS
+==================================================
+
+Review the existing database first.
+
+If line items already exist, reuse them.
+
+Otherwise create or extend models equivalent to:
+
+ReceiptLineItem
+
+Fields could include:
+
+id
+receipt_id
+name
+quantity
+unit_price
+total_price
+position
+ocr_confidence
+created_at
+updated_at
+
+Then create an allocation structure equivalent to:
+
+ReceiptLineItemAllocation
+
+Fields:
+
+id
+line_item_id
+folder_id nullable
+split_bill_id nullable
+assigned_user_id nullable
+assigned_external_person_id nullable
+amount
+percentage nullable
+allocation_type
+
+Possible allocation_type values:
+
+personal
+member
+split
+ignored
+
+==================================================
+16. RECEIPT ALLOCATION RULES
+==================================================
+
+A line item may have one or multiple allocations.
+
+Example:
+
+Item:
+£30
+
+Allocations:
+
+Ramadan £10
+Jason £20
+
+Total allocation must equal:
+£30
+
+unless part of the item is explicitly marked:
+
+Ignored / Personal
+
+Prevent over-allocation.
+
+Show a validation error if:
+
+Allocated amount > item total
+
+==================================================
+17. SHARED FOLDER TOTALS WITH ITEM ASSIGNMENT
+==================================================
+
+Shared Folder totals must use the assigned/shared amounts, not always the original receipt total.
+
+Example:
+
+Receipt A:
+£100 total
+£40 belongs to landlord
+£60 personal
+
+Folder-relevant amount:
+£40
+
+Receipt B:
+£50 entirely landlord
+
+Folder-relevant amount:
+£50
+
+Folder total:
+£90
+
+Do NOT show:
+£150
+
+unless the user specifically chooses to include the full receipts.
+
+==================================================
+18. RECEIPT DETAIL SCREEN
+==================================================
+
+When opening a receipt inside a Shared Folder show:
+
+Receipt image
+
+Receipt name
+
+Merchant
+
+Date
+
+Original total
+
+Shared amount
+
+Paid by
+
+Subfolder
+
+Category
+
+Notes
+
+Then show:
+
+Items
+
+Example:
+
+AdBlue
+£16.99
+Me
+
+Tape
+£6.69
+Jason
+
+Button:
+
+Edit assignments
+
+==================================================
+19. CHANGE ITEM ASSIGNMENTS LATER
+==================================================
+
+Users must be able to reopen a receipt and change who an item belongs to.
+
+Example:
+
+Tape originally:
+Jason
+
+Change to:
+Me
+
+Folder totals and outstanding balances must update automatically.
+
+==================================================
+20. ADD EXPENSE WITHOUT RECEIPT
+==================================================
+
+Add:
+
+Add expense
+
+Fields:
+
+Expense name
+Amount
+Date
+Category
+Paid by
+Subfolder
+Notes
+
+Example:
+
+Labour
+£100
+
+Manual expenses should be included in folder totals.
+
+==================================================
+21. SUBFOLDERS
+==================================================
+
+Users must be able to create custom subfolders.
+
+Examples:
+
+August 2026
+September 2026
+Materials
+Labour
+Furniture
+Kitchen
+Bathroom
+
+Each subfolder shows:
+
+Name
+Subtotal
+Receipt/expense count
+
+Example:
+
+August 2026
+£50 · 2 receipts
+
+Allow:
+
+Create monthly folders
+
+as an optional convenience.
+
+Do not force it.
+
+==================================================
+22. MOVE RECEIPTS BETWEEN SUBFOLDERS
+==================================================
+
+When editing a receipt or expense:
+
+Subfolder
+
+can be changed.
+
+Example:
+
+Toolstation - Screws
+
+From:
+August 2026
+
+To:
+Materials
+
+Update totals automatically.
+
+==================================================
+23. PEOPLE & PERMISSIONS
+==================================================
+
+Create proper member management.
+
+Access levels:
+
+VIEWER
+Can:
+- view receipts
+- view expenses
+- view totals
+- view item assignments
+
+Cannot:
+- add
+- edit
+- delete
+
+CONTRIBUTOR
+Can:
+- view
+- add receipts
+- add expenses
+
+EDITOR
+Can:
+- view
+- add
+- edit receipts
+- edit expenses
+- assign items
+- organise subfolders
+
+OWNER
+Full control.
+
+Owner can:
+
+- edit member name
+- edit member email
+- change permissions
+- remove member
+- add another member
+
+==================================================
+24. OWNER DETAILS SHOWN TO OTHERS
+==================================================
+
+Add:
+
+My details shown to others
+
+Fields:
+
+Name
+Email
+Phone
+
+Use logged-in account details as defaults.
+
+Allow editing.
+
+==================================================
+25. EDIT FOLDER
+==================================================
+
+Add Edit Folder screen.
+
+Allow:
+
+Folder name
+Project / note
+People
+Permissions
+Owner details
+Delete folder
+
+Use confirmation before deletion.
+
+==================================================
+26. WHO PAID
+==================================================
+
+Every receipt or expense should have:
+
+Paid by
+
+Example:
+
+Paid by Ramadan
+Paid by Jason
+
+This must contribute to balance calculations.
+
+==================================================
+27. FOLDER TOTALS
+==================================================
+
+Automatically calculate:
+
+Total spent
+Paid
+Outstanding
+Receipts
+
+The calculation must consider:
+
+- receipt allocations
+- manual expenses
+- who paid
+- payment requests
+- completed payments
+
+Do not hard-code totals.
+
+==================================================
+28. REQUEST PAYMENT
+==================================================
+
+Inside Shared Folder:
+
+Request payment
+
+Flow:
+
+Outstanding amount
+Example:
+£30
+
+Allow editing the amount.
+
+Request from:
+Jason
+
+For:
+Holborn Project
+
+Optional:
+Subfolder
+
+Optional:
+Message
+
+Example:
+“Please can you settle the materials from August.”
+
+Then:
+Next
+
+==================================================
+29. REVIEW PAYMENT REQUEST
+==================================================
+
+Show:
+
+From:
+Jason
+
+To:
+Ramadan
+
+For:
+Holborn Project
+
+Amount:
+£30
+
+Message
+
+Then:
+
+Send request
+
+==================================================
+30. PAYMENT REQUEST STATUS
+==================================================
+
+Statuses:
+
+draft
+pending
+paid
+declined
+cancelled
+failed
+
+After sending:
+
+Payment request sent
+
+Amount:
+£30
+
+Status:
+Pending
+
+Recipient sees:
+
+Ramadan requested £30
+
+Button:
+Pay now
+
+Optional:
+Decline
+
+==================================================
+31. STRIPE CONNECT ARCHITECTURE
+==================================================
+
+Receiptify must NOT hold user money.
+
+Do NOT build:
+
+Receiptify wallet
+Stored balance
+Internal custody
+Manual payout system
+
+Payments should eventually use:
+
+Stripe Connect
+
+Architecture:
+
+Recipient connects Stripe account.
+
+Payer pays.
+
+Stripe processes payment.
+
+Funds are credited to recipient’s connected Stripe account.
+
+Stripe handles payout to recipient’s bank.
+
+Receiptify only:
+
+- creates payment request
+- stores Stripe references
+- displays status
+- listens for Stripe webhook updates
+- marks requests paid
+- updates folder balances
+
+Build the system as Stripe Connect-ready.
+
+If Stripe credentials are not configured:
+
+Create:
+- database models
+- payment request states
+- service layer placeholders
+- test/development mode
+
+Do NOT fake live payments.
+
+==================================================
+32. SPLIT A BILL
+==================================================
+
+This is separate from Shared Folders.
+
+User selects:
+
+Split a Bill
+
+Allow:
+
+Upload bill
+Scan bill
+
+Extract:
+
+Merchant
+Date
+Total
+Line items where available
+
+Then:
+
+Bill name
+
+Example:
+Dinner at Nando’s
+
+Bill name must be editable.
+
+==================================================
+33. ITEM-LEVEL SPLITTING MUST ALSO WORK FOR SPLIT A BILL
+==================================================
+
+The same Assign Items system should work when splitting a one-off bill.
+
+Example restaurant receipt:
+
+Burger
+£15
+
+Chicken
+£12
+
+Drinks
+£9
+
+User can assign:
+
+Burger → Jason
+Chicken → Darlington
+Drinks → split equally
+
+Then Receiptify calculates what everyone owes.
+
+This is preferred over forcing the entire receipt to split equally.
+
+==================================================
+34. ADD PARTICIPANTS
+==================================================
+
+Example:
+
+Jason
+Darlington
+
+Fields:
+
+Name
+Email
+
+Allow:
+Add another person
+
+Allow creator to include themselves.
+
+==================================================
+35. SPLIT TYPE
+==================================================
+
+At whole-bill level offer:
+
+Equal Split
+
+Custom Split
+
+Assign Items
+
+Three clear options.
+
+A. Equal Split
+Divide total automatically.
+
+B. Custom Split
+Manually set totals per participant.
+
+C. Assign Items
+Assign individual receipt items.
+
+If line items were successfully detected, visually recommend:
+
+Assign Items
+
+==================================================
+36. CUSTOM SPLIT VALIDATION
+==================================================
+
+Example:
+
+Total:
+£36
+
+Jason:
+£10
+
+Darlington:
+£26
+
+Validate total allocations = £36.
+
+If not, show:
+
+“£4 still needs assigning”
+
+or:
+
+“You’ve allocated £4 too much”
+
+Make this clear and friendly.
+
+==================================================
+37. REVIEW SPLIT
+==================================================
+
+Show:
+
+Dinner at Nando’s
+
+Total:
+£36
+
+Jason:
+£10
+
+Darlington:
+£26
+
+If item-level allocation is used, allow expanding each participant to see their assigned items.
+
+Example:
+
+Jason £10
+- Burger £10
+
+Darlington £26
+- Chicken £12
+- Drinks £14
+
+Then:
+
+Create split
+
+==================================================
+38. SPLIT DETAIL PAGE
+==================================================
+
+Show:
+
+Bill name
+
+Total
+
+Participants
+
+Each participant:
+
+Amount owed
+Payment status
+
+Statuses:
+
+Pending
+Paid
+Declined
+
+Overall:
+
+Unpaid
+Partially paid
+Settled
+
+==================================================
+39. REQUEST PAYMENT FROM SPLIT BILL
+==================================================
+
+Allow:
+
+Jason
+£10
+Request payment
+
+Darlington
+£26
+Request payment
+
+Also:
+
+Request all
+
+Use same PaymentRequest architecture.
+
+==================================================
+40. DATABASE / DATA MODEL
+==================================================
+
+Inspect the existing schema before changing anything.
+
+Do not create duplicates where equivalent models already exist.
+
+Potential models:
+
+SharedFolder
+
+SharedFolderMember
+
+SharedSubfolder
+
+SharedExpense
+
+Receipt
+
+ReceiptLineItem
+
+ReceiptLineItemAllocation
+
+SplitBill
+
+SplitBillParticipant
+
+PaymentRequest
+
+PaymentTransaction / PaymentEvent
+
+Invitation
+
+Reuse existing models wherever sensible.
+
+==================================================
+41. RECEIPT REUSE
+==================================================
+
+If an existing Receiptify receipt is added to a Shared Folder:
+
+Prefer linking/reference instead of duplicating receipt data.
+
+The same original receipt should still exist inside My Receipts.
+
+Folder-specific data such as:
+
+Subfolder
+Assignments
+Shared amount
+
+should live separately.
+
+==================================================
+42. ACCESS CONTROL
+==================================================
+
+Implement permissions server-side.
+
+Do not only hide frontend buttons.
+
+Viewer must not be able to call edit/delete APIs directly.
+
+Every folder/split request must verify:
+
+Ownership
+or
+Membership
+
+==================================================
+43. INVITATIONS
+==================================================
+
+If email already belongs to Receiptify user:
+
+Invite/link existing account.
+
+If not:
+
+Create pending invitation.
+
+Prepare for email invite links.
+
+Do not block initial implementation if email service is not configured yet.
+
+==================================================
+44. ACTIVITY HISTORY
+==================================================
+
+Add lightweight activity history.
+
+Examples:
+
+Ramadan added Screwfix receipt
+
+Ramadan assigned Tape £6.69 to Jason
+
+Jason joined folder
+
+Receipt moved to Materials
+
+Ramadan requested £6.69
+
+Jason paid £6.69
+
+Place under:
+
+More → Activity
+
+==================================================
+45. SEARCH / FILTER
+==================================================
+
+Prepare folder architecture for:
+
+Search
+
+Filters:
+
+Date
+Subfolder
+Category
+Paid by
+Assigned to
+Member
+
+Do not overcomplicate the first release.
+
+==================================================
+46. UX RULES
+==================================================
+
+The experience must remain:
+
+Simple
+Premium
+Minimal
+Mobile-first
+Easy to understand
+
+Do NOT make it look like accounting software.
+
+Use:
+
+Large totals
+Short labels
+Cards
+Existing Receiptify green
+Existing cream background
+Existing typography
+Existing rounded UI
+
+Use progressive disclosure.
+
+Advanced controls belong in:
+Edit
+More
+Receipt details
+
+==================================================
+47. RESPONSIVE DESIGN
+==================================================
+
+Prioritise mobile.
+
+Test:
+
+iPhone
+Small Android
+Tablet
+Desktop
+
+No horizontal overflow.
+
+Bottom navigation must remain usable.
+
+==================================================
+48. MIGRATE EXISTING SPLIT FOLDERS
+==================================================
+
+Do not delete current Split Folder data.
+
+Existing folders should become Shared Folders.
+
+Preserve:
+
+Folder name
+Project name
+Receipts
+Members
+Existing relationships
+
+Example existing:
+
+Rita
+Holborn project
+
+must remain available after migration.
+
+==================================================
+49. IMPLEMENTATION ORDER
+==================================================
+
+PHASE 1
+Inspect existing project.
+
+Report:
+
+- current tech stack
+- Split components
+- database schema
+- receipt models
+- OCR/scan flow
+- whether receipt line items already exist
+- authentication
+- permissions
+- Stripe code
+- invitation system
+
+PHASE 2
+Database migrations.
+
+PHASE 3
+Split Hub.
+
+PHASE 4
+Shared Folder creation and folder page.
+
+PHASE 5
+Receipt editing.
+
+PHASE 6
+Receipt line-item extraction and Assign Items.
+
+PHASE 7
+Subfolders and manual expenses.
+
+PHASE 8
+People and permissions.
+
+PHASE 9
+Split a Bill.
+
+PHASE 10
+PaymentRequest architecture.
+
+PHASE 11
+Stripe Connect-ready integration.
+
+PHASE 12
+Existing data migration.
+
+PHASE 13
+Testing and UX polish.
+
+==================================================
+50. TESTING REQUIREMENTS
+==================================================
+
+Add tests for:
+
+Create Shared Folder
+
+Edit Shared Folder
+
+Add/remove member
+
+Permissions
+
+Add receipt
+
+Rename receipt
+
+Extract receipt line items
+
+Edit line item
+
+Assign line item to self
+
+Assign line item to another member
+
+Split line item equally
+
+Split line item custom
+
+Ignore item
+
+Validate allocation total
+
+Recalculate folder shared amount
+
+Change item assignment
+
+Add manual expense
+
+Create subfolder
+
+Move receipt
+
+Folder totals
+
+Create Split Bill
+
+Equal split
+
+Custom split
+
+Assign Items split
+
+Custom split validation
+
+Create payment request
+
+Payment state updates
+
+Migration
+
+Unauthorised API access
+
+==================================================
+51. CRITICAL ACCOUNTING LOGIC TEST
+==================================================
+
+Use this specific example as a test case:
+
+Receipt:
+
+Merchant:
+Screwfix
+
+Total:
+£23.68
+
+Items:
+
+AdBlue 10L
+£16.99
+
+Double-sided tape
+£6.69
+
+Allocation:
+
+AdBlue 10L
+Assigned to current user
+
+Double-sided tape
+Assigned to Jason / landlord
+
+Expected results:
+
+Original receipt total:
+£23.68
+
+Current user personal share:
+£16.99
+
+Jason shared/owed amount:
+£6.69
+
+Shared Folder outstanding amount from this receipt:
+£6.69
+
+It must NOT add £23.68 to Jason’s balance.
+
+This test should pass before item-level splitting is considered complete.
+
+==================================================
+52. DO NOT BREAK EXISTING RECEIPTIFY
+==================================================
+
+Before changing code:
+
+Inspect first.
+
+Reuse:
+
+Existing components
+Design tokens
+Authentication
+Receipt scanner
+OCR
+Receipt database
+Navigation
+API conventions
+
+Do not rebuild working functionality.
+
+Do not remove current features unless replaced by the upgraded equivalent.
+
+==================================================
+53. FIRST ACTION
+==================================================
+
+Before making large code changes, inspect the current app and tell me:
+
+1. Which files control the Split tab
+2. Which database models power Split Folders
+3. How receipts are linked to Split Folders
+4. Whether receipt line items are already stored
+5. How OCR currently extracts receipt information
+6. How users and invitations work
+7. Whether Stripe exists anywhere
+8. What schema migrations are required
+9. Which existing components can be reused
+10. Your recommended implementation order
+
+Then proceed carefully.
+
+Do not create a parallel duplicate Split system.
+
+Upgrade the existing implementation.
