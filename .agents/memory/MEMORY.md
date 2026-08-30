@@ -1,5 +1,6 @@
 - [Primary navigation consistency](primary-navigation-consistency.md) — Receiptify’s visual system must cover every primary nav screen, including Scan and Account.
 - [Playwright on Replit](playwright-on-replit.md) — use the provided Chromium executable through Playwright launch options so browser tests run in the workspace.
 - [Settled Split allocations](settled-split-allocations.md) — never mutate or delete paid shares implicitly; require an explicit “mark unpaid” action first.
+- [Split receipt currency edits](split-receipt-currency-edits.md) — edit source items in their original currency and derive GBP only for Split display and allocation.
 - [Email import data contract](email-import-data-contract.md) — keep pending email/OCR data on the active storage model and preserve it through reprocess and acceptance.
 - [Split balance ledger](split-balance-ledger.md) — count source spend once; derive shared debt separately and serialize member financial transitions.

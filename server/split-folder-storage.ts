@@ -22,7 +22,7 @@ import {
   type SplitPaymentRequest, type InsertSplitManualExpense, type InsertSplitActivityEvent,
   type InsertSplitBill, type InsertSplitBillParticipant, type InsertSplitPaymentRequest,
   type SplitSubfolder, type SplitFolderReceiptMetadata, type InsertSplitSubfolder,
-  type SplitBillItem, type InsertSplitBillItem,
+  type SplitBillItem, type InsertSplitBillItem, type InsertReceiptItem,
 } from "@shared/schema";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
@@ -103,6 +103,25 @@ export interface ISplitFolderStorage {
   attachReceipt(receiptId: string, folderId: string): Promise<Receipt | undefined>;
   detachReceipt(receiptId: string, folderId: string): Promise<void>;
   getReceiptItemsForReceipts(receiptIds: string[]): Promise<ReceiptItem[]>;
+  createReceiptItemIfUnsettled(
+    folderId: string,
+    receiptId: string,
+    item: InsertReceiptItem,
+  ): Promise<
+    | { status: "created"; item: ReceiptItem }
+    | { status: "paidConflict" }
+    | { status: "notFound" }
+  >;
+  updateReceiptItemIfUnsettled(
+    folderId: string,
+    receiptId: string,
+    itemId: string,
+    updates: Partial<InsertReceiptItem>,
+  ): Promise<
+    | { status: "updated"; item: ReceiptItem }
+    | { status: "paidConflict" }
+    | { status: "notFound" }
+  >;
   listManualExpenses(folderId: string): Promise<SplitManualExpense[]>;
   createManualExpense(expense: InsertSplitManualExpense): Promise<SplitManualExpense>;
   updateManualExpense(id: string, updates: Partial<InsertSplitManualExpense>): Promise<SplitManualExpense | undefined>;
@@ -274,6 +293,80 @@ class SplitFolderDbStorage implements ISplitFolderStorage {
   async getReceiptItemsForReceipts(receiptIds: string[]): Promise<ReceiptItem[]> {
     if (!receiptIds.length) return [];
     return db.select().from(receiptItems).where(inArray(receiptItems.receiptId, receiptIds));
+  }
+  async createReceiptItemIfUnsettled(
+    folderId: string,
+    receiptId: string,
+    item: InsertReceiptItem,
+  ) {
+    return db.transaction(async (tx) => {
+      const lockedReceipt = await tx.execute(
+        sql`select id from receipts
+            where id = ${receiptId} and split_folder_id = ${folderId}
+            for update`,
+      );
+      if (!lockedReceipt.rows.length) return { status: "notFound" as const };
+      await tx.execute(
+        sql`select id from split_assignments
+            where folder_id = ${folderId} and receipt_id = ${receiptId}
+            for update`,
+      );
+      const paid = await tx
+        .select({ id: splitAssignments.id })
+        .from(splitAssignments)
+        .where(
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.receiptId, receiptId),
+            eq(splitAssignments.status, "paid"),
+          ),
+        );
+      if (paid.length) return { status: "paidConflict" as const };
+      const [created] = await tx
+        .insert(receiptItems)
+        .values({ ...item, receiptId })
+        .returning();
+      return { status: "created" as const, item: created };
+    });
+  }
+  async updateReceiptItemIfUnsettled(
+    folderId: string,
+    receiptId: string,
+    itemId: string,
+    updates: Partial<InsertReceiptItem>,
+  ) {
+    return db.transaction(async (tx) => {
+      const lockedReceipt = await tx.execute(
+        sql`select id from receipts
+            where id = ${receiptId} and split_folder_id = ${folderId}
+            for update`,
+      );
+      if (!lockedReceipt.rows.length) return { status: "notFound" as const };
+      await tx.execute(
+        sql`select id from split_assignments
+            where folder_id = ${folderId} and receipt_id = ${receiptId}
+            for update`,
+      );
+      const paid = await tx
+        .select({ id: splitAssignments.id })
+        .from(splitAssignments)
+        .where(
+          and(
+            eq(splitAssignments.folderId, folderId),
+            eq(splitAssignments.receiptId, receiptId),
+            eq(splitAssignments.status, "paid"),
+          ),
+        );
+      if (paid.length) return { status: "paidConflict" as const };
+      const [updated] = await tx
+        .update(receiptItems)
+        .set(updates)
+        .where(and(eq(receiptItems.id, itemId), eq(receiptItems.receiptId, receiptId)))
+        .returning();
+      return updated
+        ? { status: "updated" as const, item: updated }
+        : { status: "notFound" as const };
+    });
   }
   async listManualExpenses(folderId: string) {
     return db.select().from(splitManualExpenses).where(eq(splitManualExpenses.folderId, folderId)).orderBy(desc(splitManualExpenses.expenseDate));

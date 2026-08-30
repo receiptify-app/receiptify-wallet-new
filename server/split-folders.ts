@@ -342,6 +342,7 @@ export function registerSplitFolderRoutes(
         total: String(totalInGBP(r)),
         items: (itemsByReceipt.get(r.id) || []).map((item) => ({
           ...item,
+          rawPrice: item.price,
           price: String(itemPriceInGBP(item, r)),
         })),
         assignments: assignmentsByReceipt.get(r.id) || [],
@@ -1143,11 +1144,37 @@ Open Receiptify to view the folder.`;
     const folder = await splitFolderStorage.getFolder(req.params.id);
     if (!folder) return res.status(404).json({ error: "Folder not found" });
     if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
-    const body = z.object({ memberId: z.string(), amount: z.union([z.string(), z.number()]), currency: z.string().length(3).optional() }).parse(req.body);
+    const body = z.object({
+      memberId: z.string(),
+      amount: z.union([z.string(), z.number()]),
+      currency: z.string().length(3).optional(),
+      context: z.string().trim().max(160).optional(),
+      message: z.string().trim().max(1000).optional(),
+      subfolderId: z.string().optional(),
+    }).parse(req.body);
     if (money(body.amount) <= 0) return res.status(400).json({ error: "Amount must be positive" });
     const member = await splitFolderStorage.getMember(body.memberId);
-    if (!member || member.folderId !== folder.id) return res.status(400).json({ error: "Invalid member" });
-    const request = await splitFolderStorage.createPaymentRequest({ folderId: folder.id, requestedBy: req.user!.id, memberId: member.id, amount: money(body.amount).toFixed(2), currency: (body.currency || "GBP").toUpperCase(), status: "draft" });
+    if (!member || member.folderId !== folder.id || member.status === "removed") {
+      return res.status(400).json({ error: "Invalid member" });
+    }
+    if (body.subfolderId) {
+      const subfolder = (await splitFolderStorage.listSubfolders(folder.id))
+        .find((candidate) => candidate.id === body.subfolderId);
+      if (!subfolder || subfolder.folderId !== folder.id) {
+        return res.status(400).json({ error: "Invalid subfolder" });
+      }
+    }
+    const request = await splitFolderStorage.createPaymentRequest({
+      folderId: folder.id,
+      requestedBy: req.user!.id,
+      memberId: member.id,
+      subfolderId: body.subfolderId || null,
+      amount: money(body.amount).toFixed(2),
+      currency: (body.currency || "GBP").toUpperCase(),
+      context: body.context || null,
+      message: body.message || null,
+      status: "draft",
+    });
     await splitFolderStorage.createPaymentEvent({ paymentRequestId: request.id, eventType: "created" });
     res.status(201).json(request);
   });
@@ -1195,8 +1222,21 @@ Open Receiptify to view the folder.`;
     const receipt = await storage.getReceipt(req.params.receiptId);
     if (!receipt || receipt.splitFolderId !== folder.id) return res.status(404).json({ error: "Receipt not in folder" });
     const body = z.object({ name: z.string().trim().min(1), price: z.union([z.string(), z.number()]), quantity: z.union([z.string(), z.number()]).optional(), category: z.string().optional(), notes: z.string().optional() }).parse(req.body);
-    if (money(body.price) < 0) return res.status(400).json({ error: "Price must be non-negative" });
-    res.status(201).json(await storage.createReceiptItem({ ...body, receiptId: receipt.id, price: money(body.price).toFixed(2), quantity: body.quantity === undefined ? "1" : String(body.quantity) }));
+    const itemPrice = Number(body.price);
+    if (!Number.isFinite(itemPrice) || itemPrice < 0) {
+      return res.status(400).json({ error: "Price must be a finite non-negative amount" });
+    }
+    const result = await splitFolderStorage.createReceiptItemIfUnsettled(folder.id, receipt.id, {
+      ...body,
+      receiptId: receipt.id,
+      price: money(itemPrice).toFixed(2),
+      quantity: body.quantity === undefined ? "1" : String(body.quantity),
+    });
+    if (result.status === "paidConflict") {
+      return res.status(409).json({ error: "Mark this receipt's paid shares as unpaid before editing its items" });
+    }
+    if (result.status === "notFound") return res.status(404).json({ error: "Receipt not in folder" });
+    res.status(201).json(result.item);
   });
   app.patch("/api/split-folders/:id/receipts/:receiptId/items/:itemId", requireAuth, async (req: AuthenticatedRequest, res) => {
     const folder = await loadFolderForUser(req.params.id, req.user!.id);
@@ -1206,10 +1246,26 @@ Open Receiptify to view the folder.`;
     if (!receipt || receipt.splitFolderId !== folder.id) {
       return res.status(404).json({ error: "Receipt not in folder" });
     }
-    const item = (await storage.getReceiptItems(req.params.receiptId)).find((i) => i.id === req.params.itemId);
-    if (!item || item.receiptId !== receipt.id) return res.status(404).json({ error: "Item not found" });
     const body = z.object({ name: z.string().trim().min(1).optional(), price: z.union([z.string(), z.number()]).optional(), quantity: z.union([z.string(), z.number()]).optional(), category: z.string().nullable().optional(), notes: z.string().nullable().optional() }).parse(req.body);
-    res.json(await storage.updateReceiptItem(item.id, { ...body, price: body.price === undefined ? undefined : money(body.price).toFixed(2), quantity: body.quantity === undefined ? undefined : String(body.quantity) }));
+    const itemPrice = body.price === undefined ? undefined : Number(body.price);
+    if (itemPrice !== undefined && (!Number.isFinite(itemPrice) || itemPrice < 0)) {
+      return res.status(400).json({ error: "Price must be a finite non-negative amount" });
+    }
+    const result = await splitFolderStorage.updateReceiptItemIfUnsettled(
+      folder.id,
+      receipt.id,
+      req.params.itemId,
+      {
+        ...body,
+        price: itemPrice === undefined ? undefined : money(itemPrice).toFixed(2),
+        quantity: body.quantity === undefined ? undefined : String(body.quantity),
+      },
+    );
+    if (result.status === "paidConflict") {
+      return res.status(409).json({ error: "Mark this receipt's paid shares as unpaid before editing its items" });
+    }
+    if (result.status === "notFound") return res.status(404).json({ error: "Item not found" });
+    res.json(result.item);
   });
 
   app.get("/api/split-folders/:id/subfolders", requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -1319,8 +1375,14 @@ Open Receiptify to view the folder.`;
         });
       }
     } else {
+      const debtorParticipants = body.participants.filter((participant) => !participant.isCreator);
+      const equalDebtorShares = body.splitMode === "equal"
+        ? splitEvenly(amount, debtorParticipants.length)
+        : [];
+      let equalDebtorIndex = 0;
       const shares = body.splitMode === "equal"
-        ? splitEvenly(amount, body.participants.length)
+        ? body.participants.map((participant) =>
+            participant.isCreator ? "0.00" : equalDebtorShares[equalDebtorIndex++])
         : body.participants.map((participant) => money(participant.shareAmount).toFixed(2));
       const normalized = body.participants.map((participant, index) => ({
         ...participant,

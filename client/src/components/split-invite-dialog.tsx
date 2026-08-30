@@ -66,7 +66,6 @@ export default function SplitInviteDialog({ folderId, open, onOpenChange }: Prop
 
   const resetTabState = () => { setLinkUrl(null); setCopied(false); setEmail(""); };
   const resetAll = () => { resetTabState(); setLinkName(""); };
-
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetAll(); }}>
       <DialogContent className="max-w-md">

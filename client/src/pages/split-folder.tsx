@@ -35,6 +35,7 @@ import {
   HandCoins,
   Settings2,
   Activity,
+  FolderOpen,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -62,11 +63,13 @@ type Assignment = {
 
 type FolderReceipt = {
   id: string;
+  userId: string;
   merchantName: string;
   total: string;
+  currency?: string | null;
   date: string;
   imageUrl: string | null;
-  items: Array<{ id: string; name: string; price: string; quantity: string | null }>;
+  items: Array<{ id: string; name: string; price: string; rawPrice?: string; quantity: string | null }>;
   assignments: Assignment[];
   splitMetadata?: { subfolderId?: string | null; displayName?: string | null } | null;
 };
@@ -88,6 +91,14 @@ type FolderDetail = {
   outstandingAmount?: number;
   subfolders?: Array<{ id: string; name: string; monthlyKey?: string | null }>;
   currentMemberId?: string | null;
+};
+
+type AttachableReceipt = {
+  id: string;
+  merchantName: string;
+  total: string;
+  date: string;
+  splitFolderId?: string | null;
 };
 
 function initials(name?: string | null) {
@@ -228,8 +239,39 @@ function ReceiptSplitter({
     }
   });
   const [itemMap, setItemMap] = useState<Record<string, string[]>>(initialItemMap);
+  const [itemModes, setItemModes] = useState<Record<string, "equal" | "custom">>(() =>
+    Object.fromEntries(receipt.items.map((item) => {
+      const itemAssignments = receipt.assignments.filter((assignment) => assignment.itemId === item.id);
+      const equalItemShare = itemAssignments.length ? Number(item.price) / itemAssignments.length : 0;
+      const isCustom = itemAssignments.some((assignment) => Math.abs(Number(assignment.shareAmount) - equalItemShare) > 0.02);
+      return [item.id, isCustom ? "custom" : "equal"];
+    }))
+  );
+  const [itemCustomAmounts, setItemCustomAmounts] = useState<Record<string, Record<string, string>>>(() => {
+    const amounts: Record<string, Record<string, string>> = {};
+    receipt.assignments.forEach((assignment) => {
+      if (!assignment.itemId) return;
+      (amounts[assignment.itemId] ||= {})[assignment.memberId] = Number(assignment.shareAmount).toFixed(2);
+    });
+    return amounts;
+  });
   // additional charges split (virtual row for gap between sum-of-items and receipt total)
   const [additionalMembers, setAdditionalMembers] = useState<string[]>(initialAdditionalMembers);
+  const [editedItems, setEditedItems] = useState<Record<string, { name: string; price: string }>>(
+    Object.fromEntries(receipt.items.map((item) => [item.id, { name: item.name, price: item.rawPrice ?? item.price }]))
+  );
+  const itemMutation = useMutation({
+    mutationFn: async (item: { id: string; name: string; price: string }) =>
+      apiRequest("PATCH", `/api/split-folders/${folderId}/receipts/${receipt.id}/items/${item.id}`, { name: item.name.trim(), price: Number(item.price) }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] }); toast({ title: "Item updated" }); },
+    onError: (error: any) => toast({ title: "Couldn't update item", description: error.message, variant: "destructive" }),
+  });
+  const createItemMutation = useMutation({
+    mutationFn: async (item: { name: string; price: number }) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/receipts/${receipt.id}/items`, item),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] }); toast({ title: "Item added" }); },
+    onError: (error: any) => toast({ title: "Couldn't add item", description: error.message, variant: "destructive" }),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -268,6 +310,23 @@ function ReceiptSplitter({
           const assigned = itemMap[item.id] || [];
           if (assigned.length === 0) return;
           const itemTotal = parseFloat(item.price);
+          if (itemModes[item.id] === "custom") {
+            const customTotal = assigned.reduce(
+              (sum, memberId) => sum + (Number(itemCustomAmounts[item.id]?.[memberId]) || 0),
+              0,
+            );
+            if (customTotal - itemTotal > 0.01) {
+              throw new Error(`Custom shares for ${item.name} exceed its £${itemTotal.toFixed(2)} amount.`);
+            }
+            assigned.forEach((memberId) => {
+              assignments.push({
+                memberId,
+                itemId: item.id,
+                shareAmount: (Number(itemCustomAmounts[item.id]?.[memberId]) || 0).toFixed(2),
+              });
+            });
+            return;
+          }
           const share = itemTotal / assigned.length;
           let runningSum = 0;
           assigned.forEach((memberId, idx) => {
@@ -379,6 +438,22 @@ function ReceiptSplitter({
     });
   };
 
+  const setItemMode = (itemId: string, nextMode: "equal" | "custom") => {
+    setItemModes((current) => ({ ...current, [itemId]: nextMode }));
+    if (nextMode === "custom") {
+      const selected = itemMap[itemId] || [];
+      const item = receipt.items.find((candidate) => candidate.id === itemId);
+      const equal = item && selected.length ? Number(item.price) / selected.length : 0;
+      setItemCustomAmounts((current) => ({
+        ...current,
+        [itemId]: Object.fromEntries(selected.map((memberId) => [
+          memberId,
+          current[itemId]?.[memberId] || equal.toFixed(2),
+        ])),
+      }));
+    }
+  };
+
   const allocatableMembers = members.filter((m) => m.status !== "removed");
 
   // The gap between the sum of all item prices and the receipt total (covers unitemised charges)
@@ -404,14 +479,30 @@ function ReceiptSplitter({
     const itemsAssigned = Object.entries(itemMap).reduce((s, [itemId, ids]) => {
       if (ids.length === 0) return s;
       const item = receipt.items.find((i) => i.id === itemId);
-      return s + (item ? parseFloat(item.price) : 0);
+      if (!item) return s;
+      if (itemModes[itemId] === "custom") {
+        return s + ids.reduce(
+          (sum, memberId) => sum + (Number(itemCustomAmounts[itemId]?.[memberId]) || 0),
+          0,
+        );
+      }
+      return s + parseFloat(item.price);
     }, 0);
     const addAssigned = hasAdditional && additionalMembers.length > 0 ? additionalAmount : 0;
     return itemsAssigned + addAssigned;
-  }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, receipt.items, total, additionalMembers, additionalAmount, hasAdditional]);
+  }, [mode, wholeMembers, wholeMode, customAmounts, itemMap, itemModes, itemCustomAmounts, receipt.items, total, additionalMembers, additionalAmount, hasAdditional]);
 
   const wholeCustomOver =
     mode === "whole" && wholeMode === "custom" && assignedTotal - total > 0.01;
+  const payerMemberId = members.find((member) => member.userId === receipt.userId)?.id;
+  const sharedAssignments = receipt.assignments.filter((assignment) =>
+    assignment.memberId !== payerMemberId &&
+    members.some((member) => member.id === assignment.memberId && member.status !== "removed")
+  );
+  const sharedTotal = sharedAssignments.reduce((sum, assignment) => sum + Number(assignment.shareAmount), 0);
+  const outstandingShared = sharedAssignments
+    .filter((assignment) => assignment.status !== "paid")
+    .reduce((sum, assignment) => sum + Number(assignment.shareAmount), 0);
 
   return (
     <Card className="receiptify-panel overflow-hidden">
@@ -430,6 +521,12 @@ function ReceiptSplitter({
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-gray-900 truncate">{receipt.splitMetadata?.displayName || receipt.merchantName}</div>
             <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })} · £{total.toFixed(2)}</div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-500">
+              <span>Original <strong className="receiptify-mono text-gray-700">£{total.toFixed(2)}</strong></span>
+              <span>Personal <strong className="receiptify-mono text-gray-700">£{Math.max(0, total - sharedTotal).toFixed(2)}</strong></span>
+              <span>Shared <strong className="receiptify-mono text-gray-700">£{sharedTotal.toFixed(2)}</strong></span>
+              <span>Outstanding <strong className="receiptify-mono text-gray-700">£{outstandingShared.toFixed(2)}</strong></span>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Badge variant="outline" className="text-xs">
@@ -444,8 +541,8 @@ function ReceiptSplitter({
                 <Settings2 className="w-4 h-4" />
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => setExpanded((e) => !e)} data-testid={`toggle-receipt-${receipt.id}`}>
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <Button size="sm" variant="outline" onClick={() => setExpanded((e) => !e)} data-testid={`toggle-receipt-${receipt.id}`}>
+              {receipt.items.length > 0 ? "Assign items" : "Edit allocation"} {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </Button>
           </div>
         </div>
@@ -453,10 +550,10 @@ function ReceiptSplitter({
         {expanded && (
           <div className="mt-4 space-y-3">
             <div className="flex gap-2">
-              <Button size="sm" variant={mode === "whole" ? "default" : "outline"} className={mode === "whole" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("whole")}>
+              <Button disabled={!canEdit} size="sm" variant={mode === "whole" ? "default" : "outline"} className={mode === "whole" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("whole")}>
                 Entire bill
               </Button>
-              <Button size="sm" variant={mode === "items" ? "default" : "outline"} className={mode === "items" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("items")}>
+              <Button disabled={!canEdit} size="sm" variant={mode === "items" ? "default" : "outline"} className={mode === "items" ? "bg-green-600 hover:bg-green-700" : ""} onClick={() => setMode("items")}>
                 Individual items
               </Button>
             </div>
@@ -466,16 +563,18 @@ function ReceiptSplitter({
                 <div className="flex gap-2 text-xs">
                   <button
                     type="button"
+                     disabled={!canEdit}
                     onClick={() => switchWholeMode("equal")}
-                    className={`px-3 py-1 rounded-full border ${wholeMode === "equal" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
+                     className={`px-3 py-1 rounded-full border disabled:opacity-50 ${wholeMode === "equal" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
                     data-testid={`whole-mode-equal-${receipt.id}`}
                   >
                     Equal split
                   </button>
                   <button
                     type="button"
+                     disabled={!canEdit}
                     onClick={() => switchWholeMode("custom")}
-                    className={`px-3 py-1 rounded-full border ${wholeMode === "custom" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
+                     className={`px-3 py-1 rounded-full border disabled:opacity-50 ${wholeMode === "custom" ? "bg-green-50 border-green-600 text-green-700" : "border-gray-200 text-gray-600"}`}
                     data-testid={`whole-mode-custom-${receipt.id}`}
                   >
                     Custom amounts
@@ -485,7 +584,7 @@ function ReceiptSplitter({
                   const selected = wholeMembers.includes(m.id);
                   return (
                     <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
-                      <Checkbox checked={selected} onCheckedChange={() => toggleWhole(m.id)} />
+                       <Checkbox disabled={!canEdit} checked={selected} onCheckedChange={() => toggleWhole(m.id)} />
                        <span className="flex-1 text-sm">
                          {m.displayName || m.inviteEmail || "Member"}
                          {m.status === "invited" ? " (invited)" : ""}
@@ -498,6 +597,7 @@ function ReceiptSplitter({
                           <span className="text-sm text-gray-500">£</span>
                           <Input
                             inputMode="decimal"
+                           disabled={!canEdit}
                             value={customAmounts[m.id] ?? ""}
                             onChange={(e) => setCustomAmount(m.id, e.target.value)}
                             className="w-20 h-8 text-sm"
@@ -529,10 +629,14 @@ function ReceiptSplitter({
                   const shares = computeShares(itemPrice, assigned);
                   return (
                     <div key={item.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium">{item.name}</div>
-                        <div className="text-sm font-semibold">£{itemPrice.toFixed(2)}</div>
+                      <div className="flex items-center gap-2">
+                         {canEdit ? <><Input className="min-w-0 flex-1 h-8 text-sm" value={editedItems[item.id]?.name ?? item.name} onChange={(e) => setEditedItems((current) => ({ ...current, [item.id]: { ...(current[item.id] || { price: item.rawPrice ?? item.price }), name: e.target.value } }))} aria-label={`Item name for ${item.name}`} /><div className="flex items-center gap-1"><span className="text-[10px] text-gray-500">{receipt.currency || "GBP"}</span><Input className="w-20 h-8 text-sm" inputMode="decimal" value={editedItems[item.id]?.price ?? item.rawPrice ?? item.price} onChange={(e) => setEditedItems((current) => ({ ...current, [item.id]: { ...(current[item.id] || { name: item.name }), price: e.target.value } }))} aria-label={`Item amount in ${receipt.currency || "GBP"} for ${item.name}`} /></div><Button size="sm" variant="ghost" disabled={itemMutation.isPending} onClick={() => itemMutation.mutate({ id: item.id, ...editedItems[item.id] })}>Save</Button></> : <><strong className="min-w-0 flex-1 truncate text-sm">{item.name}</strong><span className="receiptify-mono text-sm">£{Number(item.price).toFixed(2)}</span></>}
                       </div>
+                       <div className="flex items-center gap-2 text-xs">
+                         <button disabled={!canEdit} type="button" className={`rounded-full border px-2 py-1 disabled:opacity-50 ${itemModes[item.id] !== "custom" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-200"}`} onClick={() => setItemMode(item.id, "equal")}>Split equally</button>
+                         <button disabled={!canEdit} type="button" className={`rounded-full border px-2 py-1 disabled:opacity-50 ${itemModes[item.id] === "custom" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-200"}`} onClick={() => setItemMode(item.id, "custom")}>Custom</button>
+                         {assigned.length > 0 && <button disabled={!canEdit} type="button" className="ml-auto text-gray-500 underline disabled:opacity-50" onClick={() => setItemMap((current) => ({ ...current, [item.id]: [] }))}>Leave personal</button>}
+                       </div>
                       <div className="flex flex-wrap gap-1">
                         {allocatableMembers.map((m) => {
                           const on = assigned.includes(m.id);
@@ -541,21 +645,32 @@ function ReceiptSplitter({
                             <button
                               key={m.id}
                               type="button"
+                              disabled={!canEdit}
                               onClick={() => toggleItem(item.id, m.id)}
                               className={`text-xs px-2 py-1 rounded-full border ${on ? "bg-green-600 text-white border-green-600" : "bg-white text-gray-700 border-gray-300"}`}
                               data-testid={`item-${item.id}-member-${m.id}`}
                             >
                               {initials(m.displayName)}
-                              {on && shareEntry && (
+                               {on && shareEntry && itemModes[item.id] !== "custom" && (
                                 <span className="ml-1">£{shareEntry.share}</span>
                               )}
                             </button>
                           );
                         })}
                       </div>
+                       {itemModes[item.id] === "custom" && assigned.length > 0 && (
+                         <div className="grid gap-2">
+                           {assigned.map((memberId) => {
+                             const member = allocatableMembers.find((candidate) => candidate.id === memberId);
+                           return <label key={memberId} className="flex items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate">{member?.displayName || member?.inviteEmail || "Member"}</span><span>£</span><Input disabled={!canEdit} className="h-8 w-24" inputMode="decimal" value={itemCustomAmounts[item.id]?.[memberId] || ""} onChange={(event) => setItemCustomAmounts((current) => ({ ...current, [item.id]: { ...(current[item.id] || {}), [memberId]: event.target.value } }))} /></label>;
+                           })}
+                           <p className="text-gray-500">Any amount left unassigned stays personal.</p>
+                         </div>
+                       )}
                     </div>
                   );
                 })}
+                {canEdit && <Button variant="outline" size="sm" onClick={() => { const name = window.prompt("Item name")?.trim(); const price = window.prompt(`Item amount in ${receipt.currency || "GBP"}`) || ""; if (name && Number(price) >= 0) createItemMutation.mutate({ name, price: Number(price) }); }}>Add item</Button>}
 
                 {hasAdditional && (
                   <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
@@ -575,8 +690,9 @@ function ReceiptSplitter({
                           <button
                             key={m.id}
                             type="button"
+                             disabled={!canEdit}
                             onClick={() => toggleAdditional(m.id)}
-                            className={`text-xs px-2 py-1 rounded-full border ${on ? "bg-amber-600 text-white border-amber-600" : "bg-white text-amber-700 border-amber-300"}`}
+                             className={`text-xs px-2 py-1 rounded-full border disabled:opacity-50 ${on ? "bg-amber-600 text-white border-amber-600" : "bg-white text-amber-700 border-amber-300"}`}
                             data-testid={`additional-member-${m.id}`}
                           >
                             {initials(m.displayName)}
@@ -599,10 +715,10 @@ function ReceiptSplitter({
               </span>
             </div>
 
-            <div className="flex gap-2">
-              <Button
+            {canEdit && <div className="flex gap-2">
+               <Button
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || wholeCustomOver}
+                 disabled={!canEdit || saveMutation.isPending || wholeCustomOver}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
                 {saveMutation.isPending ? "Saving…" : "Save split"}
@@ -610,7 +726,7 @@ function ReceiptSplitter({
               <Button variant="outline" onClick={() => setConfirmRemove(true)}>
                 Remove
               </Button>
-            </div>
+            </div>}
           </div>
         )}
 
@@ -685,16 +801,24 @@ export default function SplitFolderPage() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<1 | 2 | 3>(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [subfolderOpen, setSubfolderOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const [expense, setExpense] = useState({ description: "", amount: "", notes: "", expenseDate: new Date().toISOString().slice(0, 10), payerMemberId: "", subfolderId: "", allocations: {} as Record<string, string> });
-  const [payment, setPayment] = useState({ memberId: "", amount: "" });
+  const [payment, setPayment] = useState({ memberId: "", amount: "", context: "", message: "", subfolderId: "" });
   const [folderDraft, setFolderDraft] = useState({ name: "", description: "", ownerContactName: "", ownerContactEmail: "", ownerContactPhone: "" });
   const [subfolderName, setSubfolderName] = useState("");
   const [subfolderMonth, setSubfolderMonth] = useState("");
 
   const { data, isLoading, isError } = useQuery<FolderDetail>({
     queryKey: ["/api/split-folders", folderId],
+  });
+  const { data: walletReceipts = [], isLoading: walletReceiptsLoading } = useQuery<AttachableReceipt[]>({
+    queryKey: ["/api/receipts"],
+    enabled: receiptOpen,
   });
   const canAdd = !!data?.permissions?.add || !!data?.isOwner;
   const canEdit = !!data?.permissions?.edit || !!data?.isOwner;
@@ -707,9 +831,26 @@ export default function SplitFolderPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] }); queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] }); setExpenseOpen(false); setEditingExpenseId(null); setExpense({ description:"", amount:"", notes:"", expenseDate:new Date().toISOString().slice(0,10), payerMemberId:"", subfolderId:"", allocations:{} }); toast({ title:"Expense saved" }); },
     onError: (e:any) => toast({ title:"Couldn't add expense", description:e.message, variant:"destructive" }),
   });
+  const attachReceiptMutation = useMutation({
+    mutationFn: async (receiptId: string) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/receipts`, { receiptId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      setReceiptOpen(false);
+      toast({ title: "Receipt added", description: "You can assign its items now." });
+    },
+    onError: (error: any) =>
+      toast({ title: "Couldn't add receipt", description: error.message, variant: "destructive" }),
+  });
   const paymentMutation = useMutation({
-    mutationFn: async () => { const r = await apiRequest("POST", `/api/split-folders/${folderId}/payment-requests`, { memberId: payment.memberId, amount: Number(payment.amount), currency:"GBP" }); return r.json(); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "payment-requests"] }); setPaymentOpen(false); setPayment({memberId:"",amount:""}); toast({ title:"Payment request drafted", description:"It is ready to send when Stripe Connect is available." }); },
+    mutationFn: async () => { const r = await apiRequest("POST", `/api/split-folders/${folderId}/payment-requests`, { memberId: payment.memberId, amount: Number(payment.amount), currency:"GBP", context: payment.context.trim() || undefined, message: payment.message.trim() || undefined, subfolderId: payment.subfolderId || undefined }); return r.json(); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "payment-requests"] });
+      setPaymentStep(3);
+      toast({ title:"Payment request saved as draft", description:"Nothing has been sent." });
+    },
     onError: (e:any) => toast({ title:"Couldn't draft request", description:e.message, variant:"destructive" }),
   });
   const paymentActionMutation = useMutation({
@@ -740,6 +881,7 @@ export default function SplitFolderPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
       setSubfolderName("");
       setSubfolderMonth("");
+      setSubfolderOpen(false);
       toast({ title: "Subfolder added" });
     },
     onError: (e: any) => toast({ title: "Couldn't add subfolder", description: e.message, variant: "destructive" }),
@@ -904,6 +1046,10 @@ export default function SplitFolderPage() {
             </div>
             <Badge className="bg-[#dfe9e0] text-[#1e2c2b] hover:bg-[#dfe9e0] shrink-0">{data.currentRole || (isOwner ? "Owner" : "Member")}</Badge>
           </div>
+          <div className="receiptify-member-chips mt-4">
+            {visibleMembers.slice(0, 4).map((m) => <span key={m.id}><i>{initials(m.displayName || m.inviteEmail)}</i>{m.displayName || m.inviteEmail || "Member"} <small>{m.role === "owner" ? "Owner" : m.status === "invited" ? "Invited" : "Member"}</small></span>)}
+            <Button size="sm" variant="outline" disabled={!canManage} onClick={() => setInviteOpen(true)}><UserPlus className="w-3.5 h-3.5 mr-1" /> Add person</Button>
+          </div>
           <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-4">
             {[
               ["Total spent", totalSpent],
@@ -923,14 +1069,19 @@ export default function SplitFolderPage() {
             </div>
           </div>
         </div>
-
         <div className="receiptify-workspace-actions">
-          <Button disabled={!canAdd} onClick={() => navigate("/scan")}><Plus className="w-4 h-4" /> Add receipt</Button>
+          <Button disabled={!canAdd} onClick={() => setReceiptOpen(true)}><Plus className="w-4 h-4" /> Add receipt</Button>
           <Button disabled={!canAdd} onClick={() => setExpenseOpen(true)}><HandCoins className="w-4 h-4" /> Add expense</Button>
-          <Button disabled={!canManage} onClick={() => setInviteOpen(true)}><UserPlus className="w-4 h-4" /> Invite person</Button>
-          <Button disabled={!canManage} onClick={() => setPaymentOpen(true)}><WalletCards className="w-4 h-4" /> Request payment</Button>
+          <Button disabled={!canEdit} onClick={() => setSubfolderOpen(true)}><Plus className="w-4 h-4" /> New subfolder</Button>
+          <Button disabled={!canManage} onClick={() => { setPaymentStep(1); setPaymentOpen(true); }}><WalletCards className="w-4 h-4" /> Request payment</Button>
         </div>
+        <section className="receiptify-compact-subfolders">
+          <div className="flex items-center justify-between"><h2>Subfolders</h2><button type="button" onClick={() => setMoreOpen(true)}>See all</button></div>
+          {subfolders.length === 0 ? <p>No subfolders yet.</p> : <div>{subfolders.slice(0, 3).map((s) => <span key={s.id}><FolderOpen className="w-4 h-4" />{s.name}</span>)}</div>}
+        </section>
+        <Button variant="outline" className="receiptify-more-toggle" onClick={() => setMoreOpen((open) => !open)}><span>•••</span> {moreOpen ? "Hide details" : "More"}</Button>
 
+        {moreOpen && <div className="space-y-5 receiptify-more-sections">
         {/* Members */}
         <Card className="receiptify-panel">
           <CardContent className="p-4">
@@ -1032,6 +1183,7 @@ export default function SplitFolderPage() {
           </CardContent>
         </Card>
 
+        </div>}
         {/* Receipts */}
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -1050,6 +1202,7 @@ export default function SplitFolderPage() {
           )}
         </div>
 
+        {moreOpen && <>
         {/* Settlement */}
         <Card className="receiptify-panel">
           <CardContent className="p-4">
@@ -1111,6 +1264,7 @@ export default function SplitFolderPage() {
           <Button variant="outline" onClick={() => setActivityOpen(true)}><Activity className="w-4 h-4 mr-2" /> Activity</Button>
           <Button variant="outline" disabled={!canManage} onClick={() => setSettingsOpen(true)}><Settings2 className="w-4 h-4 mr-2" /> Folder details</Button>
         </div>
+        </>}
       </div>
 
       <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
@@ -1127,15 +1281,66 @@ export default function SplitFolderPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
         <DialogContent className="receiptify-dialog max-w-md">
-          <DialogHeader><DialogTitle>Request a payment</DialogTitle><DialogDescription>Draft a clear request for one person’s outstanding share.</DialogDescription></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>From</Label><select className="w-full h-10 rounded-md border bg-transparent px-3 text-sm" value={payment.memberId} onChange={e=>setPayment({...payment,memberId:e.target.value})}><option value="">Choose a member</option>{activeMembers.filter(m=>m.role!=="owner").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail || "Member"}</option>)}</select></div>
+          <DialogHeader>
+            <DialogTitle>Add a receipt</DialogTitle>
+            <DialogDescription>Choose an unassigned receipt from your wallet, or scan a new one first.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {walletReceiptsLoading && <p className="py-4 text-center text-sm text-gray-500">Loading receipts…</p>}
+            {!walletReceiptsLoading && walletReceipts.filter((receipt) => !receipt.splitFolderId).slice(0, 8).map((receipt) => (
+              <button
+                type="button"
+                key={receipt.id}
+                disabled={attachReceiptMutation.isPending}
+                onClick={() => attachReceiptMutation.mutate(receipt.id)}
+                className="flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:border-green-500 hover:bg-green-50"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-green-100 text-green-700"><ReceiptIcon className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{receipt.merchantName}</strong><small className="text-gray-500">{new Date(receipt.date).toLocaleDateString("en-GB")}</small></span>
+                <strong className="receiptify-mono text-sm">£{Number(receipt.total).toFixed(2)}</strong>
+              </button>
+            ))}
+            {!walletReceiptsLoading && walletReceipts.filter((receipt) => !receipt.splitFolderId).length === 0 && (
+              <p className="rounded-xl border border-dashed p-4 text-center text-sm text-gray-500">There are no unassigned receipts in your wallet.</p>
+            )}
+            <Button variant="outline" className="w-full" onClick={() => { setReceiptOpen(false); navigate("/scan"); }}><Plus className="mr-2 h-4 w-4" /> Scan a new receipt</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentOpen} onOpenChange={(open) => {
+        setPaymentOpen(open);
+        if (!open) {
+          setPaymentStep(1);
+          setPayment({memberId:"",amount:"",context:"",message:"",subfolderId:""});
+        }
+      }}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader><DialogTitle>{paymentStep === 1 ? "Request payment" : paymentStep === 2 ? "Review request" : "Saved as draft"}</DialogTitle><DialogDescription>{paymentStep === 1 ? "Request one person’s outstanding share." : paymentStep === 2 ? "Check the details before saving." : "The request is saved, but nothing has been sent."}</DialogDescription></DialogHeader>
+          <div className="receiptify-flow-steps">{["Details","Review","Saved draft"].map((label,index)=><span key={label} className={index + 1 <= paymentStep ? "is-active" : ""}><i>{index + 1}</i>{label}</span>)}</div>
+          {paymentStep === 3 ? <div className="receiptify-created-summary"><div className="receiptify-success-mark">✓</div><h2>Saved as draft</h2><p className="text-sm">No payment request was sent.</p><div className="mt-4 text-left border-t pt-3 text-sm"><p><strong>Amount</strong> · £{Number(payment.amount).toFixed(2)}</p><p className="mt-1"><strong>For</strong> · {payment.context || folder.name}</p>{payment.message && <p className="mt-1"><strong>Message</strong> · {payment.message}</p>}</div><Button className="w-full receiptify-primary-action mt-5" onClick={() => setPaymentOpen(false)}>Done</Button></div> : <div className="space-y-3">
+            {paymentStep === 1 ? <><div><Label>Request from</Label><select className="w-full h-10 rounded-md border bg-transparent px-3 text-sm" value={payment.memberId} onChange={e=>{ const memberId=e.target.value; const balance=settlement.find(s=>s.memberId===memberId); setPayment({...payment,memberId,amount:balance && balance.owed > 0 ? balance.owed.toFixed(2) : payment.amount}); }}><option value="">Choose a member</option>{visibleMembers.filter(m=>m.role!=="owner").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail || "Member"}{m.status === "invited" ? " (invited)" : ""}</option>)}</select></div>
             <div><Label>Amount</Label><Input inputMode="decimal" value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} placeholder="0.00" /></div>
-            <Button className="w-full receiptify-primary-action" disabled={!payment.memberId || !Number(payment.amount) || paymentMutation.isPending} onClick={()=>paymentMutation.mutate()}>{paymentMutation.isPending ? "Drafting…" : "Create draft request"}</Button>
+            <div><Label>For (optional)</Label><Input value={payment.context} onChange={e=>setPayment({...payment,context:e.target.value})} placeholder={folder.name} /></div>
+            <div><Label>Subfolder (optional)</Label><select className="w-full h-10 rounded-md border bg-transparent px-3 text-sm" value={payment.subfolderId} onChange={e=>setPayment({...payment,subfolderId:e.target.value})}><option value="">None</option>{subfolders.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+            <div><Label>Message (optional)</Label><Textarea value={payment.message} onChange={e=>setPayment({...payment,message:e.target.value})} placeholder="Please can you settle this when you can?" /></div></> : <div className="rounded-xl border p-4 space-y-3 text-sm"><p><span className="text-gray-500">Recipient</span><br/><strong>{members.find(m=>m.id===payment.memberId)?.displayName || "Member"}</strong></p><p><span className="text-gray-500">Amount</span><br/><strong className="receiptify-mono">£{Number(payment.amount).toFixed(2)}</strong></p><p><span className="text-gray-500">For</span><br/><strong>{payment.context || folder.name}{payment.subfolderId ? ` · ${subfolders.find(s=>s.id===payment.subfolderId)?.name || ""}` : ""}</strong></p><p><span className="text-gray-500">Message</span><br/>{payment.message || "No message"}</p></div>}
+            <Button className="w-full receiptify-primary-action" disabled={!payment.memberId || !Number(payment.amount) || paymentMutation.isPending} onClick={()=>paymentStep === 1 ? setPaymentStep(2) : paymentMutation.mutate()}>{paymentMutation.isPending ? "Saving…" : paymentStep === 1 ? "Next" : "Save draft"}</Button>
+            {paymentStep === 2 && <Button variant="ghost" className="w-full" onClick={() => setPaymentStep(1)}>Back to details</Button>}
             {paymentRequests.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Existing requests</p>{paymentRequests.map((r:any)=><div key={r.id} className="rounded-lg border p-2"><div className="flex justify-between gap-2 text-sm"><span className="capitalize">{r.status}</span><strong>£{Number(r.amount).toFixed(2)}</strong></div><div className="mt-2 flex flex-wrap gap-2">{canManage && r.status === "draft" && <Button size="sm" variant="outline" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"send"})}><Send className="mr-1 h-3 w-3" />Send</Button>}{canManage && !["cancelled","paid","declined"].includes(r.status) && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"cancel"})}>Cancel</Button>}{currentMemberId === r.memberId && r.status === "pending" && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"decline"})}>Decline</Button>}</div></div>)}</div>}
             <p className="text-xs text-gray-500">Sending is unavailable until Stripe Connect is configured. Receiptify will never pretend a payment was sent.</p>
+          </div>}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={subfolderOpen} onOpenChange={setSubfolderOpen}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader><DialogTitle>New subfolder</DialogTitle><DialogDescription>Keep a trip, month, or part of the project together.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input autoFocus value={subfolderName} onChange={(e) => setSubfolderName(e.target.value)} placeholder="Materials" /></div>
+            <div><Label>Month (optional)</Label><Input type="month" value={subfolderMonth} onChange={(e) => setSubfolderMonth(e.target.value)} /></div>
+            <Button className="w-full receiptify-primary-action" disabled={!canEdit || !subfolderName.trim() || subfolderMutation.isPending} onClick={() => subfolderMutation.mutate({ name: subfolderName.trim(), monthlyKey: subfolderMonth || undefined })}>{subfolderMutation.isPending ? "Adding…" : "Add subfolder"}</Button>
           </div>
         </DialogContent>
       </Dialog>

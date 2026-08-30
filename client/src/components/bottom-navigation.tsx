@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import { useTranslation } from 'react-i18next';
 import {
   QrCode,
@@ -33,11 +32,8 @@ export default function BottomNavigation() {
             const IconComponent = item.icon;
 
             return (
-              <Link key={item.path} href={item.path}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`flex flex-col items-center py-2 px-3 h-auto ${
+              <Link key={item.path} href={item.path}
+                  className={`flex flex-col items-center justify-center py-2 px-3 h-auto rounded-md text-sm font-medium ${
                     isActive
                       ? "text-primary"
                       : "text-gray-400 hover:text-gray-600"
@@ -48,7 +44,6 @@ export default function BottomNavigation() {
                   <span className={`text-xs font-medium ${isActive ? "text-primary" : "text-gray-400"}`}>
                     {item.label}
                   </span>
-                </Button>
               </Link>
             );
           })}

@@ -324,8 +324,11 @@ export const splitPaymentRequests = pgTable("split_payment_requests", {
   folderId: varchar("folder_id").notNull(),
   requestedBy: varchar("requested_by").notNull(),
   memberId: varchar("member_id").notNull(),
+  subfolderId: varchar("subfolder_id"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("GBP"),
+  context: text("context"),
+  message: text("message"),
   status: text("status").default("draft"), // draft, pending, paid, declined, cancelled, failed
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeCheckoutSessionId: text("stripe_checkout_session_id"),

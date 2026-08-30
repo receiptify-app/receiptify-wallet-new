@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Users, FolderOpen, Receipt as ReceiptIcon, Plus, ArrowUpRight, WalletCards, Sparkles, X } from "lucide-react";
+import { Users, FolderOpen, Receipt as ReceiptIcon, Plus, ArrowUpRight, WalletCards, X } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -51,7 +51,10 @@ export default function SplitPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [folderPeople, setFolderPeople] = useState<Friend[]>([{ key: "folder-person-1", name: "", email: "" }]);
   const [billOpen, setBillOpen] = useState(false);
+  const [billStep, setBillStep] = useState<1 | 2 | 3>(1);
+  const [createdBillFolderId, setCreatedBillFolderId] = useState<string | null>(null);
   const [bill, setBill] = useState({title:"", description:"", amount:"", splitMode:"equal" as "equal" | "custom" | "items"});
   const [friends, setFriends] = useState<Friend[]>([{key:"friend-1",name:"",email:""}]);
   const [customShares, setCustomShares] = useState<Record<string, string>>({ creator: "" });
@@ -63,17 +66,44 @@ export default function SplitPage() {
   const { data: oneOffBills = [] } = useQuery<OneOffBill[]>({ queryKey:["/api/split-bills"] });
   const participants = useMemo(() => [
     { key: "creator", name: "You", isCreator: true },
-    ...friends.filter((friend) => friend.name.trim()).map((friend) => ({ ...friend, name: friend.name.trim(), email: friend.email.trim() || undefined })),
+    ...friends.filter((friend) => friend.name.trim()).map((friend) => ({ ...friend, name: friend.name.trim(), email: friend.email.trim() || undefined, isCreator: false })),
   ], [friends]);
   const amount = Number(bill.amount) || 0;
   const customAllocated = participants.reduce((sum, participant) => sum + (Number(customShares[participant.key]) || 0), 0);
   const itemsAllocated = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const allocation = bill.splitMode === "custom" ? customAllocated : bill.splitMode === "items" ? itemsAllocated : amount;
   const allocationDelta = amount - allocation;
+  const participantShares = useMemo(() => {
+    const shares: Record<string, number> = Object.fromEntries(participants.map((participant) => [participant.key, 0]));
+    if (bill.splitMode === "custom") {
+      participants.forEach((participant) => { shares[participant.key] = Number(customShares[participant.key]) || 0; });
+      return shares;
+    }
+    if (bill.splitMode === "items") {
+      items.forEach((item) => {
+        const selected = item.participantKeys.filter((key) => key in shares);
+        if (selected.length === 0) return;
+        const itemPence = Math.round((Number(item.amount) || 0) * 100);
+        const basePence = Math.floor(itemPence / selected.length);
+        selected.forEach((key, index) => {
+          shares[key] += (basePence + (index < itemPence % selected.length ? 1 : 0)) / 100;
+        });
+      });
+      return shares;
+    }
+    const debtors = participants.filter((participant) => !participant.isCreator);
+    const totalPence = Math.round(amount * 100);
+    const basePence = debtors.length ? Math.floor(totalPence / debtors.length) : 0;
+    debtors.forEach((participant, index) => {
+      shares[participant.key] = (basePence + (index < totalPence % debtors.length ? 1 : 0)) / 100;
+    });
+    return shares;
+  }, [amount, bill.splitMode, customShares, items, participants]);
   const validBill = !!bill.title.trim() && amount > 0 && participants.length > 1 &&
     (bill.splitMode === "equal" || Math.abs(allocationDelta) < 0.01) &&
     (bill.splitMode !== "items" || items.length > 0 && items.every((item) => item.label.trim() && Number(item.amount) >= 0 && item.participantKeys.length > 0));
   const resetBill = () => {
+    setBillStep(1);
     setBill({ title:"", description:"", amount:"", splitMode:"equal" });
     setFriends([{ key:"friend-1", name:"", email:"" }]);
     setCustomShares({ creator:"" });
@@ -83,7 +113,7 @@ export default function SplitPage() {
     mutationFn: async () => {
       const payloadParticipants = participants.map((participant) => ({
         ...participant,
-        ...(bill.splitMode === "custom" ? { shareAmount: (Number(customShares[participant.key]) || 0).toFixed(2) } : {}),
+        ...(bill.splitMode === "custom" ? { shareAmount: participantShares[participant.key].toFixed(2) } : {}),
       }));
       const res = await apiRequest("POST","/api/split-bills",{
         title: bill.title.trim(), description: bill.description.trim() || undefined, amount,
@@ -92,7 +122,7 @@ export default function SplitPage() {
       });
       return res.json();
     },
-    onSuccess:(created:any)=>{ queryClient.invalidateQueries({queryKey:["/api/split-bills"]}); queryClient.invalidateQueries({queryKey:["/api/split-folders"]}); setBillOpen(false); resetBill(); navigate(`/split/${created.folderId}`); },
+    onSuccess:(created:any)=>{ queryClient.invalidateQueries({queryKey:["/api/split-bills"]}); queryClient.invalidateQueries({queryKey:["/api/split-folders"]}); setCreatedBillFolderId(created.folderId); setBillStep(3); },
     onError:(e:any)=>toast({title:"Couldn't create bill",description:e.message,variant:"destructive"}),
   });
 
@@ -105,12 +135,20 @@ export default function SplitPage() {
       const folder = await res.json();
       return folder.id as string;
     },
-    onSuccess: (folderId) => {
+    onSuccess: async (folderId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      const inviteErrors: string[] = [];
+      for (const person of folderPeople.filter((candidate) => candidate.name.trim() && candidate.email.trim())) {
+        try {
+          await apiRequest("POST", `/api/split-folders/${folderId}/members`, { displayName: person.name.trim(), email: person.email.trim() });
+        } catch { inviteErrors.push(person.email.trim()); }
+      }
       setName("");
       setDescription("");
+      setFolderPeople([{ key: `folder-person-${Date.now()}`, name: "", email: "" }]);
       setCreateOpen(false);
       navigate(`/split/${folderId}`);
+      if (inviteErrors.length) toast({ title: "Folder created, invite needs attention", description: `We couldn't invite ${inviteErrors.join(", ")}. You can retry from the folder.`, variant: "destructive" });
     },
     onError: (err: any) =>
       toast({
@@ -143,13 +181,21 @@ export default function SplitPage() {
           </div>
         </div>
 
-        <section className="receiptify-split-intro receiptify-fade-in">
-          <div className="receiptify-split-intro-mark"><Sparkles className="w-5 h-5" /></div>
-          <div>
-            <p className="receiptify-eyebrow">A little less awkward</p>
-            <h2>Shared spending, kept human.</h2>
-            <p>Keep the receipt, the context, and the people who were there in one calm place.</p>
-          </div>
+        <section className="receiptify-split-choices receiptify-fade-in" aria-label="Choose how to split">
+          <Card className="receiptify-choice-card">
+            <CardContent className="p-5">
+              <div className="receiptify-choice-icon"><FolderOpen className="w-6 h-6" /></div>
+              <div className="min-w-0 flex-1"><p className="receiptify-eyebrow">ONGOING</p><h2>New shared folder</h2><p>Track receipts and expenses with someone over time.</p></div>
+              <Button className="receiptify-primary-action shrink-0" onClick={() => setCreateOpen(true)}>Create folder</Button>
+            </CardContent>
+          </Card>
+          <Card className="receiptify-choice-card">
+            <CardContent className="p-5">
+              <div className="receiptify-choice-icon is-coral"><WalletCards className="w-6 h-6" /></div>
+              <div className="min-w-0 flex-1"><p className="receiptify-eyebrow">ONE-OFF</p><h2>Split a bill</h2><p>Upload one bill and choose how much each person pays.</p></div>
+              <Button className="receiptify-primary-action shrink-0" onClick={() => setBillOpen(true)}>Start split</Button>
+            </CardContent>
+          </Card>
         </section>
 
         {isLoading && (
@@ -255,17 +301,46 @@ export default function SplitPage() {
 
       <Dialog open={billOpen} onOpenChange={setBillOpen}>
         <DialogContent className="receiptify-dialog max-w-md">
-          <DialogHeader><DialogTitle>Start a one-off bill</DialogTitle><DialogDescription>For dinner, a weekend away, or anything you’ll settle once.</DialogDescription></DialogHeader>
-          <div className="space-y-3">
+           <DialogHeader>
+             <DialogTitle>{billStep === 1 ? "Split a bill" : billStep === 2 ? "Review split" : "Split created"}</DialogTitle>
+             <DialogDescription>{billStep === 1 ? "Choose who was there and how to divide the total." : billStep === 2 ? "Check the amounts before creating this split." : "Your split is ready to share."}</DialogDescription>
+           </DialogHeader>
+           <div className="receiptify-flow-steps" aria-label={`Step ${billStep} of 3`}>
+             {["Details", "Review", "Done"].map((label, index) => <span key={label} className={index + 1 <= billStep ? "is-active" : ""}><i>{index + 1}</i>{label}</span>)}
+           </div>
+           {billStep === 3 ? (
+             <div className="receiptify-created-summary">
+               <div className="receiptify-success-mark">✓</div><h2>Split created</h2><p className="text-sm">Your split is ready to share.</p>
+               <dl><div><dt>Bill name</dt><dd>{bill.title}</dd></div><div><dt>Total amount</dt><dd>£{amount.toFixed(2)}</dd></div></dl>
+               <div className="receiptify-summary-people">{participants.filter(p => !p.isCreator).map(p => <span key={p.key}>{p.name} · £{participantShares[p.key].toFixed(2)}</span>)}</div>
+               <div className="mt-5 space-y-2">
+                 <Button className="w-full receiptify-primary-action" onClick={() => { if (createdBillFolderId) navigate(`/split/${createdBillFolderId}`); setBillOpen(false); resetBill(); }}>Request payment</Button>
+                 <Button variant="outline" className="w-full" onClick={() => { if (createdBillFolderId) navigate(`/split/${createdBillFolderId}`); setBillOpen(false); resetBill(); }}>View split</Button>
+                 <Button variant="ghost" className="w-full" onClick={() => { setBillOpen(false); resetBill(); }}>Done</Button>
+               </div>
+             </div>
+           ) : billStep === 2 ? (
+             <div className="space-y-4">
+               <div className="rounded-xl border p-4 space-y-3 text-sm">
+                 <p><span className="text-gray-500">Bill</span><br/><strong>{bill.title}</strong>{bill.description ? ` · ${bill.description}` : ""}</p>
+                 <p><span className="text-gray-500">Total</span><br/><strong className="receiptify-mono">£{amount.toFixed(2)}</strong></p>
+                 <div><span className="text-gray-500">Who owes what</span><div className="mt-2 space-y-1">{participants.map((participant) => <p key={participant.key} className="flex justify-between gap-3"><span>{participant.name}</span><strong className="receiptify-mono">£{participantShares[participant.key].toFixed(2)}</strong></p>)}</div></div>
+               </div>
+               <Button className="w-full receiptify-primary-action" disabled={billMutation.isPending} onClick={() => billMutation.mutate()}>{billMutation.isPending ? "Creating…" : "Create split"}</Button>
+               <Button variant="ghost" className="w-full" onClick={() => setBillStep(1)}>Back to details</Button>
+             </div>
+           ) : (
+           <div className="space-y-3">
             <div><Label>Title</Label><Input value={bill.title} onChange={e=>setBill({...bill,title:e.target.value})} placeholder="Dinner at Mallow" /></div>
             <div><Label>Description (optional)</Label><Input value={bill.description} onChange={e=>setBill({...bill,description:e.target.value})} placeholder="Friday night" /></div>
             <div><Label>Total amount</Label><Input inputMode="decimal" value={bill.amount} onChange={e=>setBill({...bill,amount:e.target.value})} placeholder="0.00" /></div>
             <div className="flex gap-2"><Button type="button" size="sm" variant={bill.splitMode==="equal"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"equal"})}>Equal</Button><Button type="button" size="sm" variant={bill.splitMode==="custom"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"custom"})}>Custom</Button><Button type="button" size="sm" variant={bill.splitMode==="items"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"items"})}>By item</Button></div>
             <div className="rounded-xl border border-dashed p-3 space-y-2"><div className="flex justify-between"><p className="text-sm font-semibold">People</p><span className="text-xs text-gray-500">You are included</span></div><div className="flex items-center gap-2 rounded-lg bg-[#dfe9e0] px-3 py-2 text-sm"><span className="flex-1">You</span><span className="text-xs">Creator</span>{bill.splitMode==="custom" && <Input className="w-20 h-8" inputMode="decimal" value={customShares.creator || ""} onChange={e=>setCustomShares({...customShares,creator:e.target.value})} placeholder="0.00" />}</div>{friends.map((f,i)=><div key={f.key} className="flex flex-wrap gap-2"><Input className="min-w-[120px] flex-1" placeholder="Friend's name" value={f.name} onChange={e=>setFriends(friends.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/><Input className="min-w-[130px] flex-1" placeholder="Email (optional)" value={f.email} onChange={e=>setFriends(friends.map((x,j)=>j===i?{...x,email:e.target.value}:x))}/>{bill.splitMode==="custom" && f.name.trim() && <Input className="w-20 h-9" inputMode="decimal" value={customShares[f.key] || ""} onChange={e=>setCustomShares({...customShares,[f.key]:e.target.value})} placeholder="0.00" />}<Button type="button" size="icon" variant="ghost" aria-label="Remove friend" onClick={()=>setFriends(friends.filter((_,j)=>j!==i))}><X /></Button></div>)}<Button type="button" variant="ghost" className="text-[#60786d]" onClick={()=>setFriends([...friends,{key:`friend-${Date.now()}`,name:"",email:""}])}><Plus className="w-4 h-4 mr-1"/>Add friend</Button></div>
             {bill.splitMode==="items" && <div className="space-y-2 border rounded-xl p-3"><p className="text-sm font-semibold">Items</p>{items.map((item,index)=><div key={item.key} className="space-y-2 border-b pb-3 last:border-0"><div className="flex gap-2"><Input className="flex-1" placeholder="Item label" value={item.label} onChange={e=>setItems(items.map((x,i)=>i===index?{...x,label:e.target.value}:x))}/><Input className="w-24" inputMode="decimal" placeholder="0.00" value={item.amount} onChange={e=>setItems(items.map((x,i)=>i===index?{...x,amount:e.target.value}:x))}/><Button type="button" size="icon" variant="ghost" aria-label="Remove item" onClick={()=>setItems(items.filter((_,i)=>i!==index))}><X /></Button></div><div className="flex flex-wrap gap-1">{participants.map(p=><button type="button" key={p.key} onClick={()=>setItems(items.map((x,i)=>i===index?{...x,participantKeys:x.participantKeys.includes(p.key)?x.participantKeys.filter(k=>k!==p.key):[...x.participantKeys,p.key]}:x))} className={`rounded-full border px-2 py-1 text-xs ${item.participantKeys.includes(p.key)?"bg-green-600 text-white":"bg-white"}`}>{p.name}</button>)}</div></div>)}<Button type="button" variant="ghost" onClick={()=>setItems([...items,{key:`item-${Date.now()}`,label:"",amount:"",participantKeys:["creator"]}])}><Plus className="w-4 h-4 mr-1"/>Add item</Button></div>}
-            <div className={`rounded-lg px-3 py-2 text-xs ${Math.abs(allocationDelta)<.01 ? "bg-green-50 text-green-700" : allocationDelta<0 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}><strong>Allocated £{allocation.toFixed(2)}</strong> of £{amount.toFixed(2)} · {Math.abs(allocationDelta)<.01 ? "Fully allocated" : allocationDelta>0 ? `£${allocationDelta.toFixed(2)} remaining` : `£${Math.abs(allocationDelta).toFixed(2)} over`}{bill.splitMode==="equal" && participants.length > 0 && amount>0 ? ` · £${(amount/participants.length).toFixed(2)} each` : ""}</div>
-            <Button className="w-full receiptify-primary-action" disabled={!validBill || billMutation.isPending} onClick={()=>billMutation.mutate()}>{billMutation.isPending ? "Creating…" : "Create bill"}</Button>
+             <div className={`rounded-lg px-3 py-2 text-xs ${Math.abs(allocationDelta)<.01 ? "bg-green-50 text-green-700" : allocationDelta<0 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}><strong>Allocated £{allocation.toFixed(2)}</strong> of £{amount.toFixed(2)} · {Math.abs(allocationDelta)<.01 ? "Fully allocated" : allocationDelta>0 ? `£${allocationDelta.toFixed(2)} remaining` : `£${Math.abs(allocationDelta).toFixed(2)} over`}{bill.splitMode==="equal" && participants.length > 1 && amount>0 ? ` · £${(amount/(participants.length - 1)).toFixed(2)} per friend` : ""}</div>
+             <Button className="w-full receiptify-primary-action" disabled={!validBill} onClick={() => setBillStep(2)}>Continue</Button>
           </div>
+           )}
         </DialogContent>
       </Dialog>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -300,6 +375,11 @@ export default function SplitPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 data-testid="input-new-folder-desc"
               />
+            </div>
+            <div className="space-y-2 rounded-xl border border-dashed p-3">
+              <div><Label>Shared with (optional)</Label><p className="text-xs text-gray-500">You can add people later from the folder.</p></div>
+              {folderPeople.map((person, index) => <div key={person.key} className="flex flex-wrap gap-2"><Input className="min-w-[120px] flex-1" placeholder="Name" value={person.name} onChange={(e) => setFolderPeople((current) => current.map((candidate, i) => i === index ? { ...candidate, name: e.target.value } : candidate))} /><Input className="min-w-[150px] flex-1" type="email" placeholder="Email" value={person.email} onChange={(e) => setFolderPeople((current) => current.map((candidate, i) => i === index ? { ...candidate, email: e.target.value } : candidate))} />{folderPeople.length > 1 && <Button type="button" size="icon" variant="ghost" onClick={() => setFolderPeople((current) => current.filter((_, i) => i !== index))}><X /></Button>}</div>)}
+              <Button type="button" variant="ghost" className="text-[#60786d]" onClick={() => setFolderPeople((current) => [...current, { key: `folder-person-${Date.now()}`, name: "", email: "" }])}><Plus className="w-4 h-4 mr-1" />Add another person</Button>
             </div>
             <div className="flex gap-2">
               <Button

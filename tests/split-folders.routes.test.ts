@@ -725,6 +725,169 @@ async function main() {
     );
   });
 
+  await test("Payment-request drafts preserve their reviewed context", async () => {
+    const subfolder = await splitFolderStorage.createSubfolder({
+      folderId: folderA.id,
+      name: "Friday dinner",
+    });
+    const created = await api(users.owner, "POST", `/api/split-folders/${folderA.id}/payment-requests`, {
+      memberId: viewerMember.id,
+      amount: "18.00",
+      currency: "GBP",
+      context: "Dinner at Mallow",
+      message: "Please settle this when you can.",
+      subfolderId: subfolder.id,
+    });
+    assertStatus(created, 201, "create contextual payment-request draft");
+    assert.equal(created.data.status, "draft");
+    assert.equal(created.data.context, "Dinner at Mallow");
+    assert.equal(created.data.message, "Please settle this when you can.");
+    assert.equal(created.data.subfolderId, subfolder.id);
+
+    const listed = await api(users.owner, "GET", `/api/split-folders/${folderA.id}/payment-requests`);
+    assertStatus(listed, 200, "list contextual payment-request draft");
+    const request = listed.data.find((candidate: any) => candidate.id === created.data.id);
+    assert.equal(request.context, "Dinner at Mallow");
+    assert.equal(request.message, "Please settle this when you can.");
+    assert.equal(request.subfolderId, subfolder.id);
+  });
+
+  await test("Equal one-off bills divide debt between friends, not the payer", async () => {
+    const created = await api(users.owner, "POST", "/api/split-bills", {
+      title: "Dinner",
+      amount: "36.00",
+      splitMode: "equal",
+      participants: [
+        { key: "creator", name: "You", isCreator: true },
+        { key: "jason", name: "Jason", email: "jason@example.invalid", isCreator: false },
+        { key: "darlington", name: "Darlington", email: "darlington@example.invalid", isCreator: false },
+      ],
+    });
+    assertStatus(created, 201, "create equal one-off bill");
+    folderIds.push(created.data.folderId);
+    billIds.push(created.data.id);
+    const participantShares = created.data.participants.map((participant: any) => Number(participant.shareAmount));
+    assert.deepEqual(participantShares, [0, 18, 18]);
+  });
+
+  await test("Paid receipt shares block OCR item changes until explicitly reopened", async () => {
+    assertStatus(
+      await api(users.owner, "PUT", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/assignments`, {
+        mode: "items",
+        assignments: [{ memberId: viewerMember.id, itemId: itemA.id, shareAmount: "10.00" }],
+      }),
+      200,
+      "create item assignment before settlement",
+    );
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${folderA.id}/members/${viewerMember.id}/settle`),
+      200,
+      "settle item assignment",
+    );
+    assertStatus(
+      await api(users.owner, "PATCH", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/items/${itemA.id}`, {
+        name: "Paid item must not change",
+        price: "11.00",
+      }),
+      409,
+      "paid item update guard",
+    );
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/items`, {
+        name: "Paid receipt must not gain items",
+        price: "1.00",
+      }),
+      409,
+      "paid item creation guard",
+    );
+    const unchanged = (await storage.getReceiptItems(receiptA.id)).find((item) => item.id === itemA.id);
+    assert.equal(unchanged?.name, "Folder A item");
+    assert.equal(unchanged?.price, "10.00");
+
+    assertStatus(
+      await api(users.owner, "POST", `/api/split-folders/${folderA.id}/members/${viewerMember.id}/unsettle`),
+      200,
+      "explicitly reopen paid item assignment",
+    );
+    assertStatus(
+      await api(users.owner, "PATCH", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/items/${itemA.id}`, {
+        name: "Corrected item",
+        price: "10.00",
+      }),
+      200,
+      "edit item after reopening",
+    );
+    assertStatus(
+      await api(users.owner, "PUT", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/assignments`, {
+        mode: "items",
+        assignments: [],
+      }),
+      200,
+      "clear reopened item assignment",
+    );
+  });
+
+  await test("Foreign-currency OCR edits round-trip raw values without double conversion", async () => {
+    const foreignReceipt = await storage.createReceipt({
+      userId: users.owner,
+      merchantName: `EUR split route receipt ${runId}`,
+      total: "10.00",
+      currency: "EUR",
+      exchangeRateToGBP: "0.85000000",
+      date: new Date(),
+      splitFolderId: folderA.id,
+    });
+    receiptIds.push(foreignReceipt.id);
+    const foreignItem = await storage.createReceiptItem({
+      receiptId: foreignReceipt.id,
+      name: "Raw euro item",
+      quantity: "1",
+      price: "4.00",
+    });
+    itemIds.push(foreignItem.id);
+
+    const before = await api(users.owner, "GET", `/api/split-folders/${folderA.id}`);
+    const beforeItem = before.data.receipts
+      .find((receipt: any) => receipt.id === foreignReceipt.id)
+      .items.find((item: any) => item.id === foreignItem.id);
+    assert.equal(beforeItem.rawPrice, "4.00");
+    assert.equal(Number(beforeItem.price), 3.4);
+
+    assertStatus(
+      await api(users.owner, "PATCH", `/api/split-folders/${folderA.id}/receipts/${foreignReceipt.id}/items/${foreignItem.id}`, {
+        name: "Corrected euro item",
+        price: "5.00",
+      }),
+      200,
+      "edit raw euro item",
+    );
+    const after = await api(users.owner, "GET", `/api/split-folders/${folderA.id}`);
+    const afterItem = after.data.receipts
+      .find((receipt: any) => receipt.id === foreignReceipt.id)
+      .items.find((item: any) => item.id === foreignItem.id);
+    assert.equal(afterItem.rawPrice, "5.00");
+    assert.equal(Number(afterItem.price), 4.25);
+  });
+
+  await test("OCR item edits reject negative and invalid prices", async () => {
+    assertStatus(
+      await api(users.owner, "PATCH", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/items/${itemA.id}`, {
+        price: "-0.01",
+      }),
+      400,
+      "negative item price",
+    );
+    assertStatus(
+      await api(users.owner, "PATCH", `/api/split-folders/${folderA.id}/receipts/${receiptA.id}/items/${itemA.id}`, {
+        price: "not-a-number",
+      }),
+      400,
+      "invalid item price",
+    );
+    const unchanged = (await storage.getReceiptItems(receiptA.id)).find((item) => item.id === itemA.id);
+    assert.equal(unchanged?.price, "10.00");
+  });
+
   await test("Contributor can add but cannot edit or manage", async () => {
     assertStatus(await api(users.contributor, "GET", `/api/split-folders/${folderA.id}`), 200, "contributor read");
     assertStatus(
