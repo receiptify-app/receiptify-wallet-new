@@ -101,3 +101,30 @@ run("clearing all assignments deletes everything", () => {
   assert.deepEqual(toDeleteIds.sort(), ["a1", "a2"]);
   assert.deepEqual(toInsertIndexes, []);
 });
+
+run("blocks edits that would replace an already-paid assignment", () => {
+  const existing = [
+    { id: "paid-1", memberId: "m1", itemId: null, shareAmount: "10.00", status: "paid" },
+    { id: "pending-1", memberId: "m2", itemId: null, shareAmount: "10.00", status: "pending" },
+  ];
+  const desired = [
+    { memberId: "m1", itemId: null, shareAmount: "8.00" },
+    { memberId: "m2", itemId: null, shareAmount: "12.00" },
+  ];
+  const result = diffReceiptAssignments(existing, desired);
+  assert.deepEqual(result.paidConflictIds, ["paid-1"]);
+});
+
+run("allows adding allocations while an unchanged paid row remains intact", () => {
+  const existing = [
+    { id: "paid-1", memberId: "m1", itemId: null, shareAmount: "10.00", status: "paid" },
+  ];
+  const desired = [
+    { memberId: "m1", itemId: null, shareAmount: "10.00" },
+    { memberId: "m2", itemId: null, shareAmount: "5.00" },
+  ];
+  const result = diffReceiptAssignments(existing, desired);
+  assert.deepEqual(result.paidConflictIds, []);
+  assert.deepEqual(result.toDeleteIds, []);
+  assert.deepEqual(result.toInsertIndexes, [1]);
+});

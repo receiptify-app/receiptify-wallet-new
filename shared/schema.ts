@@ -175,6 +175,12 @@ export const splitFolders = pgTable("split_folders", {
   ownerId: varchar("owner_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
+  ownerContactName: text("owner_contact_name"),
+  ownerContactEmail: text("owner_contact_email"),
+  ownerContactPhone: text("owner_contact_phone"),
+  parentFolderId: varchar("parent_folder_id"),
+  workspaceType: text("workspace_type").default("ongoing").notNull(), // ongoing, one_off
+  updatedAt: timestamp("updated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("split_folders_owner_id_idx").on(table.ownerId),
@@ -189,7 +195,8 @@ export const splitFolderMembers = pgTable("split_folder_members", {
   displayName: text("display_name"),
   inviteToken: text("invite_token").notNull().unique(),
   status: text("status").default("invited"), // invited, active, removed
-  role: text("role").default("member"), // owner, member
+  // Legacy "member" rows retain read-only access and are treated as viewers.
+  role: text("role").default("member"), // owner, viewer, contributor, editor, member (legacy)
   joinedAt: timestamp("joined_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
@@ -205,6 +212,8 @@ export const splitAssignments = pgTable("split_assignments", {
   itemId: varchar("item_id"), // null = entire-bill share
   shareAmount: decimal("share_amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").default("pending"), // pending, paid
+  sourceType: text("source_type").default("receipt").notNull(), // receipt, expense
+  sourceId: varchar("source_id"), // receipt/expense id; legacy rows are receiptId
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("split_assignments_folder_idx").on(table.folderId),
@@ -226,6 +235,113 @@ export const paymentMethods = pgTable("payment_methods", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Subfolders are organizational only: permissions inherit from their workspace.
+export const splitSubfolders = pgTable("split_subfolders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  name: text("name").notNull(),
+  monthlyKey: text("monthly_key"), // YYYY-MM when created as a monthly grouping
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("split_subfolders_folder_idx").on(table.folderId)]);
+
+// Keeps Split presentation/organization data separate from an immutable source receipt.
+export const splitFolderReceiptMetadata = pgTable("split_folder_receipt_metadata", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  receiptId: varchar("receipt_id").notNull(),
+  subfolderId: varchar("subfolder_id"),
+  displayName: text("display_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [index("split_folder_receipt_metadata_source_idx").on(table.folderId, table.receiptId)]);
+
+// A non-receipt cost in a folder.  Its allocations use split_assignments with
+// receiptId set to this expense's synthetic source id only when a client needs
+// a unified allocation view; expense shares are otherwise stored directly here.
+export const splitManualExpenses = pgTable("split_manual_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  subfolderId: varchar("subfolder_id"),
+  createdBy: varchar("created_by").notNull(),
+  payerMemberId: varchar("payer_member_id"),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("GBP"),
+  expenseDate: timestamp("expense_date").defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [index("split_manual_expenses_folder_idx").on(table.folderId)]);
+
+export const splitActivityEvents = pgTable("split_activity_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  subfolderId: varchar("subfolder_id"),
+  actorUserId: varchar("actor_user_id"),
+  eventType: text("event_type").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("split_activity_events_folder_idx").on(table.folderId)]);
+
+export const splitBills = pgTable("split_bills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  subfolderId: varchar("subfolder_id"),
+  createdBy: varchar("created_by").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("GBP"),
+  splitMode: text("split_mode").notNull(), // equal, custom, items
+  status: text("status").default("unpaid"), // unpaid, partially_paid, settled
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [index("split_bills_folder_idx").on(table.folderId)]);
+
+export const splitBillParticipants = pgTable("split_bill_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  billId: varchar("bill_id").notNull(),
+  memberId: varchar("member_id").notNull(),
+  itemId: varchar("item_id"),
+  shareAmount: decimal("share_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").default("pending"), // pending, paid, declined
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("split_bill_participants_bill_idx").on(table.billId)]);
+
+export const splitBillItems = pgTable("split_bill_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  billId: varchar("bill_id").notNull(),
+  itemKey: text("item_key"),
+  label: text("label").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("split_bill_items_bill_idx").on(table.billId)]);
+
+export const splitPaymentRequests = pgTable("split_payment_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull(),
+  requestedBy: varchar("requested_by").notNull(),
+  memberId: varchar("member_id").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("GBP"),
+  status: text("status").default("draft"), // draft, pending, paid, declined, cancelled, failed
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [index("split_payment_requests_folder_idx").on(table.folderId)]);
+
+export const splitPaymentEvents = pgTable("split_payment_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentRequestId: varchar("payment_request_id").notNull(),
+  eventType: text("event_type").notNull(),
+  stripeEventId: text("stripe_event_id"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("split_payment_events_request_idx").on(table.paymentRequestId)]);
 
 // Session storage table for authentication
 export const sessions = pgTable("sessions", {
@@ -528,6 +644,15 @@ export const insertSplitAssignmentSchema = createInsertSchema(splitAssignments).
   id: true,
   createdAt: true,
 });
+export const insertSplitSubfolderSchema = createInsertSchema(splitSubfolders).omit({ id: true, createdAt: true });
+export const insertSplitFolderReceiptMetadataSchema = createInsertSchema(splitFolderReceiptMetadata).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSplitManualExpenseSchema = createInsertSchema(splitManualExpenses).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSplitActivityEventSchema = createInsertSchema(splitActivityEvents).omit({ id: true, createdAt: true });
+export const insertSplitBillSchema = createInsertSchema(splitBills).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSplitBillParticipantSchema = createInsertSchema(splitBillParticipants).omit({ id: true, createdAt: true });
+export const insertSplitBillItemSchema = createInsertSchema(splitBillItems).omit({ id: true, createdAt: true });
+export const insertSplitPaymentRequestSchema = createInsertSchema(splitPaymentRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSplitPaymentEventSchema = createInsertSchema(splitPaymentEvents).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -568,6 +693,24 @@ export type InsertSplitFolderMember = z.infer<typeof insertSplitFolderMemberSche
 
 export type SplitAssignment = typeof splitAssignments.$inferSelect;
 export type InsertSplitAssignment = z.infer<typeof insertSplitAssignmentSchema>;
+export type SplitSubfolder = typeof splitSubfolders.$inferSelect;
+export type InsertSplitSubfolder = z.infer<typeof insertSplitSubfolderSchema>;
+export type SplitFolderReceiptMetadata = typeof splitFolderReceiptMetadata.$inferSelect;
+export type InsertSplitFolderReceiptMetadata = z.infer<typeof insertSplitFolderReceiptMetadataSchema>;
+export type SplitManualExpense = typeof splitManualExpenses.$inferSelect;
+export type InsertSplitManualExpense = z.infer<typeof insertSplitManualExpenseSchema>;
+export type SplitActivityEvent = typeof splitActivityEvents.$inferSelect;
+export type InsertSplitActivityEvent = z.infer<typeof insertSplitActivityEventSchema>;
+export type SplitBill = typeof splitBills.$inferSelect;
+export type InsertSplitBill = z.infer<typeof insertSplitBillSchema>;
+export type SplitBillParticipant = typeof splitBillParticipants.$inferSelect;
+export type InsertSplitBillParticipant = z.infer<typeof insertSplitBillParticipantSchema>;
+export type SplitBillItem = typeof splitBillItems.$inferSelect;
+export type InsertSplitBillItem = z.infer<typeof insertSplitBillItemSchema>;
+export type SplitPaymentRequest = typeof splitPaymentRequests.$inferSelect;
+export type InsertSplitPaymentRequest = z.infer<typeof insertSplitPaymentRequestSchema>;
+export type SplitPaymentEvent = typeof splitPaymentEvents.$inferSelect;
+export type InsertSplitPaymentEvent = z.infer<typeof insertSplitPaymentEventSchema>;
 
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;

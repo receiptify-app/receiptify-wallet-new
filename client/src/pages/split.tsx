@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Users, FolderOpen, Receipt as ReceiptIcon, Plus } from "lucide-react";
+import { Users, FolderOpen, Receipt as ReceiptIcon, Plus, ArrowUpRight, WalletCards, Sparkles, X } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,12 @@ type FolderSummary = {
   receiptCount: number;
   members: Array<{ id: string; displayName: string | null; userId: string | null; profileImageUrl?: string | null }>;
   status: "settled" | "pending";
+  ownerContactName?: string | null;
+  workspaceType?: "ongoing" | "one_off";
 };
+type OneOffBill = { id:string; folderId:string; title:string; amount:string|number; status:string; splitMode:string };
+type Friend = { key: string; name: string; email: string };
+type BillItem = { key: string; label: string; amount: string; participantKeys: string[] };
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -41,9 +46,49 @@ export default function SplitPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [billOpen, setBillOpen] = useState(false);
+  const [bill, setBill] = useState({title:"", description:"", amount:"", splitMode:"equal" as "equal" | "custom" | "items"});
+  const [friends, setFriends] = useState<Friend[]>([{key:"friend-1",name:"",email:""}]);
+  const [customShares, setCustomShares] = useState<Record<string, string>>({ creator: "" });
+  const [items, setItems] = useState<BillItem[]>([{ key: "item-1", label: "", amount: "", participantKeys: ["creator"] }]);
 
   const { data: folders, isLoading } = useQuery<FolderSummary[]>({
     queryKey: ["/api/split-folders"],
+  });
+  const { data: oneOffBills = [] } = useQuery<OneOffBill[]>({ queryKey:["/api/split-bills"] });
+  const participants = useMemo(() => [
+    { key: "creator", name: "You", isCreator: true },
+    ...friends.filter((friend) => friend.name.trim()).map((friend) => ({ ...friend, name: friend.name.trim(), email: friend.email.trim() || undefined })),
+  ], [friends]);
+  const amount = Number(bill.amount) || 0;
+  const customAllocated = participants.reduce((sum, participant) => sum + (Number(customShares[participant.key]) || 0), 0);
+  const itemsAllocated = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const allocation = bill.splitMode === "custom" ? customAllocated : bill.splitMode === "items" ? itemsAllocated : amount;
+  const allocationDelta = amount - allocation;
+  const validBill = !!bill.title.trim() && amount > 0 && participants.length > 1 &&
+    (bill.splitMode === "equal" || Math.abs(allocationDelta) < 0.01) &&
+    (bill.splitMode !== "items" || items.length > 0 && items.every((item) => item.label.trim() && Number(item.amount) >= 0 && item.participantKeys.length > 0));
+  const resetBill = () => {
+    setBill({ title:"", description:"", amount:"", splitMode:"equal" });
+    setFriends([{ key:"friend-1", name:"", email:"" }]);
+    setCustomShares({ creator:"" });
+    setItems([{ key:"item-1", label:"", amount:"", participantKeys:["creator"] }]);
+  };
+  const billMutation = useMutation({
+    mutationFn: async () => {
+      const payloadParticipants = participants.map((participant) => ({
+        ...participant,
+        ...(bill.splitMode === "custom" ? { shareAmount: (Number(customShares[participant.key]) || 0).toFixed(2) } : {}),
+      }));
+      const res = await apiRequest("POST","/api/split-bills",{
+        title: bill.title.trim(), description: bill.description.trim() || undefined, amount,
+        splitMode: bill.splitMode, participants: payloadParticipants,
+        ...(bill.splitMode === "items" ? { items: items.map((item) => ({ ...item, label: item.label.trim(), amount: Number(item.amount) })) } : {}),
+      });
+      return res.json();
+    },
+    onSuccess:(created:any)=>{ queryClient.invalidateQueries({queryKey:["/api/split-bills"]}); queryClient.invalidateQueries({queryKey:["/api/split-folders"]}); setBillOpen(false); resetBill(); navigate(`/split/${created.folderId}`); },
+    onError:(e:any)=>toast({title:"Couldn't create bill",description:e.message,variant:"destructive"}),
   });
 
   const createMutation = useMutation({
@@ -81,17 +126,26 @@ export default function SplitPage() {
               <Users className="w-6 h-6 text-green-600" />
               <h1>Split folders<em>.</em></h1>
             </div>
-            <p className="receiptify-subtitle">Group receipts and settle up with friends.</p>
+            <p className="receiptify-subtitle">The easy way to keep a shared tab honest.</p>
           </div>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="receiptify-primary-action"
-            data-testid="button-new-folder"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            New folder
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button onClick={() => setCreateOpen(true)} className="receiptify-primary-action flex-1 sm:flex-none" data-testid="button-new-folder">
+              <Plus className="w-4 h-4 mr-1" /> New folder
+            </Button>
+            <Button variant="outline" onClick={() => setBillOpen(true)} className="flex-1 sm:flex-none">
+              <WalletCards className="w-4 h-4 mr-1" /> One-off bill
+            </Button>
+          </div>
         </div>
+
+        <section className="receiptify-split-intro receiptify-fade-in">
+          <div className="receiptify-split-intro-mark"><Sparkles className="w-5 h-5" /></div>
+          <div>
+            <p className="receiptify-eyebrow">A little less awkward</p>
+            <h2>Shared spending, kept human.</h2>
+            <p>Keep the receipt, the context, and the people who were there in one calm place.</p>
+          </div>
+        </section>
 
         {isLoading && (
           <div className="space-y-3">
@@ -124,8 +178,13 @@ export default function SplitPage() {
           </Card>
         )}
 
-        <div className="space-y-3">
-          {folders?.map((f) => (
+        {!isLoading && folders && folders.length > 0 && (
+          <div className="receiptify-section-heading">
+            <div><h2>Your shared folders</h2><p>Everything you’re keeping track of together.</p></div>
+          </div>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {folders?.filter(f=>f.workspaceType !== "one_off").map((f) => (
             <Link key={f.id} href={`/split/${f.id}`}>
               <Card className="receiptify-panel cursor-pointer hover:shadow-md transition" data-testid={`folder-card-${f.id}`}>
                 <CardContent className="p-4">
@@ -152,8 +211,9 @@ export default function SplitPage() {
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{f.memberCount}</span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="text-lg font-bold text-gray-900">£{f.totalAmount.toFixed(2)}</div>
+                      <ArrowUpRight className="w-4 h-4 ml-auto mt-1 text-gray-400" />
                     </div>
                   </div>
 
@@ -176,8 +236,32 @@ export default function SplitPage() {
             </Link>
           ))}
         </div>
+        {!isLoading && folders && folders.length > 0 && (
+          <section className="receiptify-recent-strip">
+            <div><p className="receiptify-eyebrow">Recent shared spending</p><h2>A quick look back</h2></div>
+            <div className="receiptify-recent-items">
+              {folders.filter(f=>f.workspaceType !== "one_off").slice(0, 3).map((f) => <Link key={f.id} href={`/split/${f.id}`} className="receiptify-recent-item"><span>{f.name}</span><strong>£{f.totalAmount.toFixed(2)}</strong><ArrowUpRight className="w-4 h-4" /></Link>)}
+              {oneOffBills.slice(0,3).map(b=><Link key={b.id} href={`/split/${b.folderId}`} className="receiptify-recent-item"><span>{b.title} <small>One-off</small></span><strong>£{Number(b.amount).toFixed(2)}</strong><ArrowUpRight className="w-4 h-4" /></Link>)}
+            </div>
+          </section>
+        )}
       </main>
 
+      <Dialog open={billOpen} onOpenChange={setBillOpen}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader><DialogTitle>Start a one-off bill</DialogTitle><DialogDescription>For dinner, a weekend away, or anything you’ll settle once.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Title</Label><Input value={bill.title} onChange={e=>setBill({...bill,title:e.target.value})} placeholder="Dinner at Mallow" /></div>
+            <div><Label>Description (optional)</Label><Input value={bill.description} onChange={e=>setBill({...bill,description:e.target.value})} placeholder="Friday night" /></div>
+            <div><Label>Total amount</Label><Input inputMode="decimal" value={bill.amount} onChange={e=>setBill({...bill,amount:e.target.value})} placeholder="0.00" /></div>
+            <div className="flex gap-2"><Button type="button" size="sm" variant={bill.splitMode==="equal"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"equal"})}>Equal</Button><Button type="button" size="sm" variant={bill.splitMode==="custom"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"custom"})}>Custom</Button><Button type="button" size="sm" variant={bill.splitMode==="items"?"default":"outline"} onClick={()=>setBill({...bill,splitMode:"items"})}>By item</Button></div>
+            <div className="rounded-xl border border-dashed p-3 space-y-2"><div className="flex justify-between"><p className="text-sm font-semibold">People</p><span className="text-xs text-gray-500">You are included</span></div><div className="flex items-center gap-2 rounded-lg bg-[#dfe9e0] px-3 py-2 text-sm"><span className="flex-1">You</span><span className="text-xs">Creator</span>{bill.splitMode==="custom" && <Input className="w-20 h-8" inputMode="decimal" value={customShares.creator || ""} onChange={e=>setCustomShares({...customShares,creator:e.target.value})} placeholder="0.00" />}</div>{friends.map((f,i)=><div key={f.key} className="flex flex-wrap gap-2"><Input className="min-w-[120px] flex-1" placeholder="Friend's name" value={f.name} onChange={e=>setFriends(friends.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/><Input className="min-w-[130px] flex-1" placeholder="Email (optional)" value={f.email} onChange={e=>setFriends(friends.map((x,j)=>j===i?{...x,email:e.target.value}:x))}/>{bill.splitMode==="custom" && f.name.trim() && <Input className="w-20 h-9" inputMode="decimal" value={customShares[f.key] || ""} onChange={e=>setCustomShares({...customShares,[f.key]:e.target.value})} placeholder="0.00" />}<Button type="button" size="icon" variant="ghost" aria-label="Remove friend" onClick={()=>setFriends(friends.filter((_,j)=>j!==i))}><X /></Button></div>)}<Button type="button" variant="ghost" className="text-[#60786d]" onClick={()=>setFriends([...friends,{key:`friend-${Date.now()}`,name:"",email:""}])}><Plus className="w-4 h-4 mr-1"/>Add friend</Button></div>
+            {bill.splitMode==="items" && <div className="space-y-2 border rounded-xl p-3"><p className="text-sm font-semibold">Items</p>{items.map((item,index)=><div key={item.key} className="space-y-2 border-b pb-3 last:border-0"><div className="flex gap-2"><Input className="flex-1" placeholder="Item label" value={item.label} onChange={e=>setItems(items.map((x,i)=>i===index?{...x,label:e.target.value}:x))}/><Input className="w-24" inputMode="decimal" placeholder="0.00" value={item.amount} onChange={e=>setItems(items.map((x,i)=>i===index?{...x,amount:e.target.value}:x))}/><Button type="button" size="icon" variant="ghost" aria-label="Remove item" onClick={()=>setItems(items.filter((_,i)=>i!==index))}><X /></Button></div><div className="flex flex-wrap gap-1">{participants.map(p=><button type="button" key={p.key} onClick={()=>setItems(items.map((x,i)=>i===index?{...x,participantKeys:x.participantKeys.includes(p.key)?x.participantKeys.filter(k=>k!==p.key):[...x.participantKeys,p.key]}:x))} className={`rounded-full border px-2 py-1 text-xs ${item.participantKeys.includes(p.key)?"bg-green-600 text-white":"bg-white"}`}>{p.name}</button>)}</div></div>)}<Button type="button" variant="ghost" onClick={()=>setItems([...items,{key:`item-${Date.now()}`,label:"",amount:"",participantKeys:["creator"]}])}><Plus className="w-4 h-4 mr-1"/>Add item</Button></div>}
+            <div className={`rounded-lg px-3 py-2 text-xs ${Math.abs(allocationDelta)<.01 ? "bg-green-50 text-green-700" : allocationDelta<0 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}><strong>Allocated £{allocation.toFixed(2)}</strong> of £{amount.toFixed(2)} · {Math.abs(allocationDelta)<.01 ? "Fully allocated" : allocationDelta>0 ? `£${allocationDelta.toFixed(2)} remaining` : `£${Math.abs(allocationDelta).toFixed(2)} over`}{bill.splitMode==="equal" && participants.length > 0 && amount>0 ? ` · £${(amount/participants.length).toFixed(2)} each` : ""}</div>
+            <Button className="w-full receiptify-primary-action" disabled={!validBill || billMutation.isPending} onClick={()=>billMutation.mutate()}>{billMutation.isPending ? "Creating…" : "Create bill"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

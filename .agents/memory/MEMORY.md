@@ -1,2 +1,3 @@
 - [Primary navigation consistency](primary-navigation-consistency.md) — Receiptify’s visual system must cover every primary nav screen, including Scan and Account.
 - [Playwright on Replit](playwright-on-replit.md) — use the provided Chromium executable through Playwright launch options so browser tests run in the workspace.
+- [Settled Split allocations](settled-split-allocations.md) — never mutate or delete paid shares implicitly; require an explicit “mark unpaid” action first.

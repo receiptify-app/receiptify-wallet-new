@@ -12,6 +12,7 @@ import {
   type ReceiptItem,
 } from "@shared/schema";
 import { requireAuth, type AuthenticatedRequest } from "./auth-middleware";
+import { allocationSummary, billStatus, canSplit, canUpdateBillParticipantStatus, money, normalizeSplitRole, validateAllocations } from "./split-utils";
 
 function newToken() {
   return randomBytes(24).toString("base64url");
@@ -20,6 +21,16 @@ function newToken() {
 function num(n: string | number | null | undefined): number {
   if (n === null || n === undefined) return 0;
   return typeof n === "number" ? n : parseFloat(n);
+}
+
+function splitEvenly(amount: number, count: number): string[] {
+  if (count <= 0) return [];
+  const totalCents = Math.round(amount * 100);
+  const baseCents = Math.floor(totalCents / count);
+  const remainder = totalCents - baseCents * count;
+  return Array.from({ length: count }, (_, index) =>
+    ((baseCents + (index < remainder ? 1 : 0)) / 100).toFixed(2),
+  );
 }
 
 // Convert a receipt total to GBP using the snapshotted exchange rate.
@@ -49,6 +60,28 @@ async function loadFolderForUser(folderId: string, userId: string): Promise<Spli
   return (await splitFolderStorage.isUserActiveInFolder(folderId, userId)) ? folder : null;
 }
 
+async function folderPermission(folder: SplitFolder, userId: string) {
+  if (folder.ownerId === userId) return "owner" as const;
+  const member = (await splitFolderStorage.listMembers(folder.id)).find(
+    (m) => m.userId === userId && m.status === "active",
+  );
+  return member ? normalizeSplitRole(member.role) : null;
+}
+
+async function requireFolderPermission(
+  folder: SplitFolder,
+  userId: string,
+  permission: "read" | "add" | "edit" | "manage",
+  res: Response,
+) {
+  const role = await folderPermission(folder, userId);
+  if (!role || !canSplit(role, permission)) {
+    res.status(403).json({ error: `Your folder role does not permit this action` });
+    return null;
+  }
+  return role;
+}
+
 // inviteToken is a secret used as the join URL; never leak it in list/detail responses.
 // (The token is returned once at invite-creation time so the owner can share the link.)
 function sanitizeMember(m: SplitFolderMember) {
@@ -57,21 +90,29 @@ function sanitizeMember(m: SplitFolderMember) {
 }
 
 async function buildFolderSummary(folder: SplitFolder) {
-  const [members, folderReceipts, assignments] = await Promise.all([
+  const [members, folderReceipts, assignments, bills] = await Promise.all([
     splitFolderStorage.listMembers(folder.id),
     splitFolderStorage.listFolderReceipts(folder.id),
     splitFolderStorage.listAssignments(folder.id),
+    splitFolderStorage.listBills(folder.id),
   ]);
-  const totalAmount = folderReceipts.reduce((s, r) => s + totalInGBP(r), 0);
-  const allSettled =
-    assignments.length > 0 && assignments.every((a) => a.status === "paid");
+  // A folder is a ledger: only assigned receipt amounts are owed. Receipt
+  // totals remain factual source data and any unassigned remainder is personal.
+  const billParticipants = bills.flatMap((bill) => bill.participants);
+  const totalAmount =
+    assignments.reduce((s, a) => s + money(a.shareAmount), 0) +
+    billParticipants.reduce((s, participant) => s + money(participant.shareAmount), 0);
+  const outstandingAmount =
+    assignments.filter((a) => a.status === "pending").reduce((s, a) => s + money(a.shareAmount), 0) +
+    billParticipants.filter((participant) => participant.status === "pending").reduce((s, participant) => s + money(participant.shareAmount), 0);
   return {
     ...folder,
     totalAmount,
+    outstandingAmount,
     memberCount: members.filter((m) => m.status !== "removed").length,
     receiptCount: folderReceipts.length,
     members: members.filter((m) => m.status !== "removed").map(sanitizeMember),
-    status: allSettled ? "settled" : "pending",
+    status: outstandingAmount === 0 ? "settled" : "pending",
   };
 }
 
@@ -217,6 +258,7 @@ export function registerSplitFolderRoutes(app: Express) {
         status: "active",
         role: "owner",
       });
+      await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "folder.created" });
       res.status(201).json(folder);
     } catch (err: any) {
       res.status(400).json({ error: err?.message || "Failed to create folder" });
@@ -229,11 +271,18 @@ export function registerSplitFolderRoutes(app: Express) {
     const folder = await loadFolderForUser(req.params.id, userId);
     if (!folder) return res.status(404).json({ error: "Folder not found" });
 
-    const [members, folderReceipts, assignments] = await Promise.all([
+    const [members, folderReceipts, assignments, bills] = await Promise.all([
       splitFolderStorage.listMembers(folder.id),
       splitFolderStorage.listFolderReceipts(folder.id),
       splitFolderStorage.listAssignments(folder.id),
+      splitFolderStorage.listBills(folder.id),
     ]);
+    const manualExpenses = await splitFolderStorage.listManualExpenses(folder.id);
+    const [subfolders, receiptMetadata] = await Promise.all([
+      splitFolderStorage.listSubfolders(folder.id),
+      splitFolderStorage.listReceiptMetadata(folder.id),
+    ]);
+    const currentRole = await folderPermission(folder, userId);
     const items = await splitFolderStorage.getReceiptItemsForReceipts(folderReceipts.map((r) => r.id));
 
     const itemsByReceipt = new Map<string, ReceiptItem[]>();
@@ -254,12 +303,15 @@ export function registerSplitFolderRoutes(app: Express) {
       .filter((m) => m.status !== "removed")
       .map((m) => {
         const mine = assignments.filter((a) => a.memberId === m.id);
+        const myBillShares = bills.flatMap((bill) => bill.participants).filter((participant) => participant.memberId === m.id);
         const pending = mine
           .filter((a) => a.status === "pending")
-          .reduce((s, a) => s + num(a.shareAmount), 0);
+          .reduce((s, a) => s + num(a.shareAmount), 0) +
+          myBillShares.filter((participant) => participant.status === "pending").reduce((s, participant) => s + num(participant.shareAmount), 0);
         const paid = mine
           .filter((a) => a.status === "paid")
-          .reduce((s, a) => s + num(a.shareAmount), 0);
+          .reduce((s, a) => s + num(a.shareAmount), 0) +
+          myBillShares.filter((participant) => participant.status === "paid").reduce((s, participant) => s + num(participant.shareAmount), 0);
         return {
           memberId: m.id,
           displayName: m.displayName,
@@ -284,10 +336,29 @@ export function registerSplitFolderRoutes(app: Express) {
           price: String(itemPriceInGBP(item, r)),
         })),
         assignments: assignmentsByReceipt.get(r.id) || [],
+        splitMetadata: receiptMetadata.find((metadata) => metadata.receiptId === r.id) ?? null,
       })),
       settlement,
-      totalAmount: folderReceipts.reduce((s, r) => s + totalInGBP(r), 0),
+      manualExpenses: manualExpenses.map((expense) => ({
+        ...expense,
+        allocations: assignments.filter((assignment) => assignment.sourceType === "expense" && assignment.sourceId === expense.id),
+      })),
+      subfolders,
+      totalAmount:
+        assignments.reduce((s, a) => s + money(a.shareAmount), 0) +
+        bills.flatMap((bill) => bill.participants).reduce((s, participant) => s + money(participant.shareAmount), 0),
+      outstandingAmount:
+        assignments.filter((a) => a.status === "pending").reduce((s, a) => s + money(a.shareAmount), 0) +
+        bills.flatMap((bill) => bill.participants).filter((participant) => participant.status === "pending").reduce((s, participant) => s + money(participant.shareAmount), 0),
       isOwner: folder.ownerId === userId,
+      currentMemberId: members.find((member) => member.userId === userId && member.status === "active")?.id ?? null,
+      currentRole,
+      permissions: {
+        read: !!currentRole && canSplit(currentRole, "read"),
+        add: !!currentRole && canSplit(currentRole, "add"),
+        edit: !!currentRole && canSplit(currentRole, "edit"),
+        manage: !!currentRole && canSplit(currentRole, "manage"),
+      },
     });
   });
 
@@ -299,15 +370,21 @@ export function registerSplitFolderRoutes(app: Express) {
       const userId = req.user!.id;
       const folder = await loadFolderForUser(req.params.id, userId);
       if (!folder) return res.status(404).json({ error: "Folder not found" });
+      if (!(await requireFolderPermission(folder, userId, "add", res))) return;
       const receiptId = z.string().parse(req.body?.receiptId);
       const receipt = await storage.getReceipt(receiptId);
       if (!receipt || receipt.userId !== userId) {
         return res.status(404).json({ error: "Receipt not found" });
       }
       if (receipt.splitFolderId && receipt.splitFolderId !== folder.id) {
+        const oldAssignments = await splitFolderStorage.listAssignments(receipt.splitFolderId);
+        if (oldAssignments.some((assignment) => assignment.receiptId === receiptId && assignment.status === "paid")) {
+          return res.status(409).json({ error: "Mark paid assignments as unpaid before moving this receipt" });
+        }
         await splitFolderStorage.clearReceiptAssignments(receipt.splitFolderId, receiptId);
       }
       const updated = await splitFolderStorage.attachReceipt(receiptId, folder.id);
+      await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "receipt.attached", metadata: { receiptId } });
       res.json(updated);
     },
   );
@@ -324,8 +401,10 @@ export function registerSplitFolderRoutes(app: Express) {
       if (!receipt || receipt.splitFolderId !== folder.id) {
         return res.status(404).json({ error: "Receipt not in folder" });
       }
-      if (receipt.userId !== userId && folder.ownerId !== userId) {
-        return res.status(403).json({ error: "Only the receipt owner or folder owner can remove this receipt" });
+      if (!(await requireFolderPermission(folder, userId, "edit", res))) return;
+      const assignments = await splitFolderStorage.listAssignments(folder.id);
+      if (assignments.some((assignment) => assignment.receiptId === receipt.id && assignment.status === "paid")) {
+        return res.status(409).json({ error: "Mark paid assignments as unpaid before removing this receipt" });
       }
       await splitFolderStorage.clearReceiptAssignments(folder.id, receipt.id);
       await splitFolderStorage.detachReceipt(receipt.id, folder.id);
@@ -397,6 +476,7 @@ No action is needed from you.`;
         const userId = req.user!.id;
         const folder = await loadFolderForUser(req.params.id, userId);
         if (!folder) return res.status(404).json({ error: "Folder not found" });
+        if (!(await requireFolderPermission(folder, userId, "manage", res))) return;
         const body = inviteBody.parse(req.body);
 
         let invitedUserId: string | null = null;
@@ -504,6 +584,10 @@ No action is needed from you.`;
       if (member.role === "owner") {
         return res.status(400).json({ error: "Cannot remove the folder owner" });
       }
+      const memberAssignments = await splitFolderStorage.listAssignments(folder.id);
+      if (memberAssignments.some((assignment) => assignment.memberId === member.id && assignment.status === "paid")) {
+        return res.status(409).json({ error: "Mark this member's paid assignments as unpaid before removing them" });
+      }
       await splitFolderStorage.clearMemberAssignments(member.id);
       await splitFolderStorage.updateMember(member.id, { status: "removed" });
       res.json({ ok: true });
@@ -584,23 +668,29 @@ No action is needed from you.`;
         if (!receipt || receipt.splitFolderId !== folder.id) {
           return res.status(404).json({ error: "Receipt not in folder" });
         }
-        if (receipt.userId !== userId && folder.ownerId !== userId) {
-          return res.status(403).json({ error: "Only the receipt owner or folder owner can edit assignments" });
-        }
+        if (!(await requireFolderPermission(folder, userId, "edit", res))) return;
         const body = setAssignmentsBody.parse(req.body);
 
-        // Validate per-mode so unassigned items or items left out don't break the save.
-        const tolerance = Math.max(0.05, body.assignments.length * 0.01);
+        // Partial allocation is intentional: the remainder is personal/ignored
+        // and never becomes folder outstanding.
         if (body.mode === "whole") {
-          const sum = body.assignments.reduce((s, a) => s + parseFloat(a.shareAmount || "0"), 0);
+          if (body.assignments.some((assignment) => assignment.itemId)) {
+            return res.status(400).json({ error: "Whole-receipt assignments cannot reference receipt items" });
+          }
           const receiptTotal = totalInGBP(receipt);
-          if (body.assignments.length > 0 && Math.abs(sum - receiptTotal) > tolerance) {
+          const issue = validateAllocations(receiptTotal, body.assignments);
+          if (issue) {
             return res.status(400).json({
-              error: `Assignment total £${sum.toFixed(2)} doesn't match receipt total £${receiptTotal.toFixed(2)}`,
+              error: issue,
             });
           }
         } else if (body.mode === "items") {
           const receiptItems = await storage.getReceiptItems(receipt.id);
+          const validItemIds = new Set(receiptItems.map((item) => item.id));
+          const unknownItem = body.assignments.find((assignment) => assignment.itemId && !validItemIds.has(assignment.itemId));
+          if (unknownItem) {
+            return res.status(400).json({ error: "Invalid receipt item reference" });
+          }
           const byItem = new Map<string, number>();
           for (const a of body.assignments) {
             byItem.set(a.itemId || "", (byItem.get(a.itemId || "") || 0) + parseFloat(a.shareAmount || "0"));
@@ -608,11 +698,22 @@ No action is needed from you.`;
           for (const item of receiptItems) {
             const itemTotal = itemPriceInGBP(item, receipt);
             const assigned = byItem.get(item.id) || 0;
-            if (assigned > 0 && Math.abs(assigned - itemTotal) > tolerance) {
+            const issue = validateAllocations(itemTotal, body.assignments.filter((a) => a.itemId === item.id));
+            if (issue) {
               return res.status(400).json({
-                error: `Item "${item.name}" shares (£${assigned.toFixed(2)}) don't add up to its price (£${itemTotal.toFixed(2)})`,
+                error: `Item "${item.name}": ${issue}`,
               });
             }
+          }
+          const receiptTotal = totalInGBP(receipt);
+          const itemSubtotal = receiptItems.reduce((sum, item) => sum + itemPriceInGBP(item, receipt), 0);
+          const additionalCharges = money(Math.max(0, receiptTotal - itemSubtotal));
+          const additionalIssue = validateAllocations(
+            additionalCharges,
+            body.assignments.filter((assignment) => !assignment.itemId),
+          );
+          if (additionalIssue) {
+            return res.status(400).json({ error: `Additional charges: ${additionalIssue}` });
           }
         }
 
@@ -640,6 +741,7 @@ No action is needed from you.`;
             status: "pending",
           })),
         );
+        await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "receipt.assignments_updated", metadata: { receiptId: receipt.id } });
         res.json({ assignments: rows, mode: body.mode });
       } catch (err: any) {
         res.status(400).json({ error: err?.message || "Failed to save assignments" });
@@ -663,6 +765,7 @@ No action is needed from you.`;
         return res.status(404).json({ error: "Member not found" });
       }
       await splitFolderStorage.markMemberSettled(folder.id, member.id);
+      await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "member.settled", metadata: { memberId: member.id } });
       res.json({ ok: true });
     },
   );
@@ -686,7 +789,465 @@ No action is needed from you.`;
       if (reverted === 0) {
         return res.status(409).json({ error: "This member has no settled shares to revert" });
       }
+      await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: userId, eventType: "member.unsettled", metadata: { memberId: member.id } });
       res.json({ ok: true });
     },
   );
+
+  // Folder metadata, contact details, and first-level/subfolder relationship.
+  app.patch("/api/split-folders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const body = z.object({
+      name: z.string().trim().min(1).optional(), description: z.string().nullable().optional(),
+      ownerContactName: z.string().nullable().optional(), ownerContactEmail: z.string().email().nullable().optional(),
+      ownerContactPhone: z.string().nullable().optional(), parentFolderId: z.string().nullable().optional(),
+    }).parse(req.body);
+    if (body.parentFolderId === folder.id) return res.status(400).json({ error: "A folder cannot be its own parent" });
+    const updated = await splitFolderStorage.updateFolder(folder.id, body);
+    await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: req.user!.id, eventType: "folder.updated", metadata: Object.keys(body) });
+    res.json(updated);
+  });
+
+  app.patch("/api/split-folders/:id/members/:memberId/role", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const role = z.enum(["viewer", "contributor", "editor"]).parse(req.body?.role);
+    const member = await splitFolderStorage.getMember(req.params.memberId);
+    if (!member || member.folderId !== folder.id || member.role === "owner") return res.status(404).json({ error: "Member not found" });
+    res.json(sanitizeMember((await splitFolderStorage.updateMember(member.id, { role }))!));
+  });
+
+  app.get("/api/split-folders/:id/activity", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    res.json(await splitFolderStorage.listActivity(folder.id));
+  });
+
+  app.post("/api/split-folders/:id/expenses", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "add", res))) return;
+    const body = z.object({ description: z.string().trim().min(1), amount: z.union([z.string(), z.number()]), notes: z.string().optional(), expenseDate: z.coerce.date().optional(), payerMemberId: z.string().optional(), subfolderId: z.string().nullable().optional(), allocations: z.array(assignmentInput).optional() }).parse(req.body);
+    if (money(body.amount) <= 0) return res.status(400).json({ error: "Amount must be positive" });
+    const members = await splitFolderStorage.listMembers(folder.id);
+    if ((body.payerMemberId && !members.some((m) => m.id === body.payerMemberId && m.status === "active")) || body.allocations?.some((a) => !members.some((m) => m.id === a.memberId && m.status === "active"))) return res.status(400).json({ error: "Invalid expense member reference" });
+    if (body.subfolderId && !(await splitFolderStorage.listSubfolders(folder.id)).some((s) => s.id === body.subfolderId)) return res.status(400).json({ error: "Invalid subfolder" });
+    const issue = validateAllocations(body.amount, body.allocations || []);
+    if (issue) return res.status(400).json({ error: issue });
+    const { allocations = [], ...expenseInput } = body;
+    const expense = await splitFolderStorage.createManualExpense({ ...expenseInput, amount: money(body.amount).toFixed(2), folderId: folder.id, createdBy: req.user!.id, currency: "GBP" });
+    if (allocations.length) await splitFolderStorage.replaceReceiptAssignments(folder.id, expense.id, allocations.map((a) => ({ folderId: folder.id, receiptId: expense.id, sourceType: "expense", sourceId: expense.id, memberId: a.memberId, itemId: null, shareAmount: money(a.shareAmount).toFixed(2), status: "pending" })));
+    await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: req.user!.id, eventType: "expense.created", metadata: { expenseId: expense.id } });
+    res.status(201).json(expense);
+  });
+
+  app.patch("/api/split-folders/:id/expenses/:expenseId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const expense = (await splitFolderStorage.listManualExpenses(folder.id)).find((e) => e.id === req.params.expenseId);
+    if (!expense) return res.status(404).json({ error: "Expense not found" });
+    const body = z.object({ description: z.string().trim().min(1).optional(), amount: z.union([z.string(), z.number()]).optional(), notes: z.string().nullable().optional(), expenseDate: z.coerce.date().optional(), payerMemberId: z.string().nullable().optional(), subfolderId: z.string().nullable().optional(), allocations: z.array(assignmentInput).optional() }).parse(req.body);
+    if (body.amount !== undefined && money(body.amount) <= 0) return res.status(400).json({ error: "Amount must be positive" });
+    const members = await splitFolderStorage.listMembers(folder.id);
+    if (
+      (body.payerMemberId && !members.some((member) => member.id === body.payerMemberId && member.status === "active")) ||
+      body.allocations?.some((allocation) => !members.some((member) => member.id === allocation.memberId && member.status === "active"))
+    ) {
+      return res.status(400).json({ error: "Invalid expense member reference" });
+    }
+    if (
+      body.subfolderId &&
+      !(await splitFolderStorage.listSubfolders(folder.id)).some((subfolder) => subfolder.id === body.subfolderId)
+    ) {
+      return res.status(400).json({ error: "Invalid subfolder" });
+    }
+    const targetAmount = body.amount === undefined ? expense.amount : body.amount;
+    const issue = validateAllocations(targetAmount, body.allocations || (await splitFolderStorage.listAssignments(folder.id)).filter((a) => a.sourceType === "expense" && a.sourceId === expense.id));
+    if (issue) return res.status(400).json({ error: issue });
+    if (body.allocations) await splitFolderStorage.replaceReceiptAssignments(folder.id, expense.id, body.allocations.map((a) => ({ folderId: folder.id, receiptId: expense.id, sourceType: "expense", sourceId: expense.id, memberId: a.memberId, itemId: null, shareAmount: money(a.shareAmount).toFixed(2), status: "pending" })));
+    const { allocations, ...updates } = body;
+    res.json(await splitFolderStorage.updateManualExpense(expense.id, { ...updates, amount: body.amount === undefined ? undefined : money(body.amount).toFixed(2) }));
+  });
+
+  app.delete("/api/split-folders/:id/expenses/:expenseId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const expense = (await splitFolderStorage.listManualExpenses(folder.id)).find((row) => row.id === req.params.expenseId);
+    if (!expense) return res.status(404).json({ error: "Expense not found" });
+    const expenseAssignments = await splitFolderStorage.listAssignments(folder.id);
+    if (expenseAssignments.some((assignment) => assignment.sourceType === "expense" && assignment.sourceId === expense.id && assignment.status === "paid")) {
+      return res.status(409).json({ error: "Mark paid assignments as unpaid before deleting this expense" });
+    }
+    await splitFolderStorage.deleteManualExpense(folder.id, expense.id);
+    res.json({ ok: true });
+  });
+
+  app.get("/api/split-folders/:id/bills", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    res.json(await splitFolderStorage.listBills(folder.id));
+  });
+  app.post("/api/split-folders/:id/bills", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const body = z.object({
+      title: z.string().trim().min(1),
+      description: z.string().optional(),
+      amount: z.union([z.string(), z.number()]),
+      splitMode: z.enum(["equal", "custom", "items"]),
+      subfolderId: z.string().nullable().optional(),
+      participants: z.array(z.object({
+        memberId: z.string(),
+        shareAmount: z.union([z.string(), z.number()]).optional(),
+      })).default([]),
+      items: z.array(z.object({
+        key: z.string().min(1),
+        label: z.string().trim().min(1),
+        amount: z.union([z.string(), z.number()]),
+        memberIds: z.array(z.string()).min(1),
+      })).optional(),
+    }).parse(req.body);
+    const members = await splitFolderStorage.listMembers(folder.id);
+    const activeMemberIds = new Set(members.filter((member) => member.status === "active").map((member) => member.id));
+    if (body.subfolderId && !(await splitFolderStorage.listSubfolders(folder.id)).some((subfolder) => subfolder.id === body.subfolderId)) {
+      return res.status(400).json({ error: "Invalid subfolder" });
+    }
+    if (body.participants.some((participant) => !activeMemberIds.has(participant.memberId))) {
+      return res.status(400).json({ error: "Invalid bill participant" });
+    }
+    const total = money(body.amount);
+    if (total <= 0) return res.status(400).json({ error: "Amount must be positive" });
+
+    const billItems: Array<{ billId: string; itemKey: string; label: string; amount: string }> = [];
+    const participantRows: Array<{ billId: string; memberId: string; itemId: string | null; shareAmount: string; status: string }> = [];
+
+    if (body.splitMode === "items") {
+      const items = body.items || [];
+      if (!items.length) return res.status(400).json({ error: "Item-level bills need at least one item" });
+      if (new Set(items.map((item) => item.key)).size !== items.length) {
+        return res.status(400).json({ error: "Bill item keys must be unique" });
+      }
+      const itemTotal = items.reduce((sum, item) => sum + money(item.amount), 0);
+      if (Math.abs(itemTotal - total) > 0.01) {
+        return res.status(400).json({ error: `Items add up to £${itemTotal.toFixed(2)}, but the bill is £${total.toFixed(2)}` });
+      }
+      for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
+        const item = items[itemIndex];
+        if (money(item.amount) < 0) return res.status(400).json({ error: "Item amounts must be non-negative" });
+        if (item.memberIds.some((memberId: string) => !activeMemberIds.has(memberId))) {
+          return res.status(400).json({ error: "Invalid member assigned to a bill item" });
+        }
+        billItems.push({ billId: "", itemKey: item.key, label: item.label, amount: money(item.amount).toFixed(2) });
+        const shares = splitEvenly(money(item.amount), item.memberIds.length);
+        item.memberIds.forEach((memberId: string, memberIndex: number) => {
+          participantRows.push({
+            billId: "",
+            memberId,
+            itemId: String(itemIndex),
+            shareAmount: shares[memberIndex],
+            status: "pending",
+          });
+        });
+      }
+    } else {
+      if (!body.participants.length) return res.status(400).json({ error: "Choose at least one participant" });
+      const shares = body.splitMode === "equal"
+        ? splitEvenly(total, body.participants.length)
+        : body.participants.map((participant) => money(participant.shareAmount).toFixed(2));
+      const normalized = body.participants.map((participant, index) => ({
+        memberId: participant.memberId,
+        shareAmount: shares[index],
+      }));
+      const issue = validateAllocations(total, normalized);
+      if (issue || allocationSummary(total, normalized).personal !== 0) {
+        return res.status(400).json({ error: issue || "Bill shares must equal its amount" });
+      }
+      normalized.forEach((participant) => {
+        participantRows.push({
+          billId: "",
+          memberId: participant.memberId,
+          itemId: null,
+          shareAmount: participant.shareAmount,
+          status: "pending",
+        });
+      });
+    }
+
+    const bill = await splitFolderStorage.createBill(
+      {
+        folderId: folder.id,
+        subfolderId: body.subfolderId ?? null,
+        createdBy: req.user!.id,
+        title: body.title,
+        description: body.description,
+        amount: total.toFixed(2),
+        currency: "GBP",
+        splitMode: body.splitMode,
+        status: "unpaid",
+      },
+      participantRows,
+      billItems,
+    );
+    await splitFolderStorage.createActivity({
+      folderId: folder.id,
+      subfolderId: body.subfolderId ?? null,
+      actorUserId: req.user!.id,
+      eventType: "bill.created",
+      metadata: { billId: bill.id, splitMode: body.splitMode },
+    });
+    const expanded = (await splitFolderStorage.listBills(folder.id)).find((row) => row.id === bill.id);
+    res.status(201).json(expanded ?? bill);
+  });
+  app.patch("/api/split-folders/:id/bills/:billId/participants/:participantId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    const role = await folderPermission(folder, req.user!.id);
+    const bill = (await splitFolderStorage.listBills(folder.id)).find((b) => b.id === req.params.billId);
+    const participant = bill?.participants.find((p) => p.id === req.params.participantId);
+    if (!bill || !participant) return res.status(404).json({ error: "Bill participant not found" });
+    const nextStatus = z.enum(["pending", "paid", "declined"]).parse(req.body?.status);
+    const participantMember = participant.memberId
+      ? await splitFolderStorage.getMember(participant.memberId)
+      : undefined;
+    const permitted = canUpdateBillParticipantStatus({
+      isManager: canSplit(role, "manage"),
+      isSelf: participantMember?.userId === req.user!.id,
+      currentStatus: participant.status,
+      nextStatus,
+    });
+    if (!permitted) return res.status(403).json({ error: "Only the folder owner can mark bill shares paid or pending" });
+    const updated = await splitFolderStorage.updateBillParticipant(participant.id, nextStatus);
+    const all = await splitFolderStorage.listBills(folder.id); const current = all.find((b) => b.id === bill.id)!;
+    const status = billStatus(current.participants.map((p) => p.id === participant.id ? { ...p, status: updated!.status } : p));
+    await splitFolderStorage.updateBillStatus(bill.id, status);
+    res.json({ participant: updated, status });
+  });
+
+  app.get("/api/split-folders/:id/payment-requests", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    res.json(await splitFolderStorage.listPaymentRequests(folder.id));
+  });
+  app.post("/api/split-folders/:id/payment-requests", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const body = z.object({ memberId: z.string(), amount: z.union([z.string(), z.number()]), currency: z.string().length(3).optional() }).parse(req.body);
+    if (money(body.amount) <= 0) return res.status(400).json({ error: "Amount must be positive" });
+    const member = await splitFolderStorage.getMember(body.memberId);
+    if (!member || member.folderId !== folder.id) return res.status(400).json({ error: "Invalid member" });
+    const request = await splitFolderStorage.createPaymentRequest({ folderId: folder.id, requestedBy: req.user!.id, memberId: member.id, amount: money(body.amount).toFixed(2), currency: (body.currency || "GBP").toUpperCase(), status: "draft" });
+    await splitFolderStorage.createPaymentEvent({ paymentRequestId: request.id, eventType: "created" });
+    res.status(201).json(request);
+  });
+  app.post("/api/split-folders/:id/payment-requests/:requestId/send", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const request = (await splitFolderStorage.listPaymentRequests(folder.id)).find((r) => r.id === req.params.requestId);
+    if (!request) return res.status(404).json({ error: "Payment request not found" });
+    // This is deliberately only a Connect-ready boundary. No URL or success is
+    // fabricated; Receiptify never takes custody of a member's funds.
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(503).json({ error: "Stripe Connect is not configured", code: "stripe_unavailable", status: request.status });
+    }
+    return res.status(501).json({ error: "Stripe Connect payment creation is not configured", code: "stripe_unavailable" });
+  });
+  app.post("/api/split-folders/:id/payment-requests/:requestId/cancel", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await splitFolderStorage.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "manage", res))) return;
+    const request = (await splitFolderStorage.listPaymentRequests(folder.id)).find((r) => r.id === req.params.requestId);
+    if (!request) return res.status(404).json({ error: "Payment request not found" });
+    if (request.status !== "draft" && request.status !== "pending") return res.status(409).json({ error: "Payment request cannot be cancelled" });
+    const updated = await splitFolderStorage.updatePaymentRequest(request.id, { status: "cancelled" });
+    await splitFolderStorage.createPaymentEvent({ paymentRequestId: request.id, eventType: "cancelled" }); res.json(updated);
+  });
+  app.post("/api/split-folders/:id/payment-requests/:requestId/decline", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    const request = (await splitFolderStorage.listPaymentRequests(folder.id)).find((r) => r.id === req.params.requestId);
+    const member = request && await splitFolderStorage.getMember(request.memberId);
+    if (!request || !member) return res.status(404).json({ error: "Payment request not found" });
+    if (member.userId !== req.user!.id) return res.status(403).json({ error: "Only the recipient can decline" });
+    if (request.status !== "pending") return res.status(409).json({ error: "Only pending requests can be declined" });
+    const updated = await splitFolderStorage.updatePaymentRequest(request.id, { status: "declined" });
+    await splitFolderStorage.createPaymentEvent({ paymentRequestId: request.id, eventType: "declined" }); res.json(updated);
+  });
+
+  // Item editing in the Split workspace: editors may curate an attached
+  // receipt; contributors/viewers cannot alter another member's source facts.
+  app.post("/api/split-folders/:id/receipts/:receiptId/items", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const receipt = await storage.getReceipt(req.params.receiptId);
+    if (!receipt || receipt.splitFolderId !== folder.id) return res.status(404).json({ error: "Receipt not in folder" });
+    const body = z.object({ name: z.string().trim().min(1), price: z.union([z.string(), z.number()]), quantity: z.union([z.string(), z.number()]).optional(), category: z.string().optional(), notes: z.string().optional() }).parse(req.body);
+    if (money(body.price) < 0) return res.status(400).json({ error: "Price must be non-negative" });
+    res.status(201).json(await storage.createReceiptItem({ ...body, receiptId: receipt.id, price: money(body.price).toFixed(2), quantity: body.quantity === undefined ? "1" : String(body.quantity) }));
+  });
+  app.patch("/api/split-folders/:id/receipts/:receiptId/items/:itemId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const receipt = await storage.getReceipt(req.params.receiptId);
+    if (!receipt || receipt.splitFolderId !== folder.id) {
+      return res.status(404).json({ error: "Receipt not in folder" });
+    }
+    const item = (await storage.getReceiptItems(req.params.receiptId)).find((i) => i.id === req.params.itemId);
+    if (!item || item.receiptId !== receipt.id) return res.status(404).json({ error: "Item not found" });
+    const body = z.object({ name: z.string().trim().min(1).optional(), price: z.union([z.string(), z.number()]).optional(), quantity: z.union([z.string(), z.number()]).optional(), category: z.string().nullable().optional(), notes: z.string().nullable().optional() }).parse(req.body);
+    res.json(await storage.updateReceiptItem(item.id, { ...body, price: body.price === undefined ? undefined : money(body.price).toFixed(2), quantity: body.quantity === undefined ? undefined : String(body.quantity) }));
+  });
+
+  app.get("/api/split-folders/:id/subfolders", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    res.json(await splitFolderStorage.listSubfolders(folder.id));
+  });
+  app.post("/api/split-folders/:id/subfolders", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const body = z.object({ name: z.string().trim().min(1).optional(), monthlyKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() }).parse(req.body);
+    if (!body.name && !body.monthlyKey) return res.status(400).json({ error: "Name or monthlyKey is required" });
+    const name = body.name || new Date(`${body.monthlyKey}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+    const existing = await splitFolderStorage.listSubfolders(folder.id);
+    if (existing.some((s) => s.name.toLowerCase() === name.toLowerCase() || (!!body.monthlyKey && s.monthlyKey === body.monthlyKey))) return res.status(409).json({ error: "Subfolder already exists" });
+    const subfolder = await splitFolderStorage.createSubfolder({ folderId: folder.id, name, monthlyKey: body.monthlyKey });
+    await splitFolderStorage.createActivity({ folderId: folder.id, actorUserId: req.user!.id, eventType: "subfolder.created", metadata: { subfolderId: subfolder.id } });
+    res.status(201).json(subfolder);
+  });
+  app.patch("/api/split-folders/:id/subfolders/:subfolderId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const found = (await splitFolderStorage.listSubfolders(folder.id)).find((s) => s.id === req.params.subfolderId);
+    if (!found) return res.status(404).json({ error: "Subfolder not found" });
+    res.json(await splitFolderStorage.updateSubfolder(found.id, z.object({ name: z.string().trim().min(1).optional(), monthlyKey: z.string().nullable().optional() }).parse(req.body)));
+  });
+  app.delete("/api/split-folders/:id/subfolders/:subfolderId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    if (!(await splitFolderStorage.listSubfolders(folder.id)).some((s) => s.id === req.params.subfolderId)) return res.status(404).json({ error: "Subfolder not found" });
+    await splitFolderStorage.deleteSubfolder(req.params.subfolderId); res.json({ ok: true });
+  });
+  app.patch("/api/split-folders/:id/receipts/:receiptId/metadata", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folder = await loadFolderForUser(req.params.id, req.user!.id);
+    if (!folder) return res.status(404).json({ error: "Folder not found" });
+    if (!(await requireFolderPermission(folder, req.user!.id, "edit", res))) return;
+    const receipt = await storage.getReceipt(req.params.receiptId);
+    if (!receipt || receipt.splitFolderId !== folder.id) return res.status(404).json({ error: "Receipt not in folder" });
+    const body = z.object({ subfolderId: z.string().nullable(), displayName: z.string().trim().min(1).nullable().optional() }).parse(req.body);
+    if (body.subfolderId && !(await splitFolderStorage.listSubfolders(folder.id)).some((s) => s.id === body.subfolderId)) return res.status(400).json({ error: "Invalid subfolder" });
+    await splitFolderStorage.setReceiptMetadata(folder.id, receipt.id, body.subfolderId, body.displayName);
+    res.json({ ok: true });
+  });
+
+  // Hub-level one-off bills create a dedicated workspace rather than requiring
+  // a pre-existing ongoing folder.
+  app.get("/api/split-bills", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const folders = await splitFolderStorage.listFoldersForUser(req.user!.id);
+    const bills = (await Promise.all(folders.filter((f) => f.workspaceType === "one_off").map((f) => splitFolderStorage.listBills(f.id)))).flat();
+    res.json(bills);
+  });
+  app.post("/api/split-bills", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const body = z.object({
+      title: z.string().trim().min(1),
+      description: z.string().optional(),
+      amount: z.union([z.string(), z.number()]),
+      splitMode: z.enum(["equal", "custom", "items"]),
+      participants: z.array(z.object({
+        key: z.string().min(1),
+        name: z.string().trim().min(1),
+        email: z.string().email().optional(),
+        shareAmount: z.union([z.string(), z.number()]).optional(),
+        isCreator: z.boolean().optional(),
+      })).min(1),
+      items: z.array(z.object({
+        key: z.string().min(1),
+        label: z.string().trim().min(1),
+        amount: z.union([z.string(), z.number()]),
+        participantKeys: z.array(z.string()).min(1),
+      })).optional(),
+    }).parse(req.body);
+    const amount = money(body.amount);
+    if (amount <= 0) return res.status(400).json({ error: "Amount must be positive" });
+    if (body.participants.filter((participant) => participant.isCreator).length !== 1) return res.status(400).json({ error: "Exactly one creator participant is required" });
+    if (new Set(body.participants.map((p) => p.key)).size !== body.participants.length) return res.status(400).json({ error: "Participant keys must be unique" });
+
+    const participantIndex = new Map(body.participants.map((participant, index) => [participant.key, index]));
+    const billItems: Array<{ billId: string; itemKey: string; label: string; amount: string }> = [];
+    const participantRows: Array<{ billId: string; memberId: string; itemId: string | null; shareAmount: string; status: string }> = [];
+
+    if (body.splitMode === "items") {
+      const items = body.items || [];
+      if (!items.length) return res.status(400).json({ error: "Item-level bills need at least one item" });
+      if (new Set(items.map((item) => item.key)).size !== items.length) return res.status(400).json({ error: "Bill item keys must be unique" });
+      const itemTotal = items.reduce((sum, item) => sum + money(item.amount), 0);
+      if (Math.abs(itemTotal - amount) > 0.01) {
+        return res.status(400).json({ error: `Items add up to £${itemTotal.toFixed(2)}, but the bill is £${amount.toFixed(2)}` });
+      }
+      for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
+        const item = items[itemIndex];
+        if (money(item.amount) < 0) return res.status(400).json({ error: "Item amounts must be non-negative" });
+        const indexes = item.participantKeys.map((key: string) => participantIndex.get(key));
+        if (indexes.some((index: number | undefined) => index === undefined)) return res.status(400).json({ error: "Invalid participant assigned to a bill item" });
+        billItems.push({ billId: "", itemKey: item.key, label: item.label, amount: money(item.amount).toFixed(2) });
+        const shares = splitEvenly(money(item.amount), indexes.length);
+        indexes.forEach((index: number | undefined, memberIndex: number) => {
+          participantRows.push({
+            billId: "",
+            memberId: String(index),
+            itemId: String(itemIndex),
+            shareAmount: shares[memberIndex],
+            status: "pending",
+          });
+        });
+      }
+    } else {
+      const shares = body.splitMode === "equal"
+        ? splitEvenly(amount, body.participants.length)
+        : body.participants.map((participant) => money(participant.shareAmount).toFixed(2));
+      const normalized = body.participants.map((participant, index) => ({
+        ...participant,
+        shareAmount: shares[index],
+      }));
+      const issue = validateAllocations(amount, normalized);
+      if (issue || allocationSummary(amount, normalized).personal !== 0) {
+        return res.status(400).json({ error: issue || "Bill shares must equal its amount" });
+      }
+      normalized.forEach((participant, index) => {
+        participantRows.push({
+          billId: "",
+          memberId: String(index),
+          itemId: null,
+          shareAmount: participant.shareAmount,
+          status: "pending",
+        });
+      });
+    }
+
+    const token = newToken();
+    const bill = await splitFolderStorage.createOneOffWorkspace(
+      { ownerId: req.user!.id, name: body.title, workspaceType: "one_off" },
+      body.participants.map((p, index) => ({
+        folderId: "", userId: p.isCreator ? req.user!.id : null, inviteEmail: p.email, displayName: p.isCreator ? (req.user!.name || req.user!.email || "You") : p.name,
+        inviteToken: index === 0 ? token : newToken(), status: p.isCreator ? "active" : "invited", role: p.isCreator ? "owner" : "viewer",
+      })),
+      { folderId: "", createdBy: req.user!.id, title: body.title, description: body.description, amount: amount.toFixed(2), currency: "GBP", splitMode: body.splitMode, status: "unpaid" },
+      billItems,
+      participantRows,
+    );
+    const expanded = (await splitFolderStorage.listBills(bill.folderId)).find((row) => row.id === bill.id);
+    res.status(201).json(expanded ?? bill);
+  });
 }

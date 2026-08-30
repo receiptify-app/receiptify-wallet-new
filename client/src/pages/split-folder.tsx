@@ -4,6 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -28,10 +30,17 @@ import {
   Send,
   Trash2,
   Undo2,
+  Plus,
+  WalletCards,
+  HandCoins,
+  Settings2,
+  Activity,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import SplitInviteDialog from "@/components/split-invite-dialog";
+import FolderBillsPanel from "@/components/split/folder-bills-panel";
 
 type Member = {
   id: string;
@@ -59,15 +68,22 @@ type FolderReceipt = {
   imageUrl: string | null;
   items: Array<{ id: string; name: string; price: string; quantity: string | null }>;
   assignments: Assignment[];
+  splitMetadata?: { subfolderId?: string | null; displayName?: string | null } | null;
 };
 
 type FolderDetail = {
-  folder: { id: string; name: string; description: string | null; ownerId: string };
+  folder: { id: string; name: string; description: string | null; ownerId: string; ownerContactName?: string | null; ownerContactEmail?: string | null; ownerContactPhone?: string | null; parentFolderId?: string | null };
   members: Member[];
   receipts: FolderReceipt[];
   settlement: Array<{ memberId: string; displayName: string | null; userId: string | null; inviteEmail: string | null; owed: number; paid: number; total: number; status: string; role: string }>;
   totalAmount: number;
   isOwner: boolean;
+  permissions?: { read: boolean; add: boolean; edit: boolean; manage: boolean };
+  currentRole?: string;
+  manualExpenses?: Array<{ id: string; description: string; amount: string | number; expenseDate: string; notes?: string | null; createdBy: string; payerMemberId?: string | null; subfolderId?: string | null; allocations?: Array<{ memberId: string; shareAmount: string | number }> }>;
+  outstandingAmount?: number;
+  subfolders?: Array<{ id: string; name: string; monthlyKey?: string | null }>;
+  currentMemberId?: string | null;
 };
 
 function initials(name?: string | null) {
@@ -154,14 +170,21 @@ function ReceiptSplitter({
   receipt,
   members,
   folderId,
+  canEdit,
+  subfolders,
 }: {
   receipt: FolderReceipt;
   members: Member[];
   folderId: string;
+  canEdit: boolean;
+  subfolders: Array<{ id: string; name: string }>;
 }) {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [metadataOpen, setMetadataOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(receipt.splitMetadata?.displayName || "");
+  const [subfolderId, setSubfolderId] = useState(receipt.splitMetadata?.subfolderId || "");
   const total = parseFloat(receipt.total);
 
   // Infer the prior mode from saved assignments so re-opening the editor preserves intent.
@@ -291,6 +314,22 @@ function ReceiptSplitter({
     },
   });
 
+  const metadataMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest(
+        "PATCH",
+        `/api/split-folders/${folderId}/receipts/${receipt.id}/metadata`,
+        { displayName: displayName.trim() || null, subfolderId: subfolderId || null },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      setMetadataOpen(false);
+      toast({ title: "Receipt details saved" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Couldn't organize receipt", description: error.message, variant: "destructive" }),
+  });
+
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const toggleWhole = (memberId: string) => {
@@ -385,7 +424,7 @@ function ReceiptSplitter({
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-gray-900 truncate">{receipt.merchantName}</div>
+            <div className="font-semibold text-gray-900 truncate">{receipt.splitMetadata?.displayName || receipt.merchantName}</div>
             <div className="text-xs text-gray-500">{new Date(receipt.date).toLocaleDateString('en-GB', { timeZone: 'UTC' })} · £{total.toFixed(2)}</div>
           </div>
           <div className="flex items-center gap-1">
@@ -396,6 +435,11 @@ function ReceiptSplitter({
                 ? "Paid"
                 : "Pending"}
             </Badge>
+            {canEdit && (
+              <Button size="sm" variant="ghost" onClick={() => setMetadataOpen(true)} aria-label="Organize receipt">
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => setExpanded((e) => !e)} data-testid={`toggle-receipt-${receipt.id}`}>
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </Button>
@@ -581,6 +625,33 @@ function ReceiptSplitter({
           </AlertDialogContent>
         </AlertDialog>
 
+        <Dialog open={metadataOpen} onOpenChange={setMetadataOpen}>
+          <DialogContent className="receiptify-dialog max-w-md">
+            <DialogHeader>
+              <DialogTitle>Organize receipt</DialogTitle>
+              <DialogDescription>
+                Give this receipt a folder-only name or move it into a subfolder. The original receipt stays unchanged.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Folder display name</Label>
+                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={receipt.merchantName} />
+              </div>
+              <div>
+                <Label>Subfolder</Label>
+                <select className="h-10 w-full rounded-md border bg-transparent px-3 text-sm" value={subfolderId} onChange={(event) => setSubfolderId(event.target.value)}>
+                  <option value="">None</option>
+                  {subfolders.map((subfolder) => <option key={subfolder.id} value={subfolder.id}>{subfolder.name}</option>)}
+                </select>
+              </div>
+              <Button className="w-full receiptify-primary-action" disabled={metadataMutation.isPending} onClick={() => metadataMutation.mutate()}>
+                {metadataMutation.isPending ? "Saving…" : "Save receipt details"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {imageOpen && receipt.imageUrl && (
           <ReceiptImageOverlay
             imageUrl={receipt.imageUrl}
@@ -602,9 +673,88 @@ export default function SplitFolderPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [expense, setExpense] = useState({ description: "", amount: "", notes: "", expenseDate: new Date().toISOString().slice(0, 10), payerMemberId: "", subfolderId: "", allocations: {} as Record<string, string> });
+  const [payment, setPayment] = useState({ memberId: "", amount: "" });
+  const [folderDraft, setFolderDraft] = useState({ name: "", description: "", ownerContactName: "", ownerContactEmail: "", ownerContactPhone: "" });
+  const [subfolderName, setSubfolderName] = useState("");
+  const [subfolderMonth, setSubfolderMonth] = useState("");
 
-  const { data, isLoading } = useQuery<FolderDetail>({
+  const { data, isLoading, isError } = useQuery<FolderDetail>({
     queryKey: ["/api/split-folders", folderId],
+  });
+  const canAdd = !!data?.permissions?.add || !!data?.isOwner;
+  const canEdit = !!data?.permissions?.edit || !!data?.isOwner;
+  const canManage = !!data?.permissions?.manage || !!data?.isOwner;
+  const expenseMutation = useMutation({
+    mutationFn: async () => {
+      const payload = { ...expense, amount: Number(expense.amount), payerMemberId: expense.payerMemberId || undefined, subfolderId: expense.subfolderId || null, allocations: Object.entries(expense.allocations).filter(([, shareAmount]) => Number(shareAmount) > 0).map(([memberId, shareAmount]) => ({ memberId, shareAmount: Number(shareAmount) })) };
+      return apiRequest(editingExpenseId ? "PATCH" : "POST", editingExpenseId ? `/api/split-folders/${folderId}/expenses/${editingExpenseId}` : `/api/split-folders/${folderId}/expenses`, payload);
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] }); queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] }); setExpenseOpen(false); setEditingExpenseId(null); setExpense({ description:"", amount:"", notes:"", expenseDate:new Date().toISOString().slice(0,10), payerMemberId:"", subfolderId:"", allocations:{} }); toast({ title:"Expense saved" }); },
+    onError: (e:any) => toast({ title:"Couldn't add expense", description:e.message, variant:"destructive" }),
+  });
+  const paymentMutation = useMutation({
+    mutationFn: async () => { const r = await apiRequest("POST", `/api/split-folders/${folderId}/payment-requests`, { memberId: payment.memberId, amount: Number(payment.amount), currency:"GBP" }); return r.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "payment-requests"] }); setPaymentOpen(false); setPayment({memberId:"",amount:""}); toast({ title:"Payment request drafted", description:"It is ready to send when Stripe Connect is available." }); },
+    onError: (e:any) => toast({ title:"Couldn't draft request", description:e.message, variant:"destructive" }),
+  });
+  const paymentActionMutation = useMutation({
+    mutationFn: async ({ requestId, action }: { requestId: string; action: "send" | "cancel" | "decline" }) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/payment-requests/${requestId}/${action}`, {}),
+    onSuccess: (_response, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId, "payment-requests"] });
+      toast({ title: variables.action === "cancel" ? "Request cancelled" : variables.action === "decline" ? "Request declined" : "Request sent" });
+    },
+    onError: (error: any, variables) =>
+      toast({
+        title: variables.action === "send" ? "Sending isn't available yet" : `Couldn't ${variables.action} request`,
+        description: error.message,
+        variant: "destructive",
+      }),
+  });
+  const folderMutation = useMutation({
+    mutationFn: async () => apiRequest("PATCH", `/api/split-folders/${folderId}`, { ...folderDraft, description: folderDraft.description || null, ownerContactName: folderDraft.ownerContactName || null, ownerContactEmail: folderDraft.ownerContactEmail || null, ownerContactPhone: folderDraft.ownerContactPhone || null }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] }); queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] }); setSettingsOpen(false); toast({title:"Folder details saved"}); },
+    onError: (e:any) => toast({title:"Couldn't save details",description:e.message,variant:"destructive"}),
+  });
+  const { data: activity = [] } = useQuery<any[]>({ queryKey: ["/api/split-folders", folderId, "activity"], enabled: activityOpen });
+  const { data: paymentRequests = [] } = useQuery<any[]>({ queryKey: ["/api/split-folders", folderId, "payment-requests"], enabled: paymentOpen });
+  const subfolderMutation = useMutation({
+    mutationFn: async (body: { name?: string; monthlyKey?: string }) =>
+      apiRequest("POST", `/api/split-folders/${folderId}/subfolders`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      setSubfolderName("");
+      setSubfolderMonth("");
+      toast({ title: "Subfolder added" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't add subfolder", description: e.message, variant: "destructive" }),
+  });
+  const updateSubfolderMutation = useMutation({
+    mutationFn: async ({ id, method, name }: { id: string; method: "PATCH" | "DELETE"; name?: string }) =>
+      apiRequest(method, `/api/split-folders/${folderId}/subfolders/${id}`, name ? { name } : undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      toast({ title: "Subfolder updated" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Couldn't update subfolder", description: error.message, variant: "destructive" }),
+  });
+  const deleteExpenseMutation = useMutation({
+    mutationFn: async (expenseId: string) =>
+      apiRequest("DELETE", `/api/split-folders/${folderId}/expenses/${expenseId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/split-folders"] });
+      toast({ title: "Expense deleted" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Couldn't delete expense", description: error.message, variant: "destructive" }),
   });
 
   const settleMutation = useMutation({
@@ -686,7 +836,7 @@ export default function SplitFolderPage() {
     onError: (err: any) => toast({ title: "Couldn't remove member", description: err.message, variant: "destructive" }),
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="receiptify-page min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
@@ -694,7 +844,23 @@ export default function SplitFolderPage() {
     );
   }
 
-  const { folder, members, receipts: folderReceipts, settlement, totalAmount, isOwner } = data;
+  if (isError || !data) {
+    return (
+      <div className="receiptify-page min-h-screen flex items-center justify-center px-6">
+        <Card className="receiptify-panel w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <h1 className="text-xl font-bold text-gray-900">Split workspace not found</h1>
+            <p className="mt-2 text-sm text-gray-500">It may have been deleted, or you may no longer have access.</p>
+            <Button className="mt-4 receiptify-primary-action" onClick={() => navigate("/split")}>
+              Back to Split
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { folder, members, receipts: folderReceipts, settlement, totalAmount, isOwner, manualExpenses = [], outstandingAmount = totalAmount, subfolders = [], currentMemberId = null } = data;
   const activeMembers = members.filter((m) => m.status !== "removed");
 
   return (
@@ -720,18 +886,31 @@ export default function SplitFolderPage() {
 
       <div className="receiptify-detail-content px-6 space-y-5">
         <div className="receiptify-folder-hero">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">{folder.name}</h1>
           {folder.description && <p className="text-sm text-gray-600 mt-1">{folder.description}</p>}
+            </div>
+            <Badge className="bg-[#dfe9e0] text-[#1e2c2b] hover:bg-[#dfe9e0] shrink-0">{data.currentRole || (isOwner ? "Owner" : "Member")}</Badge>
+          </div>
           <div className="mt-3 flex items-center justify-between">
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-wide">Total</div>
               <div className="text-2xl font-bold text-gray-900">£{totalAmount.toFixed(2)}</div>
+              <div className="text-xs text-gray-500 mt-2">Outstanding <strong className="text-[#f4ddd4]">£{Number(outstandingAmount).toFixed(2)}</strong></div>
             </div>
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-wide text-right">Receipts</div>
               <div className="text-2xl font-bold text-gray-900 text-right">{folderReceipts.length}</div>
             </div>
           </div>
+        </div>
+
+        <div className="receiptify-workspace-actions">
+          <Button disabled={!canAdd} onClick={() => navigate("/scan")}><Plus className="w-4 h-4" /> Add receipt</Button>
+          <Button disabled={!canAdd} onClick={() => setExpenseOpen(true)}><HandCoins className="w-4 h-4" /> Add expense</Button>
+          <Button disabled={!canManage} onClick={() => setInviteOpen(true)}><UserPlus className="w-4 h-4" /> Invite person</Button>
+          <Button disabled={!canManage} onClick={() => setPaymentOpen(true)}><WalletCards className="w-4 h-4" /> Request payment</Button>
         </div>
 
         {/* Members */}
@@ -742,7 +921,7 @@ export default function SplitFolderPage() {
                 <Users className="w-4 h-4 text-green-600" />
                 <h3 className="font-semibold">Members ({activeMembers.length})</h3>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} data-testid="button-invite">
+              <Button size="sm" variant="outline" disabled={!canManage} onClick={() => setInviteOpen(true)} data-testid="button-invite">
                 <UserPlus className="w-4 h-4 mr-1" /> Invite
               </Button>
             </div>
@@ -758,6 +937,7 @@ export default function SplitFolderPage() {
                       {m.role === "owner" ? "Owner" : m.status === "invited" ? "Invited" : "Member"}
                     </div>
                   </div>
+                  {canManage && m.role !== "owner" && <select aria-label={`Role for ${m.displayName || "member"}`} value={m.role === "member" ? "viewer" : m.role} onChange={async e=>{try { await apiRequest("PATCH", `/api/split-folders/${folderId}/members/${m.id}/role`, {role:e.target.value}); queryClient.invalidateQueries({queryKey:["/api/split-folders",folderId]}); toast({title:"Role updated"}); } catch(err:any){toast({title:"Couldn't update role",description:err.message,variant:"destructive"})}}} className="h-8 max-w-[100px] rounded-md border bg-transparent px-2 text-xs"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="editor">Editor</option></select>}
                   {isOwner && m.role !== "owner" && m.status === "invited" && m.inviteEmail && (
                     <Button
                       size="sm"
@@ -782,6 +962,58 @@ export default function SplitFolderPage() {
           </CardContent>
         </Card>
 
+        <FolderBillsPanel
+          folderId={folderId}
+          members={members}
+          subfolders={subfolders}
+          canEdit={canEdit}
+          canManage={canManage}
+        />
+
+        <Card className="receiptify-panel">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold">Subfolders</h3><span className="text-xs text-gray-500">Trips and months</span></div>
+            <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="flex gap-2">
+                <Input value={subfolderName} onChange={e=>setSubfolderName(e.target.value)} placeholder="e.g. Saturday" />
+                <Button aria-label="Add custom subfolder" disabled={!canManage || !subfolderName.trim() || subfolderMutation.isPending} onClick={()=>subfolderMutation.mutate({ name: subfolderName.trim() })}><Plus className="w-4 h-4" /></Button>
+              </div>
+              <div className="flex gap-2">
+                <Input type="month" value={subfolderMonth} onChange={e=>setSubfolderMonth(e.target.value)} />
+                <Button aria-label="Add monthly subfolder" disabled={!canManage || !subfolderMonth || subfolderMutation.isPending} onClick={()=>subfolderMutation.mutate({ monthlyKey: subfolderMonth })}>Add month</Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {subfolders.length === 0 && <p className="text-sm text-gray-500">No subfolders yet.</p>}
+              {subfolders.map(s=>(
+                <div key={s.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">{s.name}{s.monthlyKey ? ` · ${s.monthlyKey}` : ""}</span>
+                  {canManage && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        const name = window.prompt("Rename subfolder", s.name)?.trim();
+                        if (name && name !== s.name) updateSubfolderMutation.mutate({ id: s.id, method: "PATCH", name });
+                      }}>Rename</Button>
+                      <Button size="icon" variant="ghost" aria-label={`Delete ${s.name}`} className="text-red-600" onClick={() => {
+                        if (window.confirm(`Delete “${s.name}”? Its entries will move back to the main folder.`)) {
+                          updateSubfolderMutation.mutate({ id: s.id, method: "DELETE" });
+                        }
+                      }}><Trash2 className="h-4 w-4" /></Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="receiptify-panel">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold flex items-center gap-2"><HandCoins className="w-4 h-4 text-[#60786d]" /> Manual expenses</h3><Button size="sm" variant="ghost" disabled={!canAdd} onClick={() => setExpenseOpen(true)}><Plus className="w-4 h-4" /></Button></div>
+            {manualExpenses.length === 0 ? <p className="text-sm text-gray-500">Add a tip, taxi, or anything that never came with a receipt.</p> : <div className="space-y-2">{manualExpenses.map((e) => { const allocated = (e.allocations || []).reduce((sum, allocation) => sum + Number(allocation.shareAmount), 0); const subfolder = subfolders.find((candidate) => candidate.id === e.subfolderId); return <div key={e.id} className="flex flex-wrap items-center gap-3 border-b last:border-0 pb-2 last:pb-0"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{e.description}</p><p className="text-xs text-gray-500">{e.expenseDate ? new Date(e.expenseDate).toLocaleDateString("en-GB") : "No date"}{subfolder ? ` · ${subfolder.name}` : ""} · Allocated £{allocated.toFixed(2)} · Personal £{Math.max(0, Number(e.amount) - allocated).toFixed(2)}</p></div><strong className="receiptify-mono text-sm">£{Number(e.amount).toFixed(2)}</strong>{canEdit && <Button size="sm" variant="ghost" onClick={() => { setEditingExpenseId(e.id); setExpense({ description:e.description, amount:String(e.amount), notes:e.notes || "", expenseDate:e.expenseDate ? new Date(e.expenseDate).toISOString().slice(0,10) : new Date().toISOString().slice(0,10), payerMemberId:e.payerMemberId || "", subfolderId:e.subfolderId || "", allocations:Object.fromEntries((e.allocations || []).map(a=>[a.memberId,String(a.shareAmount)])) }); setExpenseOpen(true); }}>Edit</Button>}{canEdit && <Button size="icon" variant="ghost" className="text-red-600" aria-label={`Delete ${e.description}`} onClick={() => { if (window.confirm(`Delete “${e.description}”?`)) deleteExpenseMutation.mutate(e.id); }}><Trash2 className="h-4 w-4" /></Button>}</div>})}</div>}
+          </CardContent>
+        </Card>
+
         {/* Receipts */}
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -795,7 +1027,7 @@ export default function SplitFolderPage() {
             </Card>
           ) : (
             folderReceipts.map((r) => (
-              <ReceiptSplitter key={r.id} receipt={r} members={members} folderId={folderId} />
+              <ReceiptSplitter key={r.id} receipt={r} members={members} folderId={folderId} canEdit={canEdit} subfolders={subfolders} />
             ))
           )}
         </div>
@@ -856,7 +1088,50 @@ export default function SplitFolderPage() {
             )}
           </CardContent>
         </Card>
+        <div className="receiptify-secondary-actions">
+          <Button variant="outline" onClick={() => setActivityOpen(true)}><Activity className="w-4 h-4 mr-2" /> Activity</Button>
+          <Button variant="outline" disabled={!canManage} onClick={() => setSettingsOpen(true)}><Settings2 className="w-4 h-4 mr-2" /> Folder details</Button>
+        </div>
       </div>
+
+      <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader><DialogTitle>{editingExpenseId ? "Edit manual expense" : "Add a manual expense"}</DialogTitle><DialogDescription>Allocate only the shared portion; any remaining amount stays personal.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Description</Label><Input value={expense.description} onChange={e=>setExpense({...expense,description:e.target.value})} placeholder="Taxi to dinner" /></div>
+            <div className="grid grid-cols-2 gap-3"><div><Label>Amount</Label><Input inputMode="decimal" value={expense.amount} onChange={e=>setExpense({...expense,amount:e.target.value})} placeholder="0.00" /></div><div><Label>Date</Label><Input type="date" value={expense.expenseDate} onChange={e=>setExpense({...expense,expenseDate:e.target.value})} /></div></div>
+            <div className="grid grid-cols-2 gap-3"><div><Label>Paid by</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.payerMemberId} onChange={e=>setExpense({...expense,payerMemberId:e.target.value})}><option value="">Not specified</option>{activeMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail}</option>)}</select></div><div><Label>Subfolder</Label><select className="w-full h-10 rounded-md border bg-transparent px-2 text-sm" value={expense.subfolderId} onChange={e=>setExpense({...expense,subfolderId:e.target.value})}><option value="">None</option>{subfolders.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div>
+            <div className="space-y-2 border rounded-xl p-3"><Label>Allocate to members</Label>{activeMembers.filter(m=>m.status==="active").map(m=><div key={m.id} className="flex items-center gap-2"><span className="flex-1 text-sm truncate">{m.displayName || m.inviteEmail}</span><Input className="w-24" inputMode="decimal" value={expense.allocations[m.id] || ""} onChange={e=>setExpense({...expense,allocations:{...expense.allocations,[m.id]:e.target.value}})} placeholder="0.00" /></div>)}{(() => { const allocated=Object.values(expense.allocations).reduce((sum, value)=>sum+(Number(value)||0),0); const remainder=(Number(expense.amount)||0)-allocated; return <p className={remainder < -0.01 ? "text-xs text-red-600" : "text-xs text-gray-500"}>Allocated £{allocated.toFixed(2)} · {remainder < 0 ? `£${Math.abs(remainder).toFixed(2)} over` : `£${remainder.toFixed(2)} personal remainder`}</p>; })()}</div>
+            <div><Label>Note (optional)</Label><Textarea value={expense.notes} onChange={e=>setExpense({...expense,notes:e.target.value})} placeholder="Who paid, or any useful context" /></div>
+            <Button className="w-full receiptify-primary-action" disabled={!expense.description.trim() || !Number(expense.amount) || Object.values(expense.allocations).reduce((sum, value)=>sum+(Number(value)||0),0) > Number(expense.amount) + .01 || expenseMutation.isPending} onClick={()=>expenseMutation.mutate()}>{expenseMutation.isPending ? "Saving…" : editingExpenseId ? "Save expense" : "Add expense"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent className="receiptify-dialog max-w-md">
+          <DialogHeader><DialogTitle>Request a payment</DialogTitle><DialogDescription>Draft a clear request for one person’s outstanding share.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>From</Label><select className="w-full h-10 rounded-md border bg-transparent px-3 text-sm" value={payment.memberId} onChange={e=>setPayment({...payment,memberId:e.target.value})}><option value="">Choose a member</option>{activeMembers.filter(m=>m.role!=="owner").map(m=><option key={m.id} value={m.id}>{m.displayName || m.inviteEmail || "Member"}</option>)}</select></div>
+            <div><Label>Amount</Label><Input inputMode="decimal" value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} placeholder="0.00" /></div>
+            <Button className="w-full receiptify-primary-action" disabled={!payment.memberId || !Number(payment.amount) || paymentMutation.isPending} onClick={()=>paymentMutation.mutate()}>{paymentMutation.isPending ? "Drafting…" : "Create draft request"}</Button>
+            {paymentRequests.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Existing requests</p>{paymentRequests.map((r:any)=><div key={r.id} className="rounded-lg border p-2"><div className="flex justify-between gap-2 text-sm"><span className="capitalize">{r.status}</span><strong>£{Number(r.amount).toFixed(2)}</strong></div><div className="mt-2 flex flex-wrap gap-2">{canManage && r.status === "draft" && <Button size="sm" variant="outline" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"send"})}><Send className="mr-1 h-3 w-3" />Send</Button>}{canManage && !["cancelled","paid","declined"].includes(r.status) && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"cancel"})}>Cancel</Button>}{currentMemberId === r.memberId && r.status === "pending" && <Button size="sm" variant="ghost" disabled={paymentActionMutation.isPending} onClick={()=>paymentActionMutation.mutate({requestId:r.id,action:"decline"})}>Decline</Button>}</div></div>)}</div>}
+            <p className="text-xs text-gray-500">Sending is unavailable until Stripe Connect is configured. Receiptify will never pretend a payment was sent.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
+        <DialogContent className="receiptify-dialog max-w-md"><DialogHeader><DialogTitle>Folder activity</DialogTitle><DialogDescription>A quiet record of changes and shared moments.</DialogDescription></DialogHeader>
+          <div className="max-h-80 overflow-y-auto space-y-3">{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : activity.map((a:any)=><div key={a.id} className="flex gap-3 border-b pb-3"><div className="w-2 h-2 mt-2 rounded-full bg-[#ce725d]" /><div><p className="text-sm">{String(a.eventType).replaceAll(".", " ")}</p><p className="text-xs text-gray-500">{a.createdAt ? new Date(a.createdAt).toLocaleString("en-GB") : ""}</p></div></div>)}</div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={settingsOpen} onOpenChange={(open)=>{setSettingsOpen(open); if(open) setFolderDraft({name:folder.name,description:folder.description||"",ownerContactName:folder.ownerContactName||"",ownerContactEmail:folder.ownerContactEmail||"",ownerContactPhone:folder.ownerContactPhone||""})}}>
+        <DialogContent className="receiptify-dialog max-w-md"><DialogHeader><DialogTitle>Folder details</DialogTitle><DialogDescription>Keep the shared context and a reliable contact close by.</DialogDescription></DialogHeader>
+          <div className="space-y-3"><div><Label>Folder name</Label><Input value={folderDraft.name} onChange={e=>setFolderDraft({...folderDraft,name:e.target.value})}/></div><div><Label>Description</Label><Textarea value={folderDraft.description} onChange={e=>setFolderDraft({...folderDraft,description:e.target.value})}/></div><div className="border-t pt-3"><p className="text-sm font-semibold mb-2">Owner contact details</p><div className="space-y-2"><Input placeholder="Name" value={folderDraft.ownerContactName} onChange={e=>setFolderDraft({...folderDraft,ownerContactName:e.target.value})}/><Input placeholder="Email" type="email" value={folderDraft.ownerContactEmail} onChange={e=>setFolderDraft({...folderDraft,ownerContactEmail:e.target.value})}/><Input placeholder="Phone" value={folderDraft.ownerContactPhone} onChange={e=>setFolderDraft({...folderDraft,ownerContactPhone:e.target.value})}/></div></div><Button className="w-full receiptify-primary-action" disabled={folderMutation.isPending || !folderDraft.name.trim()} onClick={()=>folderMutation.mutate()}>{folderMutation.isPending ? "Saving…" : "Save details"}</Button></div>
+        </DialogContent>
+      </Dialog>
 
       <SplitInviteDialog folderId={folderId} open={inviteOpen} onOpenChange={setInviteOpen} />
 
