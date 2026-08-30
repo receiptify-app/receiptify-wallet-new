@@ -164,6 +164,7 @@ export interface IStorage {
 
   // Pending receipt operations
   getPendingReceipts(userId: string): Promise<PendingReceipt[]>;
+  getPendingReceipt(id: string): Promise<PendingReceipt | undefined>;
   createPendingReceipt(receipt: InsertPendingReceipt): Promise<PendingReceipt>;
   updatePendingReceipt(id: string, updates: Partial<InsertPendingReceipt>): Promise<PendingReceipt | undefined>;
   deletePendingReceipt(id: string): Promise<boolean>;
@@ -210,15 +211,32 @@ export class MemStorage implements IStorage {
   private comments: Map<string, Comment> = new Map();
   private splits: Map<string, Split> = new Map();
   private receiptDesigns: Map<string, ReceiptDesign> = new Map();
+  private emailIntegrations: Map<string, EmailIntegration> = new Map();
+  private pendingReceipts: Map<string, PendingReceipt> = new Map();
+  private processedMessages: Map<string, ProcessedMessage> = new Map();
+  private forwardingAddresses: Map<string, ForwardingAddress> = new Map();
+  private admins: Map<string, Admin> = new Map();
+  private activities: Map<string, UserActivity> = new Map();
 
   constructor() {
     // Create default user (required for the app to work)
-    const defaultUser = {
+    const defaultUser: User = {
       id: "default-user",
       username: "demo",
       email: "demo@receiptify.com",
       phone: "+44 7700 900123",
+      firstName: null,
+      lastName: null,
+      gender: null,
+      profileImageUrl: null,
+      authProvider: "local",
+      providerId: null,
+      phoneVerified: false,
+      emailVerified: false,
+      isActive: true,
+      lastLoginAt: null,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.users.set(defaultUser.id, defaultUser);
     
@@ -243,12 +261,23 @@ export class MemStorage implements IStorage {
     });
 
     // Create default user
-    const defaultUser = {
+    const defaultUser: User = {
       id: "default-user",
       username: "demo",
       email: "demo@receiptify.com",
       phone: "+44 7700 900123",
+      firstName: null,
+      lastName: null,
+      gender: null,
+      profileImageUrl: null,
+      authProvider: "local",
+      providerId: null,
+      phoneVerified: false,
+      emailVerified: false,
+      isActive: true,
+      lastLoginAt: null,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.users.set(defaultUser.id, defaultUser);
 
@@ -308,6 +337,13 @@ export class MemStorage implements IStorage {
         imageUrl: null,
         latitude: null,
         longitude: null,
+        subtotal: null,
+        tax: null,
+        serviceCharge: null,
+        exchangeRateToGBP: null,
+        splitFolderId: null,
+        myShareType: null,
+        myShareValue: null,
         createdAt: new Date(),
         merchantId: null,
       });
@@ -358,11 +394,22 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const user: User = { 
       ...insertUser,
+      username: insertUser.username || null,
       email: insertUser.email || null,
       phone: insertUser.phone || null,
+      firstName: insertUser.firstName || null,
+      lastName: insertUser.lastName || null,
+      gender: insertUser.gender || null,
       profileImageUrl: insertUser.profileImageUrl || getRandomProfileAvatar(insertUser.gender),
+      authProvider: insertUser.authProvider || "local",
+      providerId: insertUser.providerId || null,
+      phoneVerified: insertUser.phoneVerified ?? false,
+      emailVerified: insertUser.emailVerified ?? false,
+      isActive: insertUser.isActive ?? true,
       id, 
-      createdAt: new Date() 
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastLoginAt: null,
     };
     this.users.set(id, user);
     return user;
@@ -434,6 +481,16 @@ export class MemStorage implements IStorage {
       paymentMethod: receipt.paymentMethod || null,
       latitude: receipt.latitude || null,
       longitude: receipt.longitude || null,
+      subtotal: receipt.subtotal || null,
+      tax: receipt.tax || null,
+      serviceCharge: receipt.serviceCharge || null,
+      exchangeRateToGBP: receipt.exchangeRateToGBP || null,
+      receiptNumber: receipt.receiptNumber || null,
+      rawData: receipt.rawData ?? null,
+      imageUrl: receipt.imageUrl || null,
+      splitFolderId: receipt.splitFolderId || null,
+      myShareType: receipt.myShareType || null,
+      myShareValue: receipt.myShareValue || null,
     };
     this.receipts.set(id, newReceipt);
 
@@ -569,8 +626,23 @@ export class MemStorage implements IStorage {
       ...warranty, 
       id,
       isActive: warranty.isActive ?? true,
-      claimCode: warranty.claimCode || `WR-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      warrantyPeriod: warranty.warrantyPeriod || null,
+      brand: warranty.brand || null,
+      model: warranty.model || null,
+      serialNumber: warranty.serialNumber || null,
+      receiptId: warranty.receiptId || null,
+      warrantyType: warranty.warrantyType || "manufacturer",
+      retailerContact: warranty.retailerContact || null,
+      retailerWebsite: warranty.retailerWebsite || null,
+      retailerSupportEmail: warranty.retailerSupportEmail || null,
+      retailerSupportPhone: warranty.retailerSupportPhone || null,
+      invoiceNumber: warranty.invoiceNumber || null,
+      purchasePrice: warranty.purchasePrice || null,
+      category: warranty.category || null,
+      description: warranty.description || null,
+      warrantyTerms: warranty.warrantyTerms || null,
+      claimInstructions: warranty.claimInstructions || null,
+      reminderSent: warranty.reminderSent ?? false,
+      createdAt: new Date(),
     };
     this.warranties.set(id, newWarranty);
     return newWarranty;
@@ -714,11 +786,26 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       updatedAt: new Date(),
+      isDefault: data.isDefault ?? false,
+      colorScheme: data.colorScheme || "green",
+      backgroundStyle: data.backgroundStyle || "clean",
+      layoutStyle: data.layoutStyle || "modern",
+      showMap: data.showMap ?? true,
+      showEcoPoints: data.showEcoPoints ?? true,
+      showAnalyticsToggle: data.showAnalyticsToggle ?? true,
+      fontStyle: data.fontStyle || "modern",
+      fontSize: data.fontSize || "medium",
+      itemDisplayStyle: data.itemDisplayStyle || "list",
+      showItemCategories: data.showItemCategories ?? false,
+      showItemImages: data.showItemImages ?? false,
+      groupSimilarItems: data.groupSimilarItems ?? false,
+      showMerchantLogo: data.showMerchantLogo ?? true,
+      customWatermark: data.customWatermark || null,
     };
 
     // If this is set as default, unset other defaults first
     if (data.isDefault) {
-      for (const [designId, existingDesign] of this.receiptDesigns.entries()) {
+      for (const [designId, existingDesign] of Array.from(this.receiptDesigns.entries())) {
         if (existingDesign.userId === data.userId && existingDesign.isDefault) {
           this.receiptDesigns.set(designId, { ...existingDesign, isDefault: false });
         }
@@ -740,7 +827,7 @@ export class MemStorage implements IStorage {
 
     // If this is being set as default, unset other defaults first
     if (data.isDefault) {
-      for (const [designId, existingDesign] of this.receiptDesigns.entries()) {
+      for (const [designId, existingDesign] of Array.from(this.receiptDesigns.entries())) {
         if (existingDesign.userId === existing.userId && existingDesign.isDefault) {
           this.receiptDesigns.set(designId, { ...existingDesign, isDefault: false });
         }
@@ -792,6 +879,8 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       isVerified: false,
       attempts: 0,
+      email: otp.email || null,
+      method: otp.method || "sms",
     };
     return verification; // Would store in DB
   }
@@ -812,6 +901,8 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       status: "pending",
       pointsEarned: 0,
+      userId: session.userId || null,
+      receiptId: session.receiptId || null,
     };
     return kioskSession; // Would store in DB
   }
@@ -836,6 +927,11 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       status: "submitted",
       claimDate: new Date(),
+      claimNumber: claim.claimNumber || null,
+      retailerResponse: claim.retailerResponse || null,
+      resolutionDate: claim.resolutionDate || null,
+      resolutionDetails: claim.resolutionDetails || null,
+      attachments: claim.attachments || null,
     };
     return warrantyClaim; // Would store in DB
   }
@@ -901,6 +997,125 @@ export class MemStorage implements IStorage {
     this.subscriptions.set(id, updated);
     return updated;
   }
+
+  async getEmailIntegrations(userId: string): Promise<EmailIntegration[]> {
+    return Array.from(this.emailIntegrations.values()).filter(value => value.userId === userId);
+  }
+  async getEmailIntegration(id: string): Promise<EmailIntegration | undefined> {
+    return this.emailIntegrations.get(id);
+  }
+  async getEmailIntegrationsByProvider(provider: string): Promise<EmailIntegration[]> {
+    return Array.from(this.emailIntegrations.values()).filter(value => value.provider === provider);
+  }
+  async createEmailIntegration(data: InsertEmailIntegration): Promise<EmailIntegration> {
+    const value: EmailIntegration = {
+      ...data, id: randomUUID(), refreshToken: data.refreshToken || null,
+      tokenExpiry: data.tokenExpiry || null, syncCursor: data.syncCursor || null,
+      lastSyncAt: data.lastSyncAt || null, status: data.status || "active",
+      isActive: data.isActive ?? true, createdAt: new Date(), updatedAt: new Date(),
+    };
+    this.emailIntegrations.set(value.id, value);
+    return value;
+  }
+  async updateEmailIntegration(id: string, updates: Partial<InsertEmailIntegration>): Promise<EmailIntegration | undefined> {
+    const current = this.emailIntegrations.get(id);
+    if (!current) return undefined;
+    const value = { ...current, ...updates, updatedAt: new Date() };
+    this.emailIntegrations.set(id, value);
+    return value;
+  }
+  async getPendingReceipts(userId: string): Promise<PendingReceipt[]> {
+    return Array.from(this.pendingReceipts.values()).filter(value => value.userId === userId);
+  }
+  async getPendingReceipt(id: string): Promise<PendingReceipt | undefined> {
+    return this.pendingReceipts.get(id);
+  }
+  async createPendingReceipt(data: InsertPendingReceipt): Promise<PendingReceipt> {
+    const value: PendingReceipt = {
+      ...data, id: randomUUID(), confidence: data.confidence || "0.0",
+      status: data.status || "pending", reviewedAt: data.reviewedAt || null, createdAt: new Date(),
+    };
+    this.pendingReceipts.set(value.id, value);
+    return value;
+  }
+  async updatePendingReceipt(id: string, updates: Partial<InsertPendingReceipt>): Promise<PendingReceipt | undefined> {
+    const current = this.pendingReceipts.get(id);
+    if (!current) return undefined;
+    const value = { ...current, ...updates };
+    this.pendingReceipts.set(id, value);
+    return value;
+  }
+  async deletePendingReceipt(id: string): Promise<boolean> { return this.pendingReceipts.delete(id); }
+  async createProcessedMessage(data: InsertProcessedMessage): Promise<ProcessedMessage> {
+    const value: ProcessedMessage = {
+      ...data, id: randomUUID(), subject: data.subject || null, sender: data.sender || null,
+      processed: data.processed ?? false, hasReceipt: data.hasReceipt ?? false, createdAt: new Date(),
+    };
+    this.processedMessages.set(value.id, value);
+    return value;
+  }
+  async getProcessedMessage(emailIntegrationId: string, messageId: string): Promise<ProcessedMessage | undefined> {
+    return Array.from(this.processedMessages.values()).find(
+      value => value.emailIntegrationId === emailIntegrationId && value.messageId === messageId
+    );
+  }
+  async createJob(job: { jobType: string; payload: any; status: string }): Promise<{ id: string }> {
+    return { id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
+  }
+  async updateJob(id: string, updates: { status: string }): Promise<void> {}
+  async getForwardingAddress(userId: string): Promise<ForwardingAddress | undefined> {
+    return Array.from(this.forwardingAddresses.values()).find(value => value.userId === userId);
+  }
+  async createForwardingAddress(data: InsertForwardingAddress): Promise<ForwardingAddress> {
+    const value: ForwardingAddress = {
+      ...data, id: randomUUID(), isActive: data.isActive ?? true, createdAt: new Date(),
+    };
+    this.forwardingAddresses.set(value.id, value);
+    return value;
+  }
+  async getAdmin(id: string): Promise<Admin | undefined> { return this.admins.get(id); }
+  async getAdminByEmail(email: string): Promise<Admin | undefined> {
+    return Array.from(this.admins.values()).find(value => value.email === email.toLowerCase());
+  }
+  async getAdmins(): Promise<Admin[]> { return Array.from(this.admins.values()); }
+  async createAdmin(data: InsertAdmin): Promise<Admin> {
+    const value: Admin = {
+      ...data, id: randomUUID(), email: data.email.toLowerCase(), createdBy: data.createdBy || null,
+      isActive: data.isActive ?? true, lastLoginAt: null, createdAt: new Date(),
+    };
+    this.admins.set(value.id, value);
+    return value;
+  }
+  async updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined> {
+    const current = this.admins.get(id);
+    if (!current) return undefined;
+    const value = { ...current, ...updates };
+    this.admins.set(id, value);
+    return value;
+  }
+  async updateAdminLastLogin(id: string): Promise<void> {
+    const current = this.admins.get(id);
+    if (current) this.admins.set(id, { ...current, lastLoginAt: new Date() });
+  }
+  async getAdminCount(): Promise<number> { return this.admins.size; }
+  async createUserActivity(data: InsertUserActivity): Promise<UserActivity> {
+    const value: UserActivity = {
+      ...data, id: randomUUID(), metadata: data.metadata ?? null, createdAt: new Date(),
+    };
+    this.activities.set(value.id, value);
+    return value;
+  }
+  async getTotalSignups(): Promise<number> { return this.users.size; }
+  async getDailyActiveUsers(date = new Date()): Promise<number> {
+    return Array.from(this.users.values()).filter(value =>
+      value.lastLoginAt?.toDateString() === date.toDateString()
+    ).length;
+  }
+  async getSignupDropoffs(): Promise<number> {
+    return Array.from(this.activities.values()).filter(value => value.activityType === "signup_dropped").length;
+  }
+  async getAllUsers(): Promise<User[]> { return Array.from(this.users.values()); }
+  async getTotalUsers(): Promise<number> { return this.users.size; }
 }
 
 // DatabaseStorage implementation using PostgreSQL
@@ -952,13 +1167,11 @@ export class DatabaseStorage implements IStorage {
 
   // Receipt operations (abbreviated for space - following similar pattern)
   async getReceipts(userId: string, filters?: any): Promise<Receipt[]> {
-    let query = db.select().from(receipts).where(eq(receipts.userId, userId));
-    
-    if (filters?.category) {
-      query = query.where(eq(receipts.category, filters.category));
-    }
-    
-    return await query.orderBy(desc(receipts.date));
+    const conditions = [eq(receipts.userId, userId)];
+    if (filters?.category) conditions.push(eq(receipts.category, filters.category));
+    return await db.select().from(receipts)
+      .where(and(...conditions))
+      .orderBy(desc(receipts.date));
   }
 
   async getReceipt(id: string): Promise<Receipt | undefined> {
@@ -986,7 +1199,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceipt(id: string): Promise<boolean> {
     const result = await db.delete(receipts).where(eq(receipts.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // OTP operations
@@ -1046,7 +1259,7 @@ export class DatabaseStorage implements IStorage {
 
     const detectedSubs: Subscription[] = [];
     
-    for (const [merchant, merchantReceipts] of subscriptionPatterns) {
+    for (const [merchant, merchantReceipts] of Array.from(subscriptionPatterns.entries())) {
       if (merchantReceipts.length >= 2) {
         // Check for recurring patterns (monthly charges)
         const sortedReceipts = merchantReceipts.sort((a, b) => 
@@ -1239,7 +1452,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceiptItem(id: string): Promise<boolean> {
     const result = await db.delete(receiptItems).where(eq(receiptItems.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getLoyaltyCards(userId: string): Promise<LoyaltyCard[]> {
@@ -1289,17 +1502,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getComments(receiptId?: string, itemId?: string): Promise<Comment[]> {
-    let query = db.select().from(comments);
-    
-    if (receiptId && itemId) {
-      query = query.where(and(eq(comments.receiptId, receiptId), eq(comments.itemId, itemId)));
-    } else if (receiptId) {
-      query = query.where(eq(comments.receiptId, receiptId));
-    } else if (itemId) {
-      query = query.where(eq(comments.itemId, itemId));
-    }
-    
-    return await query.orderBy(desc(comments.createdAt));
+    const conditions = [];
+    if (receiptId) conditions.push(eq(comments.receiptId, receiptId));
+    if (itemId) conditions.push(eq(comments.itemId, itemId));
+    return await db.select().from(comments)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(comments.createdAt));
   }
 
   async createComment(comment: InsertComment): Promise<Comment> {
@@ -1365,6 +1573,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(pendingReceipts).where(eq(pendingReceipts.userId, userId));
   }
 
+  async getPendingReceipt(id: string): Promise<PendingReceipt | undefined> {
+    const [receipt] = await db.select().from(pendingReceipts).where(eq(pendingReceipts.id, id));
+    return receipt;
+  }
+
   async createPendingReceipt(receipt: InsertPendingReceipt): Promise<PendingReceipt> {
     const [newReceipt] = await db.insert(pendingReceipts).values(receipt).returning();
     return newReceipt;
@@ -1380,7 +1593,7 @@ export class DatabaseStorage implements IStorage {
 
   async deletePendingReceipt(id: string): Promise<boolean> {
     const result = await db.delete(pendingReceipts).where(eq(pendingReceipts.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Processed message operations

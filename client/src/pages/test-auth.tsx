@@ -18,6 +18,11 @@ export default function TestAuth() {
     
     try {
       console.log("Testing Firebase connection...");
+      if (!auth) {
+        setResult("❌ Firebase authentication is unavailable because required configuration is missing.");
+        return;
+      }
+      const firebaseAuth = auth;
       const configInfo = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? "Set" : "Missing",
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "Missing",
@@ -29,11 +34,11 @@ export default function TestAuth() {
       
       // Try anonymous auth as a simple test
       try {
-        const userCredential = await signInAnonymously(auth);
+        const userCredential = await signInAnonymously(firebaseAuth);
         setResult(prev => prev + `✅ Firebase connection successful!\nUser ID: ${userCredential.user.uid}\n\n`);
         
         // Sign out the test user
-        await auth.signOut();
+        await firebaseAuth.signOut();
         setResult(prev => prev + `✅ Anonymous auth test passed\n\n`);
       } catch (anonError: any) {
         setResult(prev => prev + `❌ Anonymous auth failed: ${anonError.code}\nMessage: ${anonError.message}\n\n`);
@@ -46,9 +51,9 @@ export default function TestAuth() {
         
         // Test if we can trigger a popup (this will show the actual error)
         try {
-          await signInWithPopup(auth, provider);
+          await signInWithPopup(firebaseAuth, provider);
           setResult(prev => prev + `✅ Google sign-in successful!\n`);
-          await auth.signOut();
+          await firebaseAuth.signOut();
         } catch (googleError: any) {
           setResult(prev => prev + `❌ Google sign-in failed: ${googleError.code}\nMessage: ${googleError.message}\n\nCommon fixes:\n- Enable Google provider in Firebase Console\n- Add ${window.location.hostname} to authorized domains\n- Check if popups are blocked\n\n`);
         }

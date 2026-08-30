@@ -78,15 +78,21 @@ export default function ReceiptCustomization() {
   });
 
   // Get user's receipt designs
-  const { data: designs = [], isLoading } = useQuery({
+  const { data: designs = [], isLoading } = useQuery<ReceiptDesign[]>({
     queryKey: ["/api/receipt-designs", userId],
-    queryFn: () => apiRequest("GET", `/api/receipt-designs?userId=${userId}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/receipt-designs?userId=${userId}`);
+      return response.json() as Promise<ReceiptDesign[]>;
+    },
   });
 
   // Get default design
-  const { data: defaultDesign } = useQuery({
+  const { data: defaultDesign } = useQuery<ReceiptDesign>({
     queryKey: ["/api/receipt-designs/default", userId],
-    queryFn: () => apiRequest("GET", `/api/receipt-designs/default?userId=${userId}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/receipt-designs/default?userId=${userId}`);
+      return response.json() as Promise<ReceiptDesign>;
+    },
   });
 
   // Create new design mutation
@@ -121,20 +127,20 @@ export default function ReceiptCustomization() {
       if (design) {
         setDesignForm({
           name: design.name,
-          isDefault: design.isDefault,
-          colorScheme: design.colorScheme,
-          backgroundStyle: design.backgroundStyle,
-          layoutStyle: design.layoutStyle,
-          showMap: design.showMap,
-          showEcoPoints: design.showEcoPoints,
-          showAnalyticsToggle: design.showAnalyticsToggle,
-          fontStyle: design.fontStyle,
-          fontSize: design.fontSize,
-          itemDisplayStyle: design.itemDisplayStyle,
-          showItemCategories: design.showItemCategories,
-          showItemImages: design.showItemImages,
-          groupSimilarItems: design.groupSimilarItems,
-          showMerchantLogo: design.showMerchantLogo,
+          isDefault: design.isDefault ?? false,
+          colorScheme: design.colorScheme ?? "green",
+          backgroundStyle: design.backgroundStyle ?? "clean",
+          layoutStyle: design.layoutStyle ?? "modern",
+          showMap: design.showMap ?? true,
+          showEcoPoints: design.showEcoPoints ?? true,
+          showAnalyticsToggle: design.showAnalyticsToggle ?? true,
+          fontStyle: design.fontStyle ?? "modern",
+          fontSize: design.fontSize ?? "medium",
+          itemDisplayStyle: design.itemDisplayStyle ?? "list",
+          showItemCategories: design.showItemCategories ?? false,
+          showItemImages: design.showItemImages ?? false,
+          groupSimilarItems: design.groupSimilarItems ?? false,
+          showMerchantLogo: design.showMerchantLogo ?? true,
           customWatermark: design.customWatermark || "",
         });
       }

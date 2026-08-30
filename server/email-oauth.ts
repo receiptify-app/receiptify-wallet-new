@@ -12,7 +12,7 @@ const oauthStates = new Map<string, { userId: string; provider: string; timestam
 // Clean up old states (older than 10 minutes)
 setInterval(() => {
   const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-  for (const [state, data] of oauthStates.entries()) {
+  for (const [state, data] of Array.from(oauthStates.entries())) {
     if (data.timestamp < tenMinutesAgo) {
       oauthStates.delete(state);
     }
@@ -181,7 +181,11 @@ async function handleGmailCallback(code: string, userId: string, req: Request, r
       }),
     });
 
-    const tokens = await tokenResponse.json();
+    const tokens = await tokenResponse.json() as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
     
     if (!tokenResponse.ok) {
       return res.status(400).json({ error: "Token exchange failed", details: tokens });
@@ -191,7 +195,7 @@ async function handleGmailCallback(code: string, userId: string, req: Request, r
     const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
-    const profile = await profileResponse.json();
+    const profile = await profileResponse.json() as { email: string };
 
     // Get initial historyId
     let syncCursor = null;
@@ -199,7 +203,7 @@ async function handleGmailCallback(code: string, userId: string, req: Request, r
       const historyResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/history?maxResults=1", {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       });
-      const historyData = await historyResponse.json();
+      const historyData = await historyResponse.json() as { historyId?: string };
       syncCursor = historyData.historyId || "initial-history-id";
     } catch (error) {
       console.log("Could not get initial historyId, will use fallback");
@@ -259,7 +263,11 @@ async function handleOutlookCallback(code: string, userId: string, req: Request,
       }),
     });
 
-    const tokens = await tokenResponse.json();
+    const tokens = await tokenResponse.json() as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
     
     if (!tokenResponse.ok) {
       return res.status(400).json({ error: "Token exchange failed", details: tokens });
@@ -269,7 +277,10 @@ async function handleOutlookCallback(code: string, userId: string, req: Request,
     const profileResponse = await fetch("https://graph.microsoft.com/v1.0/me", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
-    const profile = await profileResponse.json();
+    const profile = await profileResponse.json() as {
+      mail?: string;
+      userPrincipalName: string;
+    };
 
     // Get initial delta token
     let syncCursor = null;
@@ -277,7 +288,7 @@ async function handleOutlookCallback(code: string, userId: string, req: Request,
       const deltaResponse = await fetch("https://graph.microsoft.com/v1.0/me/messages/delta?$top=1", {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       });
-      const deltaData = await deltaResponse.json();
+      const deltaData = await deltaResponse.json() as { "@odata.deltaLink"?: string };
       // Extract deltaToken from @odata.deltaLink
       const deltaLink = deltaData["@odata.deltaLink"];
       if (deltaLink) {

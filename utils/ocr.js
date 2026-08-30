@@ -1,5 +1,5 @@
-const fs = require('fs').promises;
-const path = require('path');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 // Google Vision API implementation
 class GoogleVisionOCR {
@@ -199,7 +199,7 @@ async function ocrExtract(filepath) {
   return await ocr.ocrExtract(filepath);
 }
 
-module.exports = {
+export {
   ocrExtract,
   getOCR,
   GoogleVisionOCR,

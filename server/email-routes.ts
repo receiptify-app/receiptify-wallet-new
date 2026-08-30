@@ -2,6 +2,40 @@ import type { Express } from "express";
 import { storage } from "./storage";
 import { buildAuthUrl, exchangeCodeForTokens } from "../utils/oauth";
 import { enqueueSimpleJob, JobType } from "../lib/simple-queue";
+import type { EmailIntegration } from "@shared/schema";
+
+const TEST_USER_ID = "test-user-id";
+const TEST_USER_EMAIL = "test-user@receiptify.local";
+
+type ParsedEmailReceipt = {
+  merchant: string;
+  amount: string;
+  confidence: number;
+  date?: string;
+  lineItems?: unknown[];
+  attachments?: unknown[];
+};
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" ? value as Record<string, any> : {};
+}
+
+async function getTestUser() {
+  return await storage.getUser(TEST_USER_ID)
+    ?? await storage.getUserByEmail(TEST_USER_EMAIL);
+}
+
+async function getOrCreateTestUser() {
+  const existingUser = await getTestUser();
+  if (existingUser) return existingUser;
+
+  return storage.createUser({
+    username: `email-test-${Date.now()}`,
+    email: TEST_USER_EMAIL,
+    firstName: "Test",
+    lastName: "User",
+  });
+}
 
 export function registerEmailRoutes(app: Express) {
   // GET /api/email/authorize?provider=gmail|outlook
@@ -50,27 +84,16 @@ export function registerEmailRoutes(app: Express) {
       const tokens = await exchangeCodeForTokens(provider as 'gmail' | 'outlook', code as string);
       
       // Create test user if doesn't exist
-      const testUserId = 'test-user-id';
-      await prisma.user.upsert({
-        where: { id: testUserId },
-        update: {},
-        create: {
-          id: testUserId,
-          email: `test@${provider}.com`,
-          name: 'Test User'
-        }
-      });
+      const testUser = await getOrCreateTestUser();
       
       // Store email integration
-      const integration = await prisma.emailIntegration.create({
-        data: {
-          userId: testUserId,
-          provider: provider as string,
-          email: `test@${provider}.com`,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          tokenExpiry: new Date(Date.now() + (tokens.expires_in * 1000))
-        }
+      const integration = await storage.createEmailIntegration({
+        userId: testUser.id,
+        provider: provider as string,
+        email: `test@${provider}.com`,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiry: new Date(Date.now() + (tokens.expires_in * 1000))
       });
       
       console.log('Created email integration:', integration.id);
@@ -153,10 +176,11 @@ export function registerEmailRoutes(app: Express) {
       // Generate or retrieve forwarding address
       const domain = process.env.FORWARDING_DOMAIN || 'receipts.example.com';
       const address = `receipts+${Date.now()}@${domain}`;
+      const testUser = await getOrCreateTestUser();
       
       // Store forwarding address
       await storage.createForwardingAddress({
-        userId: 'test-user-id', // In real app, would use authenticated user
+        userId: testUser.id, // In real app, would use authenticated user
         address,
         token: `token_${Date.now()}`,
         isActive: true
@@ -177,7 +201,10 @@ export function registerEmailRoutes(app: Express) {
   // GET /api/email/pending
   app.get("/api/email/pending", async (req, res) => {
     try {
-      const pendingReceipts = await storage.getPendingReceipts('test-user-id');
+      const testUser = await getTestUser();
+      const pendingReceipts = testUser
+        ? await storage.getPendingReceipts(testUser.id)
+        : [];
       
       console.log(`Found ${pendingReceipts.length} pending receipts`);
       
@@ -196,38 +223,35 @@ export function registerEmailRoutes(app: Express) {
     try {
       const { id } = req.params;
       
-      const pendingReceipt = await prisma.pendingReceipt.findUnique({
-        where: { id }
-      });
+      const pendingReceipt = await storage.getPendingReceipt(id);
       
       if (!pendingReceipt) {
         return res.status(404).json({ error: 'Pending receipt not found' });
       }
       
       // Create receipt from pending data
-      const extractedData = pendingReceipt.extractedData as any;
-      const receipt = await prisma.receipt.create({
-        data: {
-          userId: pendingReceipt.userId,
-          merchantName: extractedData.merchantName || 'Unknown Merchant',
-          total: extractedData.total || '0.00',
-          date: new Date(extractedData.date || Date.now()),
-          receiptNumber: extractedData.receiptNumber,
-          category: extractedData.category || 'Other',
-          paymentMethod: extractedData.paymentMethod,
-          location: extractedData.location,
-          items: extractedData.items,
-          metadata: { source: 'email_import', confidence: pendingReceipt.confidence }
+      const extractedData = asRecord(pendingReceipt.extractedData);
+      const receipt = await storage.createReceipt({
+        userId: pendingReceipt.userId,
+        merchantName: extractedData.merchantName || extractedData.merchant || 'Unknown Merchant',
+        total: extractedData.total || extractedData.amount || '0.00',
+        date: new Date(extractedData.date || Date.now()),
+        receiptNumber: extractedData.receiptNumber,
+        category: extractedData.category || 'Other',
+        paymentMethod: extractedData.paymentMethod,
+        location: extractedData.location,
+        rawData: {
+          source: 'email_import',
+          confidence: pendingReceipt.confidence,
+          items: extractedData.items || extractedData.lineItems,
+          ocrResults: extractedData.ocrResults,
         }
       });
       
       // Update pending receipt status
-      await prisma.pendingReceipt.update({
-        where: { id },
-        data: {
-          status: 'accepted',
-          reviewedAt: new Date()
-        }
+      await storage.updatePendingReceipt(id, {
+        status: 'accepted',
+        reviewedAt: new Date()
       });
       
       console.log(`Accepted pending receipt ${id}, created receipt ${receipt.id}`);
@@ -249,21 +273,16 @@ export function registerEmailRoutes(app: Express) {
       const { id } = req.params;
       const { reason } = req.body;
       
-      const pendingReceipt = await prisma.pendingReceipt.findUnique({
-        where: { id }
-      });
+      const pendingReceipt = await storage.getPendingReceipt(id);
       
       if (!pendingReceipt) {
         return res.status(404).json({ error: 'Pending receipt not found' });
       }
       
       // Update pending receipt status
-      await prisma.pendingReceipt.update({
-        where: { id },
-        data: {
-          status: 'rejected',
-          reviewedAt: new Date()
-        }
+      await storage.updatePendingReceipt(id, {
+        status: 'rejected',
+        reviewedAt: new Date()
       });
       
       console.log(`Rejected pending receipt ${id}. Reason:`, reason);
@@ -282,14 +301,12 @@ export function registerEmailRoutes(app: Express) {
   app.post("/api/email/pending/reprocess", async (req, res) => {
     try {
       // Get all pending receipts that need reprocessing
-      const pendingReceipts = await prisma.pendingReceipt.findMany({
-        where: {
-          status: 'pending'
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      const testUser = await getTestUser();
+      const pendingReceipts = (testUser
+        ? await storage.getPendingReceipts(testUser.id)
+        : [])
+        .filter(receipt => receipt.status === "pending")
+        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
       if (pendingReceipts.length === 0) {
         return res.json({ 
@@ -305,7 +322,7 @@ export function registerEmailRoutes(app: Express) {
       for (const pendingReceipt of pendingReceipts) {
         try {
           // Get the original message data from extractedData
-          const extractedData = pendingReceipt.extractedData as any;
+          const extractedData = asRecord(pendingReceipt.extractedData);
           const messageData = {
             messageId: pendingReceipt.messageId,
             subject: extractedData?.subject || 'Reprocessed Email',
@@ -316,37 +333,37 @@ export function registerEmailRoutes(app: Express) {
           };
 
           // Re-parse using the new parser
-          let parsed = { merchant: 'Unknown', amount: '0.00', confidence: 0.3 };
+          let parsed: ParsedEmailReceipt = { merchant: 'Unknown', amount: '0.00', confidence: 0.3 };
           
           try {
             const parserModule = await import(new URL('../utils/parser.js', import.meta.url).href);
             const parseEmailMessage = parserModule.parseEmailMessage || parserModule.default?.parseEmailMessage;
             
             if (parseEmailMessage) {
-              parsed = parseEmailMessage(messageData);
+              parsed = parseEmailMessage(messageData) as ParsedEmailReceipt;
               console.log(`Reprocessed ${pendingReceipt.id}: ${parsed.merchant} - $${parsed.amount} (confidence: ${parsed.confidence})`);
             }
           } catch (parseError) {
-            console.warn(`Parser error for ${pendingReceipt.id}:`, parseError.message);
+            console.warn(
+              `Parser error for ${pendingReceipt.id}:`,
+              parseError instanceof Error ? parseError.message : String(parseError)
+            );
           }
 
           // Update the pending receipt with new parsed data
-          await prisma.pendingReceipt.update({
-            where: { id: pendingReceipt.id },
-            data: {
-              extractedData: {
-                merchant: parsed.merchant || 'Unknown',
-                amount: parsed.amount || '0.00',
-                date: parsed.date || new Date().toISOString(),
-                lineItems: parsed.lineItems || [],
-                confidence: parsed.confidence,
-                attachments: parsed.attachments || [],
-                // Preserve original raw data
-                rawHtml: pendingReceipt.extractedData?.rawHtml,
-                body: pendingReceipt.extractedData?.body
-              },
-              confidence: parsed.confidence
-            }
+          await storage.updatePendingReceipt(pendingReceipt.id, {
+            extractedData: {
+              merchant: parsed.merchant || 'Unknown',
+              amount: parsed.amount || '0.00',
+              date: parsed.date || new Date().toISOString(),
+              lineItems: parsed.lineItems || [],
+              confidence: parsed.confidence,
+              attachments: parsed.attachments || [],
+              ocrResults: extractedData.ocrResults,
+              rawHtml: extractedData.rawHtml,
+              body: extractedData.body
+            },
+            confidence: parsed.confidence.toString()
           });
 
           reprocessedCount++;
@@ -390,21 +407,23 @@ export function registerEmailRoutes(app: Express) {
   // GET /api/email/integrations
   app.get("/api/email/integrations", async (req, res) => {
     try {
-      const integrations = await prisma.emailIntegration.findMany({
-        select: {
-          id: true,
-          provider: true,
-          email: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true
-        }
-      });
+      const integrations: EmailIntegration[] = [
+        ...await storage.getEmailIntegrationsByProvider("gmail"),
+        ...await storage.getEmailIntegrationsByProvider("outlook"),
+      ];
+      const publicIntegrations = integrations.map((integration) => ({
+        id: integration.id,
+        provider: integration.provider,
+        email: integration.email,
+        isActive: integration.isActive,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      }));
       
       res.json({
-        gmail: integrations.find(i => i.provider === 'gmail'),
-        outlook: integrations.find(i => i.provider === 'outlook'),
-        lastSync: integrations[0]?.updatedAt
+        gmail: publicIntegrations.find(i => i.provider === 'gmail'),
+        outlook: publicIntegrations.find(i => i.provider === 'outlook'),
+        lastSync: publicIntegrations[0]?.updatedAt
       });
     } catch (error) {
       console.error("Error fetching integrations:", error);
@@ -421,14 +440,12 @@ export function registerEmailRoutes(app: Express) {
         return res.status(400).json({ error: "Integration ID required" });
       }
       
-      await prisma.emailIntegration.update({
-        where: { id: integrationId },
-        data: { 
-          isActive: false,
-          accessToken: null,
-          refreshToken: null
-        }
+      const integration = await storage.updateEmailIntegration(integrationId, {
+        isActive: false,
+        accessToken: "",
+        refreshToken: null
       });
+      if (!integration) return res.status(404).json({ error: "Integration not found" });
       
       res.json({ success: true, message: "Integration disconnected" });
     } catch (error) {
@@ -466,9 +483,10 @@ export function registerEmailRoutes(app: Express) {
         return res.status(400).json({ error: "Maximum backfill period is 365 days" });
       }
       
-      const integrations = await prisma.emailIntegration.findMany({
-        where: { isActive: true }
-      });
+      const integrations = [
+        ...await storage.getEmailIntegrationsByProvider("gmail"),
+        ...await storage.getEmailIntegrationsByProvider("outlook"),
+      ].filter(integration => integration.isActive);
       
       if (integrations.length === 0) {
         return res.status(400).json({ error: "No active email integrations found" });

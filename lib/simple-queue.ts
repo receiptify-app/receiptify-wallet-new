@@ -104,13 +104,17 @@ class SimpleQueue {
       if (integration) {
         await storage.createPendingReceipt({
           userId: integration.userId,
-          sourceType: source === 'forwarding' ? 'forwarding' : 'email',
-          subject: emailContent.subject,
-          sender: emailContent.from,
-          rawContent: JSON.stringify(emailContent),
-          extractedAmount: this.extractAmount(emailContent),
-          merchantName: this.extractMerchant(emailContent),
-          processed: false,
+          messageId,
+          extractedData: {
+            sourceType: source === 'forwarding' ? 'forwarding' : 'email',
+            subject: emailContent.subject,
+            sender: emailContent.from,
+            rawContent: JSON.stringify(emailContent),
+            amount: this.extractAmount(emailContent),
+            merchant: this.extractMerchant(emailContent),
+          },
+          confidence: "1",
+          status: "pending",
         });
         
         console.log(`Created pending receipt for ${emailContent.subject}`);
@@ -276,7 +280,11 @@ async function processEmailMessageSimple(data: EmailProcessMessageJob) {
   let integration = await storage.getEmailIntegration(data.emailIntegrationId)
   
   if (!integration) {
-    const integrations = await storage.getEmailIntegrations('test-user-id')
+    const testUser = await storage.getUser('test-user-id')
+      ?? await storage.getUserByEmail('test-user@receiptify.local')
+    const integrations = testUser
+      ? (await storage.getEmailIntegrations(testUser.id)).filter(candidate => candidate.isActive)
+      : []
     integration = integrations[0] || null
     
     if (!integration) {
@@ -315,7 +323,7 @@ async function processEmailMessageSimple(data: EmailProcessMessageJob) {
     parsed = parseEmailMessage(emailContent)
     console.log('Parsed email data:', JSON.stringify(parsed, null, 2))
   } catch (error) {
-    console.warn('Parser not available, using default values:', error.message)
+    console.warn('Parser not available, using default values:', getErrorMessage(error))
     // Apply basic fallback parsing
     parsed.merchant = data.sender?.split('@')[1]?.split('.')[0] || 'Unknown'
     parsed.amount = (emailContent.body?.match(/\$?(\d+\.\d{2})/)?.[1]) || '0.00'
@@ -375,14 +383,13 @@ async function processEmailMessageSimple(data: EmailProcessMessageJob) {
 }
 
 async function processOcrSimple(data: any) {
-  console.log(`Processing OCR for receipt: ${data.receiptId}`)
+  console.log(`Processing OCR for pending receipt: ${data.receiptId}`)
   
   try {
-    // Get receipt
-    const receipt = await storage.getReceipt(data.receiptId)
+    const pendingReceipt = await storage.getPendingReceipt(data.receiptId)
     
-    if (!receipt) {
-      console.log(`Receipt ${data.receiptId} not found`)
+    if (!pendingReceipt) {
+      console.log(`Pending receipt ${data.receiptId} not found`)
       return
     }
     
@@ -396,27 +403,35 @@ async function processOcrSimple(data: any) {
       ocrResult = await ocrExtract(mockFilePath)
       console.log(`OCR result for ${data.filename}:`, ocrResult)
     } catch (error) {
-      console.warn('OCR not available, using default values:', error.message)
+      console.warn('OCR not available, using default values:', getErrorMessage(error))
     }
     
-    // Update receipt with OCR data
-    const currentMetadata = receipt.metadata as any || {}
-    const updatedMetadata = {
-      ...currentMetadata,
+    const currentExtractedData = asRecord(pendingReceipt.extractedData)
+    const updatedExtractedData = {
+      ...currentExtractedData,
       ocrResults: {
-        ...(currentMetadata.ocrResults || {}),
+        ...asRecord(currentExtractedData.ocrResults),
         [data.filename]: ocrResult
       }
     }
     
-    await prisma.receipt.update({
-      where: { id: data.receiptId },
-      data: { metadata: updatedMetadata }
+    await storage.updatePendingReceipt(data.receiptId, {
+      extractedData: updatedExtractedData
     })
     
-    console.log(`Updated receipt ${data.receiptId} with OCR data`)
+    console.log(`Updated pending receipt ${data.receiptId} with OCR data`)
   } catch (error) {
     console.error(`Failed to process OCR for receipt ${data.receiptId}:`, error)
     throw error
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, any>
+    : {}
 }
